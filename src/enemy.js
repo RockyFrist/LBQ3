@@ -199,23 +199,35 @@ export class Enemy {
 
       // AI变招：在startup阶段取消攻击
       if (this.aiState === 'feint_wait' && f.phase === 'startup') {
+        const opHeavyRate = this._getPlayerHeavyRate();
+        // 格挡只在对手爱用重击时有格反收益，否则选攻击型变招
+        const blockWorth = opHeavyRate > 0.25 || pf.state === 'heavyAttack';
         if (f.attackType === 'light') {
-          // 轻击→防御（骗对手反击后格反）
-          cmd.blockHeld = true;
-          this.aiState = 'defend';
-          this.aiTimer = 0.3 + Math.random() * 0.15;
-          this._logDecision(this._gameTime, 'feint_exec', 'light_to_block', {});
+          if (blockWorth) {
+            // 轻击→防御（骗对手反击后格反）
+            cmd.blockHeld = true;
+            this.aiState = 'defend';
+            this.aiTimer = 0.3 + Math.random() * 0.15;
+            this._logDecision(this._gameTime, 'feint_exec', 'light_to_block', {});
+          } else {
+            // 轻击→重击（对手不爱出重击，格挡无收益，改为攻击型变招）
+            cmd.heavyAttack = true;
+            this.aiState = 'recover';
+            this.aiTimer = 0.5;
+            this._logDecision(this._gameTime, 'feint_exec', 'light_to_heavy', {});
+          }
         } else if (f.attackType === 'heavy') {
-          // 重击变招：两种策略
+          // 重击变招：根据对手风格选策略
           const r = Math.random();
-          if (r < 0.55) {
+          const blockChance = blockWorth ? 0.35 : 0.08;
+          if (r >= blockChance) {
             // 重击→轻击（最常见，快速打出）
             cmd.lightAttack = true;
             this.aiState = 'recover';
             this.aiTimer = 0.3;
             this._logDecision(this._gameTime, 'feint_exec', 'heavy_to_light', {});
           } else {
-            // 重击→格挡（等对手出手后格反）
+            // 重击→格挡（对手爱出重击时等格反）
             cmd.blockHeld = true;
             this.aiState = 'defend';
             this.aiTimer = 0.4 + Math.random() * 0.2;
@@ -254,8 +266,8 @@ export class Enemy {
         const reactFeint = cfg.feintChance * 0.6;
         if (Math.random() < reactFeint * dt * 8) {
           if (f.attackType === 'light') {
-            // 轻击→举盾，等对手放弃格挡后再出手
-            cmd.blockHeld = true;
+            // 对手在格挡，轻击变重击（重击vs格挡=格反机会）
+            cmd.heavyAttack = true;
           } else {
             // 重击→轻击，快速打出
             cmd.lightAttack = true;
@@ -303,13 +315,14 @@ export class Enemy {
           const guessChance = diffScaleG * 0.50;
           if (Math.random() < guessChance) {
             const guess = Math.random();
+            const opHeavyRateG = this._getPlayerHeavyRate();
             if (guess < 0.40) {
               cmd.heavyAttack = true;
               this.aiState = 'recover';
               this.aiTimer = 1.2;
               this._logDecision(this._gameTime, 'stagger_guess', 'heavy', { dist: +d.toFixed(0), opState: pf.state });
-            } else if (guess < 0.55) {
-              // 只在对手可能出重击时格挡才有意义
+            } else if (guess < 0.55 && opHeavyRateG > 0.25) {
+              // 对手爱出重击时格挡才有格反收益
               cmd.blockHeld = true;
               this.aiState = 'defend';
               this.aiTimer = cfg.blockDurBase + Math.random() * 0.3;
@@ -328,13 +341,15 @@ export class Enemy {
 
       // 轻击连击衔接
       if (f.state === 'lightAttack' && f.phase === 'recovery' && this.comboCount < this.comboTarget) {
-        // 连击途中有概率变招（中断combo→格挡或重击）
+        // 连击途中有概率变招（中断combo→重击或格挡）
         if (cfg.feintChance > 0.15 && this.comboCount >= 1 &&
             f.stamina >= C.FEINT_COST + 1 && Math.random() < cfg.feintChance * 0.3) {
-          if (Math.random() < 0.6) {
-            cmd.heavyAttack = true; // 轻击→重击（节奏变化）
+          const opHeavyRate = this._getPlayerHeavyRate();
+          // 格挡只在对手爱出重击时有意义（格反收益），否则切重击
+          if (opHeavyRate > 0.25 && Math.random() < 0.35) {
+            cmd.blockHeld = true; // 轻击→格挡（等对手重击后格反）
           } else {
-            cmd.blockHeld = true; // 轻击→格挡（安全取消）
+            cmd.heavyAttack = true; // 轻击→重击（节奏变化）
           }
           this.comboTarget = 0; // 终止连击
           this.aiState = 'recover';
@@ -739,13 +754,14 @@ export class Enemy {
     const cfg = this._cfg;
 
     if (f.isExhausted) {
-      // 体力空了，尽量防御或后退
-      if (r < 0.6) {
-        this.aiState = 'defend';
-        this.aiTimer = cfg.blockDurBase + Math.random() * 0.5;
-      } else {
+      // 体力空了：格挡本身不耗体力但暂停回复，优先后退拉距
+      // 近身格挡有被轻击消耗 / 非精准格挡消耗的风险
+      if (r < 0.55) {
         this.aiState = 'retreat';
-        this.aiTimer = 0.5;
+        this.aiTimer = 0.5 + Math.random() * 0.3;
+      } else {
+        this.aiState = 'defend';
+        this.aiTimer = cfg.blockDurBase + Math.random() * 0.3;
       }
       return;
     }
@@ -998,12 +1014,17 @@ export class Enemy {
         this._initPlan([{ act: 'light', dur: 1.0 }]);
       }
     } else {
-      // 非精准 → 保守
-      if (Math.random() < 0.5) {
+      // 非精准 → 根据对手风格决定
+      const opHeavyRateP = this._getPlayerHeavyRate();
+      if (opHeavyRateP > 0.25 && Math.random() < 0.5) {
+        // 对手爱出重击：继续格挡等格反机会
         this._initPlan([
           { act: 'block', dur: 0.25 },
           { act: 'light', dur: 1.0 },
         ]);
+      } else if (Math.random() < 0.5) {
+        // 对手不爱出重击：直接轻击反击
+        this._initPlan([{ act: 'light', dur: 1.0 }]);
       }
     }
   }
@@ -1011,16 +1032,20 @@ export class Enemy {
   // --- 被弹恢复后计划 ---
   _createRecoveryPlan(f, pf, d, cfg) {
     const r = Math.random();
-    if (this.difficulty >= 4 && r < 0.3) {
-      // 格挡后立刻反击
+    const opHeavyRate = this._getPlayerHeavyRate();
+    if (this.difficulty >= 4 && r < 0.3 && opHeavyRate > 0.2) {
+      // 对手爱出重击时：格挡后立刻反击（有格反收益）
       this._initPlan([
         { act: 'block', dur: 0.25 },
         { act: 'light', dur: 1.0 },
       ]);
-    } else if (r < 0.6) {
-      // 纯防御
+    } else if (r < 0.3) {
+      // 对手不爱出重击：直接轻击反击（格挡无收益，节省时间）
+      this._initPlan([{ act: 'light', dur: 1.0 }]);
+    } else if (r < 0.55 && opHeavyRate > 0.2) {
+      // 对手爱出重击时纯防御有意义
       this._initPlan([{ act: 'block', dur: 0.4 + Math.random() * 0.3 }]);
-    } else if (r < 0.8) {
+    } else if (r < 0.7) {
       // 闪避撤退
       this._initPlan([{ act: 'dodge', dur: 0.5 }]);
     }
@@ -1030,12 +1055,16 @@ export class Enemy {
   // --- 拼刀后计划 ---
   _createClashFollowupPlan(f, pf, d, cfg) {
     const r = Math.random();
+    const opHeavyRate = this._getPlayerHeavyRate();
     if (r < 0.45) {
       // 再次轻击 → 追求连续拼刀节奏
       this._initPlan([{ act: 'light', dur: 0.8 }]);
-    } else if (r < 0.70) {
-      // 格挡等对手出手
+    } else if (r < 0.70 && opHeavyRate > 0.25) {
+      // 对手爱出重击时格挡等格反
       this._initPlan([{ act: 'block', dur: 0.3 + Math.random() * 0.2 }]);
+    } else if (r < 0.70) {
+      // 对手不爱出重击，格挡无收益，改为轻击反击
+      this._initPlan([{ act: 'light', dur: 0.8 }]);
     } else if (r < 0.85 && this.difficulty >= 3) {
       // 重击压制
       this._initPlan([{ act: 'heavy', dur: 1.5 }]);
@@ -1079,11 +1108,20 @@ export class Enemy {
       { act: 'heavy', dur: 1.5 },
     ]);
 
-    // 假重击→格挡（等格反）
-    plans.push([
-      { act: 'heavy', dur: 1.5, feint: true },
-      { act: 'block', dur: 0.5 },
-    ]);
+    // 假重击→格挡（仅在对手爱出重击时有格反收益）
+    const opHeavyRate = this._getPlayerHeavyRate();
+    if (opHeavyRate > 0.25) {
+      plans.push([
+        { act: 'heavy', dur: 1.5, feint: true },
+        { act: 'block', dur: 0.5 },
+      ]);
+    } else {
+      // 对手不爱出重击：假重击→再重击（纯节奏骗招）
+      plans.push([
+        { act: 'heavy', dur: 1.5, feint: true },
+        { act: 'heavy', dur: 1.5 },
+      ]);
+    }
 
     if (this.difficulty >= 4) {
       // 双重假动作：假重→假轻→真重
@@ -1093,12 +1131,20 @@ export class Enemy {
         { act: 'heavy', dur: 1.5 },
       ]);
 
-      // 假轻→格挡→轻击（骗反击后格反再打）
-      plans.push([
-        { act: 'light', dur: 1.0, feint: true },
-        { act: 'block', dur: 0.4 },
-        { act: 'light', dur: 1.0, combo: 2 },
-      ]);
+      // 假轻→格挡→轻击（仅对手爱出重击时有意义）
+      if (opHeavyRate > 0.25) {
+        plans.push([
+          { act: 'light', dur: 1.0, feint: true },
+          { act: 'block', dur: 0.4 },
+          { act: 'light', dur: 1.0, combo: 2 },
+        ]);
+      } else {
+        // 假轻→真重（直接攻击型变招）
+        plans.push([
+          { act: 'light', dur: 1.0, feint: true },
+          { act: 'heavy', dur: 1.5 },
+        ]);
+      }
     }
 
     if (d > 60) {
@@ -1118,23 +1164,33 @@ export class Enemy {
   _createPressurePlan(f, pf, d, cfg) {
     if (f.stamina < 2) return;
 
+    const opHeavyRate = this._getPlayerHeavyRate();
     const plans = [
-      // 轻击连打 → 格挡（安全压制）
-      [{ act: 'light', dur: 1.0 }, { act: 'light', dur: 1.0 }, { act: 'block', dur: 0.3 }],
       // 轻击 → 重击（混合节奏）
       [{ act: 'light', dur: 1.0 }, { act: 'heavy', dur: 1.5 }],
       // 重击（高风险高回报）
       [{ act: 'heavy', dur: 1.5 }],
+      // 轻击连打
+      [{ act: 'light', dur: 1.0 }, { act: 'light', dur: 1.0 }],
     ];
+
+    // 对手爱出重击时，压制计划可以包含格挡（有格反收益）
+    if (opHeavyRate > 0.25) {
+      plans.push(
+        [{ act: 'light', dur: 1.0 }, { act: 'light', dur: 1.0 }, { act: 'block', dur: 0.3 }],
+      );
+    }
 
     // 高难度增加更多策略选项
     if (this.difficulty >= 4 && f.stamina >= 3) {
-      // 轻击 → 格挡 → 轻击（试探→防守→反击）
-      plans.push([
-        { act: 'light', dur: 1.0 },
-        { act: 'block', dur: 0.35 },
-        { act: 'light', dur: 1.0 },
-      ]);
+      if (opHeavyRate > 0.25) {
+        // 对手爱出重击：轻击 → 格挡 → 轻击（试探→格反→反击）
+        plans.push([
+          { act: 'light', dur: 1.0 },
+          { act: 'block', dur: 0.35 },
+          { act: 'light', dur: 1.0 },
+        ]);
+      }
       // 接近 → 重击
       plans.push([
         { act: 'approach', dur: 0.3, dist: 50 },
