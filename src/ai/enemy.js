@@ -1,6 +1,8 @@
-import { Fighter } from './fighter.js';
-import { dist, angleBetween, randomRange, normalizeAngle } from './utils.js';
-import * as C from './constants.js';
+import { Fighter } from '../combat/fighter.js';
+import { dist, angleBetween, randomRange, normalizeAngle } from '../core/utils.js';
+import * as C from '../core/constants.js';
+import { buildAIConfig } from './ai-config.js';
+import { planMethods } from './ai-plans.js';
 
 export class Enemy {
   constructor(x, y, difficulty = 2) {
@@ -47,43 +49,8 @@ export class Enemy {
     // 难度参数
     // difficulty 1=新手  2=普通  3=熟练  4=困难  5=大师
     //           6=拼刀训练  7=格挡乒乓训练
-    this._cfg = this._buildConfig(difficulty);
+    this._cfg = buildAIConfig(difficulty);
     this.trainingMode = difficulty >= 6 ? difficulty : 0;
-  }
-
-  _buildConfig(d) {
-    // 训练模式6: 拼刀训练 — 只用轻击，有节奏地对攻（不再无脑spam）
-    if (d === 6) return {
-      reactChance: 0.05, dodgeChance: 0, thinkCD: 0.15,
-      attackRate: 0.85, heavyRate: 0, maxCombo: 1,
-      blockDurBase: 0, retreatWhenLow: 0, approachDist: 50,
-      heavyReactMult: 0, heavyReactDist: 0, punishRate: 0, feintChance: 0,
-    };
-    // 训练模式7: 格挡反击训练 — 用重击和防御，积极格挡
-    if (d === 7) return {
-      reactChance: 0.90, dodgeChance: 0.10, thinkCD: 0.06,
-      attackRate: 0.30, heavyRate: 0.55, maxCombo: 1,
-      blockDurBase: 0.80, retreatWhenLow: 0.01, approachDist: 55,
-      heavyReactMult: 0.85, heavyReactDist: 140, punishRate: 0.65, feintChance: 0.12,
-    };
-
-    return {
-      // D1=新手 D2=普通 D3=熟练 D4=困难 D5=大师
-      // 核心差异：D5反应极快+惩罚极准，D1-D3靠攻击频率弥补但失误多
-      reactChance:     [0.35, 0.50, 0.62, 0.82, 0.97][d - 1],
-      dodgeChance:     [0.08, 0.14, 0.20, 0.30, 0.38][d - 1],
-      thinkCD:         [0.35, 0.22, 0.16, 0.06, 0.02][d - 1],
-      attackRate:      [0.35, 0.42, 0.50, 0.60, 0.68][d - 1],
-      heavyRate:       [0.12, 0.20, 0.26, 0.35, 0.42][d - 1],
-      maxCombo:        [1,    2,    3,    3,    3   ][d - 1],
-      blockDurBase:    [0.25, 0.38, 0.50, 0.65, 0.85][d - 1],
-      retreatWhenLow:  [0.02, 0.04, 0.07, 0.10, 0.14][d - 1],
-      approachDist:    [80,   68,   58,   48,   42  ][d - 1],
-      heavyReactMult:  [0.30, 0.50, 0.65, 0.90, 0.99][d - 1],
-      heavyReactDist:  [70,   95,   115,  155,  175 ][d - 1],
-      punishRate:      [0.10, 0.25, 0.35, 0.72, 0.95][d - 1],
-      feintChance:     [0.03, 0.08, 0.18, 0.45, 0.65][d - 1],
-    };
   }
 
   _logDecision(time, reason, action, context) {
@@ -690,6 +657,16 @@ export class Enemy {
         }
         break;
       }
+      case 'dodge_away': {
+        // 体力耗尽时闪避脱离
+        if (f.state === 'idle' && f.stamina >= C.DODGE_COST) {
+          cmd.dodge = true;
+          cmd.dodgeAngle = ang + Math.PI; // 向后闪避
+        }
+        this.aiState = 'retreat';
+        this.aiTimer = 0.6 + Math.random() * 0.4;
+        break;
+      }
       case 'recover': {
         // 等待恢复
         if (this.aiTimer <= 0) {
@@ -754,14 +731,24 @@ export class Enemy {
     const cfg = this._cfg;
 
     if (f.isExhausted) {
-      // 体力空了：格挡本身不耗体力但暂停回复，优先后退拉距
-      // 近身格挡有被轻击消耗 / 非精准格挡消耗的风险
-      if (r < 0.55) {
+      // 体力空了：优先撤退拉距等回复，格挡会暂停回复所以尽量少用
+      if (d < 70 && f.stamina >= C.DODGE_COST && r < 0.3) {
+        // 近身且还够闪避体力：闪避脱离
+        this.aiState = 'dodge_away';
+        return;
+      }
+      if (r < 0.75) {
+        // 大概率后撤拉距
         this.aiState = 'retreat';
-        this.aiTimer = 0.5 + Math.random() * 0.3;
-      } else {
+        this.aiTimer = 0.8 + Math.random() * 0.7;
+      } else if (d < 80) {
+        // 近身被迫格挡（短暂）
         this.aiState = 'defend';
-        this.aiTimer = cfg.blockDurBase + Math.random() * 0.3;
+        this.aiTimer = 0.2 + Math.random() * 0.15;
+      } else {
+        // 远距离等回复
+        this.aiState = 'retreat';
+        this.aiTimer = 0.6 + Math.random() * 0.4;
       }
       return;
     }
@@ -829,560 +816,8 @@ export class Enemy {
     }
   }
 
-  // ===================== HTN 计划系统 =====================
-
-  _initPlan(steps) {
-    this._plan = steps;
-    this._planIdx = 0;
-    this._planTimer = 0;
-  }
-
-  _clearPlan() {
-    this._plan = [];
-    this._planIdx = 0;
-  }
-
-  _advancePlan() {
-    this._planIdx++;
-    this._planTimer = 0;
-    if (this._planIdx >= this._plan.length) {
-      this._plan = [];
-    }
-  }
-
-  _hasPlan() {
-    return this._plan.length > 0 && this._planIdx < this._plan.length;
-  }
-
-  _executePlan(dt, f, pf, d, ang, cmd) {
-    if (!this._hasPlan()) return false;
-
-    const step = this._plan[this._planIdx];
-    this._planTimer += dt;
-
-    // 超时安全阀
-    if (this._planTimer > (step.dur || 2.0)) {
-      this._advancePlan();
-      return this._hasPlan();
-    }
-
-    switch (step.act) {
-      case 'light':
-        if (f.state === 'idle') {
-          cmd.lightAttack = true;
-          this.comboTarget = step.combo || 1;
-          this.comboCount = 1;
-          this.attackCooldown = C.AI_MIN_ATTACK_INTERVAL;
-          if (step.feint && f.stamina >= C.FEINT_COST + 1) {
-            this.aiState = 'feint_wait';
-          }
-          this._advancePlan();
-        }
-        break;
-      case 'heavy':
-        if (f.state === 'idle') {
-          cmd.heavyAttack = true;
-          this.attackCooldown = C.AI_MIN_ATTACK_INTERVAL;
-          if (step.feint && f.stamina >= C.FEINT_COST + 1) {
-            this.aiState = 'feint_wait';
-          }
-          this._advancePlan();
-        }
-        break;
-      case 'block':
-        if (f.state === 'idle' || f.state === 'blocking') {
-          cmd.blockHeld = true;
-        }
-        if (this._planTimer >= step.dur) this._advancePlan();
-        break;
-      case 'dodge':
-        if (f.state === 'idle' && f.stamina >= C.DODGE_COST) {
-          const side = step.side || (Math.random() < 0.5 ? Math.PI / 2 : -Math.PI / 2);
-          cmd.dodge = true;
-          cmd.dodgeAngle = ang + side;
-          this._advancePlan();
-        } else if (this._planTimer > 0.3) {
-          this._advancePlan();
-        }
-        break;
-      case 'approach':
-        if (d > (step.dist || 55)) {
-          cmd.moveX = Math.cos(ang);
-          cmd.moveY = Math.sin(ang);
-        }
-        if (d <= (step.dist || 55) || this._planTimer >= step.dur) this._advancePlan();
-        break;
-      case 'wait':
-        if (this._planTimer >= step.dur) this._advancePlan();
-        break;
-    }
-
-    return true;
-  }
-
-  _checkPlanTriggers(f, pf, d, cfg) {
-    if (this._hasPlan()) return;
-    if (this.trainingMode) return;
-
-    const prev = this._prevFighterState;
-    const cur = f.state;
-    const smartness = cfg.reactChance;
-
-    // === 格挡成功获得加速buff → 规划反击 ===
-    if (f.parryBoost.timer > 0 && !this._wasParryBoosted && cur === 'idle') {
-      if (Math.random() < smartness * 1.2) {
-        this._createParryFollowupPlan(f, pf, d, cfg);
-        return;
-      }
-    }
-
-    // === 被弹恢复 → 规划防守反击 ===
-    if (prev === 'parryStunned' && cur === 'idle') {
-      if (Math.random() < smartness * 0.7) {
-        this._createRecoveryPlan(f, pf, d, cfg);
-        return;
-      }
-    }
-
-    // === 拼刀/硬直恢复 → 规划后续 ===
-    if (prev === 'staggered' && cur === 'idle' && d < 90) {
-      this.thinkCD = 0; // 拼刀恢复后立即允许反应
-      if (Math.random() < smartness * 0.8) {
-        // 高难度：恢复后有概率发动变招试探而非直接攻击
-        if (cfg.feintChance > 0.2 && f.stamina >= C.FEINT_COST + 1 &&
-            Math.random() < cfg.feintChance * 0.50) {
-          this._createFeintPlan(d);
-          return;
-        }
-        this._createClashFollowupPlan(f, pf, d, cfg);
-        return;
-      }
-    }
-
-    // === 闪避恢复 → 规划惩罚 ===
-    if (prev === 'dodging' && cur === 'idle') {
-      if (Math.random() < smartness * 0.9) {
-        // 高难度：闪避后有概率变招而非直接惩罚
-        if (cfg.feintChance > 0.2 && d < 80 && f.stamina >= C.FEINT_COST + 1 &&
-            Math.random() < cfg.feintChance * 0.40) {
-          this._createFeintPlan(d);
-          return;
-        }
-        this._createDodgeFollowupPlan(f, pf, d, cfg);
-        return;
-      }
-    }
-
-    // === 主动压制（高难度，空闲过久）===
-    if (this.difficulty >= 3 && cur === 'idle' && d < 70 && this._idleTimer > 0.8) {
-      if (Math.random() < 0.015) {
-        this._createPressurePlan(f, pf, d, cfg);
-      }
-    }
-  }
-
-  // --- 格挡成功后计划 ---
-  _createParryFollowupPlan(f, pf, d, cfg) {
-    const boost = f.parryBoost.mult;
-
-    if (boost <= 0.4) {
-      // 精准格挡 → 积极反击
-      if (d < 70) {
-        const r = Math.random();
-        if (r < 0.35 && this.difficulty >= 4) {
-          // 加速重击 → 被格挡可形成乒乓
-          this._initPlan([{ act: 'heavy', dur: 1.5 }]);
-        } else if (r < 0.65) {
-          // 加速轻击连击 → 安全伤害
-          this._initPlan([{ act: 'light', dur: 1.0, combo: 2 }]);
-        } else {
-          // 延迟一拍再攻击（出其不意）
-          this._initPlan([
-            { act: 'wait', dur: 0.12 },
-            { act: 'light', dur: 1.0 },
-          ]);
-        }
-      } else {
-        this._initPlan([
-          { act: 'approach', dur: 0.4, dist: 60 },
-          { act: 'light', dur: 1.0 },
-        ]);
-      }
-    } else if (boost <= 0.6) {
-      // 半精准 → 轻击反击
-      if (d < 70) {
-        this._initPlan([{ act: 'light', dur: 1.0 }]);
-      }
-    } else {
-      // 非精准 → 根据对手风格决定
-      const opHeavyRateP = this._getPlayerHeavyRate();
-      if (opHeavyRateP > 0.25 && Math.random() < 0.5) {
-        // 对手爱出重击：继续格挡等格反机会
-        this._initPlan([
-          { act: 'block', dur: 0.25 },
-          { act: 'light', dur: 1.0 },
-        ]);
-      } else if (Math.random() < 0.5) {
-        // 对手不爱出重击：直接轻击反击
-        this._initPlan([{ act: 'light', dur: 1.0 }]);
-      }
-    }
-  }
-
-  // --- 被弹恢复后计划 ---
-  _createRecoveryPlan(f, pf, d, cfg) {
-    const r = Math.random();
-    const opHeavyRate = this._getPlayerHeavyRate();
-    if (this.difficulty >= 4 && r < 0.3 && opHeavyRate > 0.2) {
-      // 对手爱出重击时：格挡后立刻反击（有格反收益）
-      this._initPlan([
-        { act: 'block', dur: 0.25 },
-        { act: 'light', dur: 1.0 },
-      ]);
-    } else if (r < 0.3) {
-      // 对手不爱出重击：直接轻击反击（格挡无收益，节省时间）
-      this._initPlan([{ act: 'light', dur: 1.0 }]);
-    } else if (r < 0.55 && opHeavyRate > 0.2) {
-      // 对手爱出重击时纯防御有意义
-      this._initPlan([{ act: 'block', dur: 0.4 + Math.random() * 0.3 }]);
-    } else if (r < 0.7) {
-      // 闪避撤退
-      this._initPlan([{ act: 'dodge', dur: 0.5 }]);
-    }
-    // else: 回到正常AI
-  }
-
-  // --- 拼刀后计划 ---
-  _createClashFollowupPlan(f, pf, d, cfg) {
-    const r = Math.random();
-    const opHeavyRate = this._getPlayerHeavyRate();
-    if (r < 0.45) {
-      // 再次轻击 → 追求连续拼刀节奏
-      this._initPlan([{ act: 'light', dur: 0.8 }]);
-    } else if (r < 0.70 && opHeavyRate > 0.25) {
-      // 对手爱出重击时格挡等格反
-      this._initPlan([{ act: 'block', dur: 0.3 + Math.random() * 0.2 }]);
-    } else if (r < 0.70) {
-      // 对手不爱出重击，格挡无收益，改为轻击反击
-      this._initPlan([{ act: 'light', dur: 0.8 }]);
-    } else if (r < 0.85 && this.difficulty >= 3) {
-      // 重击压制
-      this._initPlan([{ act: 'heavy', dur: 1.5 }]);
-    } else {
-      // 后闪避开
-      this._initPlan([{ act: 'dodge', dur: 0.5, side: Math.PI }]);
-    }
-  }
-
-  // --- 闪避后计划 ---
-  _createDodgeFollowupPlan(f, pf, d, cfg) {
-    if (d < 80) {
-      const r = Math.random();
-      if (r < 0.6) {
-        this._initPlan([{ act: 'light', dur: 1.0, combo: Math.min(2, cfg.maxCombo) }]);
-      } else if (this.difficulty >= 4) {
-        this._initPlan([{ act: 'heavy', dur: 1.5 }]);
-      }
-    } else {
-      this._initPlan([
-        { act: 'approach', dur: 0.5, dist: 60 },
-        { act: 'light', dur: 1.0 },
-      ]);
-    }
-  }
-
-  // --- 主动变招计划（从_decide进入）---
-  _createFeintPlan(d) {
-    const cfg = this._cfg;
-    const plans = [];
-
-    // 假重击→真轻击连（最经典的变招）
-    plans.push([
-      { act: 'heavy', dur: 1.5, feint: true },
-      { act: 'light', dur: 1.0, combo: 2 },
-    ]);
-
-    // 假轻击→真重击
-    plans.push([
-      { act: 'light', dur: 1.0, feint: true },
-      { act: 'heavy', dur: 1.5 },
-    ]);
-
-    // 假重击→格挡（仅在对手爱出重击时有格反收益）
-    const opHeavyRate = this._getPlayerHeavyRate();
-    if (opHeavyRate > 0.25) {
-      plans.push([
-        { act: 'heavy', dur: 1.5, feint: true },
-        { act: 'block', dur: 0.5 },
-      ]);
-    } else {
-      // 对手不爱出重击：假重击→再重击（纯节奏骗招）
-      plans.push([
-        { act: 'heavy', dur: 1.5, feint: true },
-        { act: 'heavy', dur: 1.5 },
-      ]);
-    }
-
-    if (this.difficulty >= 4) {
-      // 双重假动作：假重→假轻→真重
-      plans.push([
-        { act: 'heavy', dur: 1.5, feint: true },
-        { act: 'light', dur: 1.0, feint: true },
-        { act: 'heavy', dur: 1.5 },
-      ]);
-
-      // 假轻→格挡→轻击（仅对手爱出重击时有意义）
-      if (opHeavyRate > 0.25) {
-        plans.push([
-          { act: 'light', dur: 1.0, feint: true },
-          { act: 'block', dur: 0.4 },
-          { act: 'light', dur: 1.0, combo: 2 },
-        ]);
-      } else {
-        // 假轻→真重（直接攻击型变招）
-        plans.push([
-          { act: 'light', dur: 1.0, feint: true },
-          { act: 'heavy', dur: 1.5 },
-        ]);
-      }
-    }
-
-    if (d > 60) {
-      // 远距离：接近后变招
-      plans.push([
-        { act: 'approach', dur: 0.4, dist: 50 },
-        { act: 'heavy', dur: 1.5, feint: true },
-        { act: 'light', dur: 1.0, combo: 2 },
-      ]);
-    }
-
-    this._initPlan(plans[Math.floor(Math.random() * plans.length)]);
-    this._logDecision(this._gameTime, 'decide', 'feint_plan', {});
-  }
-
-  // --- 主动压制计划（高难度）---
-  _createPressurePlan(f, pf, d, cfg) {
-    if (f.stamina < 2) return;
-
-    const opHeavyRate = this._getPlayerHeavyRate();
-    const plans = [
-      // 轻击 → 重击（混合节奏）
-      [{ act: 'light', dur: 1.0 }, { act: 'heavy', dur: 1.5 }],
-      // 重击（高风险高回报）
-      [{ act: 'heavy', dur: 1.5 }],
-      // 轻击连打
-      [{ act: 'light', dur: 1.0 }, { act: 'light', dur: 1.0 }],
-    ];
-
-    // 对手爱出重击时，压制计划可以包含格挡（有格反收益）
-    if (opHeavyRate > 0.25) {
-      plans.push(
-        [{ act: 'light', dur: 1.0 }, { act: 'light', dur: 1.0 }, { act: 'block', dur: 0.3 }],
-      );
-    }
-
-    // 高难度增加更多策略选项
-    if (this.difficulty >= 4 && f.stamina >= 3) {
-      if (opHeavyRate > 0.25) {
-        // 对手爱出重击：轻击 → 格挡 → 轻击（试探→格反→反击）
-        plans.push([
-          { act: 'light', dur: 1.0 },
-          { act: 'block', dur: 0.35 },
-          { act: 'light', dur: 1.0 },
-        ]);
-      }
-      // 接近 → 重击
-      plans.push([
-        { act: 'approach', dur: 0.3, dist: 50 },
-        { act: 'heavy', dur: 1.5 },
-      ]);
-    }
-
-    // 变招专用计划（需要足够体力）
-    if (this.difficulty >= 3 && f.stamina >= C.FEINT_COST + 2 && cfg.feintChance > 0) {
-      // 假重击 → 等一拍 → 真轻击连击
-      plans.push([
-        { act: 'heavy', dur: 1.5, feint: true },
-        { act: 'wait', dur: 0.1 },
-        { act: 'light', dur: 1.0, combo: 2 },
-      ]);
-      // 假轻击 → 真重击
-      plans.push([
-        { act: 'light', dur: 1.0, feint: true },
-        { act: 'wait', dur: 0.08 },
-        { act: 'heavy', dur: 1.5 },
-      ]);
-      if (this.difficulty >= 4) {
-        // 假重击 → 假重击 → 真重击（双重假动作）
-        plans.push([
-          { act: 'heavy', dur: 1.5, feint: true },
-          { act: 'heavy', dur: 1.5, feint: true },
-          { act: 'heavy', dur: 1.5 },
-        ]);
-      }
-    }
-
-    this._initPlan(plans[Math.floor(Math.random() * plans.length)]);
-  }
-
-  // ===================== 智能重击应对（预判系统） =====================
-  _reactToHeavy(pf, d, ang, cmd, cfg) {
-    const feintRate = this._getPlayerHeavyFeintRate();
-    const releaseRate = 1 - feintRate;
-    const staminaLow = this.fighter.stamina <= 2;
-    const smartness = cfg.heavyReactMult;
-
-    // 核心预判：玩家释放率越高 → AI格挡信心越强，能拿精准格挡
-    // 变招率高 → 观察等待，抓变招惩罚
-
-    // 基础策略权重
-    let wBlock = 0.15;
-    let wRead  = 0.20;
-    let wDodge = 0.10;
-    let wTrade = 0.10;
-    let wHeavy = 0.05;
-
-    // === 基于释放率动态调整 ===
-    if (releaseRate > 0.80) {
-      // 玩家几乎不变招 → heavy_read等精准格挡时机
-      wRead += 0.35;
-      wBlock += 0.15;
-      wDodge -= 0.05;
-      wTrade -= 0.05;
-    } else if (releaseRate > 0.55) {
-      wBlock += 0.20;
-      wRead += 0.15;
-    } else {
-      // 玩家常变招 → 多等待抓空档
-      wRead += 0.30;
-      wTrade += 0.10;
-      wBlock -= 0.05;
-    }
-
-    // 体力低 → 避免闪避，多格挡
-    if (staminaLow) {
-      wBlock += wDodge * 0.8;
-      wDodge *= 0.2;
-    }
-
-    // 归一化
-    const total = wBlock + wDodge + wRead + wTrade + wHeavy;
-    wBlock /= total; wDodge /= total; wRead /= total; wTrade /= total; wHeavy /= total;
-
-    // 难度缩放：smartness=1时100%反应
-    if (Math.random() > smartness) return;
-
-    const r = Math.random();
-    let c = 0;
-
-    c += wRead;
-    if (r < c) {
-      this.aiState = 'heavy_read';
-      this.aiTimer = 1.2;
-      return;
-    }
-
-    c += wBlock;
-    if (r < c) {
-      this.aiState = 'defend';
-      this.blockDuration = 0.6 + Math.random() * 0.3;
-      this.aiTimer = this.blockDuration;
-      return;
-    }
-
-    c += wDodge;
-    if (r < c) {
-      if (this.fighter.stamina >= C.DODGE_COST) {
-        cmd.dodge = true;
-        cmd.dodgeAngle = ang + (Math.random() < 0.5 ? Math.PI / 2 : -Math.PI / 2);
-        this.aiState = 'punish';
-        this.aiTimer = 0.15;
-        return;
-      }
-      // 体力不足 → 回退到后续选项
-    }
-
-    c += wTrade;
-    if (r < c) {
-      cmd.lightAttack = true;
-      this.comboTarget = 1;
-      this.comboCount = 1;
-      this.aiState = 'recover';
-      this.aiTimer = 0.5;
-      this.attackCooldown = C.AI_MIN_ATTACK_INTERVAL;
-      return;
-    }
-
-    cmd.heavyAttack = true;
-    this.aiState = 'recover';
-    this.aiTimer = 1.2;
-    this.attackCooldown = C.AI_MIN_ATTACK_INTERVAL;
-  }
-
-  // ===================== 训练模式6：拼刀训练 =====================
-  _clashTrainerBehavior(dt, pf, d, ang, cmd) {
-    const f = this.fighter;
-
-    // 对手在攻击且近距离 → 防御反应（修复被连续轻击打死的问题）
-    if (d < 100 && f.state === 'idle' &&
-        (pf.state === 'lightAttack' || pf.state === 'heavyAttack')) {
-      if (Math.random() < 0.4 * dt * 60) { // 每帧约40%概率举盾
-        cmd.blockHeld = true;
-        this.aiState = 'defend';
-        this.aiTimer = 0.2 + Math.random() * 0.15;
-        return cmd;
-      }
-    }
-
-    // 简单节奏：接近 → 单次轻击 → 冷却 → 重复
-    if (d > 55) {
-      cmd.moveX = Math.cos(ang);
-      cmd.moveY = Math.sin(ang);
-    } else if (this.attackCooldown <= 0 && f.state === 'idle') {
-      cmd.lightAttack = true;
-      this.attackCooldown = 0.7 + Math.random() * 0.5;
-    }
-    return cmd;
-  }
-
-  // ===================== 训练模式7：格挡乒乓训练 =====================
-  _parryTrainerBehavior(dt, pf, d, ang, cmd) {
-    const f = this.fighter;
-
-    // 遇到玩家重击/攻击时举盾（给玩家格挡练习的对象）
-    const playerThreat = pf.state === 'heavyAttack' ||
-      (pf.state === 'lightAttack' && pf.phase !== 'recovery') ||
-      (pf.state === 'parryCounter' && pf.phase !== 'recovery');
-    if (playerThreat && d < 120 && f.state === 'idle') {
-      cmd.blockHeld = true;
-      return cmd;
-    }
-
-    // 保持防御直到威胁消除
-    if (f.state === 'blocking') {
-      const stillThreat = pf.state === 'heavyAttack' ||
-        (pf.state === 'lightAttack' && pf.phase !== 'recovery');
-      if (stillThreat) {
-        cmd.blockHeld = true;
-        return cmd;
-      }
-      // 放下盾
-      return cmd;
-    }
-
-    // 接近并有节奏地攻击
-    if (d > 60) {
-      cmd.moveX = Math.cos(ang);
-      cmd.moveY = Math.sin(ang);
-    } else if (this.attackCooldown <= 0 && f.state === 'idle') {
-      if (Math.random() < 0.55) {
-        cmd.heavyAttack = true;
-        this.attackCooldown = 1.0 + Math.random() * 0.5;
-      } else {
-        cmd.lightAttack = true;
-        this.attackCooldown = 0.7 + Math.random() * 0.4;
-      }
-    }
-    return cmd;
-  }
+  // HTN 计划系统和重击应对、训练模式行为 → 见 ai-plans.js (mixin)
 }
+
+// 将计划系统方法混入 Enemy 原型
+Object.assign(Enemy.prototype, planMethods);

@@ -11,11 +11,11 @@
  *   --log-round N    只输出第N轮的详细日志（配合 --log 使用）
  */
 
-import * as C from './src/constants.js';
-import { Fighter } from './src/fighter.js';
-import { Enemy } from './src/enemy.js';
-import { CombatSystem } from './src/combat.js';
-import { dist, angleBetween } from './src/utils.js';
+import * as C from './src/core/constants.js';
+import { Fighter } from './src/combat/fighter.js';
+import { Enemy } from './src/ai/enemy.js';
+import { CombatSystem } from './src/combat/combat-system.js';
+import { dist, angleBetween } from './src/core/utils.js';
 
 // ---- 命令行参数 ----
 const args = process.argv.slice(2);

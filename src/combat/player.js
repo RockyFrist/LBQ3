@@ -1,5 +1,5 @@
 import { Fighter } from './fighter.js';
-import { vec2Normalize } from './utils.js';
+import { vec2Normalize } from '../core/utils.js';
 
 export class Player {
   constructor(x, y) {

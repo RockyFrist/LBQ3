@@ -1,4 +1,4 @@
-import * as C from './constants.js';
+import * as C from '../core/constants.js';
 
 export class Renderer {
   constructor(canvas, camera) {

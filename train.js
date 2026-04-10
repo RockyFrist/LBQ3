@@ -17,15 +17,15 @@
  *   3. 课程学习: 先打D1, 胜率>70%后升D2, ..., 直到D5
  */
 
-import * as C from './src/constants.js';
-import { Fighter } from './src/fighter.js';
-import { Enemy } from './src/enemy.js';
-import { CombatSystem } from './src/combat.js';
-import { dist, angleBetween } from './src/utils.js';
+import * as C from './src/core/constants.js';
+import { Fighter } from './src/combat/fighter.js';
+import { Enemy } from './src/ai/enemy.js';
+import { CombatSystem } from './src/combat/combat-system.js';
+import { dist, angleBetween } from './src/core/utils.js';
 import {
   NeuralNetwork, extractState, actionToCommand,
   PolicyGradientTrainer, ACTIONS,
-} from './src/nn-agent.js';
+} from './src/nn/nn-agent.js';
 import { readFileSync, writeFileSync, existsSync } from 'fs';
 
 // ---- 参数 ----

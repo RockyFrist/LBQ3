@@ -1,5 +1,5 @@
-import * as C from './constants.js';
-import { dist, angleBetween, isInArc, normalizeAngle } from './utils.js';
+import * as C from '../core/constants.js';
+import { dist, angleBetween, isInArc, normalizeAngle } from '../core/utils.js';
 
 export class CombatSystem {
   constructor(particles, camera) {

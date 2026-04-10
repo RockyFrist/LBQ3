@@ -6,8 +6,8 @@
  * 训练: REINFORCE 策略梯度 + 基线值网络
  */
 
-import { dist, angleBetween, normalizeAngle } from './utils.js';
-import * as C from './constants.js';
+import { dist, angleBetween, normalizeAngle } from '../core/utils.js';
+import * as C from '../core/constants.js';
 
 // ---- 数学工具 ----
 function relu(x) { return x > 0 ? x : 0; }

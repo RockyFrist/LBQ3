@@ -20,6 +20,9 @@ export class Menu {
     // 训练状态（由 main.js 注入 BrowserTrainer）
     this.trainer = null; // BrowserTrainer 实例
     this._onTrainDone = null; // 训练完成回调
+
+    // 帮助面板引用
+    this.helpOverlay = document.getElementById('help-overlay');
   }
 
   update(dt) {
@@ -53,6 +56,13 @@ export class Menu {
         this._clickCooldown = 0.2;
         return;
       }
+    }
+    // 新手引导按钮
+    if (this._hit(mx, my, L.helpBtn.x, L.helpBtn.y, L.helpBtn.w, L.helpBtn.h)) {
+      if (this.helpOverlay) {
+        this.helpOverlay.classList.toggle('hidden');
+      }
+      this._clickCooldown = 0.3;
     }
   }
 
@@ -217,6 +227,9 @@ export class Menu {
     ctx.font = '12px "Microsoft YaHei", sans-serif';
     ctx.textAlign = 'center';
     ctx.fillText('选择模式开始 · 按 ESC 可随时返回菜单', cw / 2, ch - 24);
+
+    // 新手引导按钮（右下角）
+    this._drawActionBtn(ctx, L.helpBtn, '📖 操作帮助', '#888', mx, my);
   }
 
   _layoutMain() {
@@ -239,6 +252,7 @@ export class Menu {
         { id: 'wusheng', label: '🏆 挑战武圣', desc: '对战神经网络训练的终极AI', accent: '#ff00ff',
           x: cx - btnW / 2, y: startY + (btnH + gap) * 3, w: btnW, h: btnH },
       ],
+      helpBtn: { x: cw - 110, y: ch - 44, w: 96, h: 32 },
     };
   }
 
@@ -499,6 +513,12 @@ export class Menu {
       this._clickCooldown = 0.3;
       return;
     }
+    // 上传权重
+    if (this._hit(mx, my, L.uploadBtn.x, L.uploadBtn.y, L.uploadBtn.w, L.uploadBtn.h)) {
+      if (this._onUploadWeights) this._onUploadWeights();
+      this._clickCooldown = 0.3;
+      return;
+    }
     // 返回
     if (this._hit(mx, my, L.backBtn.x, L.backBtn.y, L.backBtn.w, L.backBtn.h)) {
       this.page = 'main';
@@ -610,12 +630,15 @@ export class Menu {
         this._drawActionBtn(ctx, L.downloadBtn, '💾 下载权重', '#448899', mx, my);
       }
 
+      // 上传按钮
+      this._drawActionBtn(ctx, L.uploadBtn, '📂 上传权重', '#668844', mx, my);
+
       this._drawActionBtn(ctx, L.backBtn, '← 返回', '#666', mx, my);
 
       // 底部说明
       ctx.fillStyle = '#444';
       ctx.font = '11px "Microsoft YaHei", sans-serif';
-      ctx.fillText('训练约需 1~3 分钟 · 课程学习 D1→D5 · 训练完自动可用', cw / 2, ch - 20);
+      ctx.fillText('训练约需 1~3 分钟 · 课程学习 D1→D5 · 训练完自动可用 · 下载可保存/上传可导入', cw / 2, ch - 20);
     }
   }
 
@@ -642,6 +665,7 @@ export class Menu {
         spectateBtn: { x: -999, y: -999, w: 0, h: 0 },
         trainBtn: { x: -999, y: -999, w: 0, h: 0 },
         downloadBtn: { x: -999, y: -999, w: 0, h: 0 },
+        uploadBtn: { x: -999, y: -999, w: 0, h: 0 },
         backBtn: { x: -999, y: -999, w: 0, h: 0 },
       };
     }
@@ -653,7 +677,8 @@ export class Menu {
       startBtn:    { x: cx - btnW / 2, y: row1Y, w: btnW, h: btnH },
       spectateBtn: { x: cx - btnW / 2, y: row1Y + gap, w: btnW, h: btnH },
       trainBtn:    { x: cx - btnW / 2, y: row1Y + gap * 2 + 8, w: btnW, h: btnH },
-      downloadBtn: { x: cx - smBtnW / 2, y: row1Y + gap * 3 + 8, w: smBtnW, h: smBtnH },
+      downloadBtn: { x: cx - smBtnW / 2 - smBtnW / 2 - 6, y: row1Y + gap * 3 + 8, w: smBtnW, h: smBtnH },
+      uploadBtn:   { x: cx + 6, y: row1Y + gap * 3 + 8, w: smBtnW, h: smBtnH },
       backBtn:     { x: cx - 60, y: row1Y + gap * 3 + 8 + smBtnH + 14, w: 120, h: 30 },
       // 占位
       pauseBtn: { x: -999, y: -999, w: 0, h: 0 },

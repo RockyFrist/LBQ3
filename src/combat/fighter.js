@@ -1,5 +1,5 @@
-import * as C from './constants.js';
-import { clamp, normalizeAngle, angleDiff } from './utils.js';
+import * as C from '../core/constants.js';
+import { clamp, normalizeAngle, angleDiff } from '../core/utils.js';
 
 /*
   状态列表:
@@ -539,9 +539,10 @@ export class Fighter {
     this.x += this.vx * dt;
     this.y += this.vy * dt;
 
-    // 边界
-    this.x = clamp(this.x, this.radius, C.ARENA_W - this.radius);
-    this.y = clamp(this.y, this.radius, C.ARENA_H - this.radius);
+    // 边界（额外留出视觉空间，防止角色半身出屏）
+    const margin = this.radius + 14;
+    this.x = clamp(this.x, margin, C.ARENA_W - margin);
+    this.y = clamp(this.y, margin, C.ARENA_H - margin);
   }
 
   // ===================== 体力 =====================

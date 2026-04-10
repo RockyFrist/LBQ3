@@ -1,10 +1,10 @@
 import './style.css';
-import { Input } from './input.js';
-import { Game } from './game.js';
-import { Menu } from './menu.js';
-import { NeuralNetwork } from './nn-agent.js';
-import { BrowserTrainer } from './browser-train.js';
-import * as C from './constants.js';
+import { Input } from './core/input.js';
+import { Game } from './game/game.js';
+import { Menu } from './ui/menu.js';
+import { NeuralNetwork } from './nn/nn-agent.js';
+import { BrowserTrainer } from './nn/browser-train.js';
+import * as C from './core/constants.js';
 
 const canvas = document.getElementById('game-canvas');
 const ctx = canvas.getContext('2d');
@@ -66,6 +66,28 @@ function setupTrainCallbacks(m) {
     a.download = 'nn-weights.json';
     a.click();
     URL.revokeObjectURL(url);
+  };
+  m._onUploadWeights = () => {
+    const fileInput = document.createElement('input');
+    fileInput.type = 'file';
+    fileInput.accept = '.json';
+    fileInput.addEventListener('change', () => {
+      const file = fileInput.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const data = JSON.parse(e.target.result);
+          nnWeights = NeuralNetwork.fromJSON(data);
+          m.nnWeightsLoaded = true;
+          m.nnLoadError = false;
+        } catch (err) {
+          console.error('权重文件解析失败:', err);
+        }
+      };
+      reader.readAsText(file);
+    });
+    fileInput.click();
   };
 }
 

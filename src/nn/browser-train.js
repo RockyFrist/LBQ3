@@ -3,11 +3,11 @@
  * 使用 async chunked execution 避免阻塞 UI
  */
 
-import * as C from './constants.js';
-import { Fighter } from './fighter.js';
-import { Enemy } from './enemy.js';
-import { CombatSystem } from './combat.js';
-import { dist, angleBetween } from './utils.js';
+import * as C from '../core/constants.js';
+import { Fighter } from '../combat/fighter.js';
+import { Enemy } from '../ai/enemy.js';
+import { CombatSystem } from '../combat/combat-system.js';
+import { dist, angleBetween } from '../core/utils.js';
 import {
   NeuralNetwork, extractState, actionToCommand,
   PolicyGradientTrainer, ACTIONS,

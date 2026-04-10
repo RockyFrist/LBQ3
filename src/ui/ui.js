@@ -1,4 +1,4 @@
-import * as C from './constants.js';
+import * as C from '../core/constants.js';
 
 export class UI {
   constructor(canvas) {
