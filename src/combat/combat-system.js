@@ -186,13 +186,17 @@ export class CombatSystem {
     const pullDist = parryLevel === 'precise' ? C.PARRY_PULL_PRECISE
       : parryLevel === 'semi' ? C.PARRY_PULL_SEMI : C.PARRY_PULL_NONPRECISE;
     if (pullDist > 0) {
-      target.x += Math.cos(ang) * pullDist;
-      target.y += Math.sin(ang) * pullDist;
+      // 平滑滑动靠近（复用击退系统，方向朝向攻击方）
+      target.applyKnockback(ang, pullDist);
     }
 
     // 招架方回到idle（手动选择后续行动，形成二次博弈）
     target.parryChainCount = 0;
     target.setState('idle');
+
+    // 格挡加速增益（格挡成功后下次攻击前摇压缩）
+    const boost = C.PARRY_BOOST[parryLevel];
+    target.parryBoost = { mult: boost.mult, timer: boost.duration };
 
     // 特效
     const sparkCount = parryLevel === 'precise' ? 15 : parryLevel === 'semi' ? 10 : 6;

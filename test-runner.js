@@ -115,6 +115,11 @@ function runRound(diffA, diffB, collectLog) {
   let timeScale = 1;
   let timeScaleTimer = 0;
   let prevStateA = 'idle', prevStateB = 'idle';
+  let prevPhaseA = 'none', prevPhaseB = 'none';
+
+  // 状态/阶段时间追踪（用于计算持续时间）
+  let stateStartA = 0, stateStartB = 0;
+  let phaseStartA = 0, phaseStartB = 0;
 
   for (let t = 0; t < MAX_TICKS; t++) {
     gameTime += SIM_DT;
@@ -150,8 +155,43 @@ function runRound(diffA, diffB, collectLog) {
     fighterA.update(dt, pCmd, gameTime);
     if (fighterB.alive) fighterB.update(dt, eCmd, gameTime);
 
-    // 检测攻击发起、闪避、格挡（state transition）
+    // 检测攻击发起、闪避、格挡（state transition）+ 状态持续时间
     if (collectLog) {
+      // A 状态切换 → 记录旧状态持续时间
+      if (fighterA.state !== prevStateA) {
+        const dur = gameTime - stateStartA;
+        if (prevStateA !== 'idle' && dur > 0.001) {
+          logEvent(gameTime, 'stateEnd', { who: 'A', prevState: prevStateA, duration: +dur.toFixed(3) });
+        }
+        stateStartA = gameTime;
+        phaseStartA = gameTime;
+      }
+      if (fighterB.state !== prevStateB) {
+        const dur = gameTime - stateStartB;
+        if (prevStateB !== 'idle' && dur > 0.001) {
+          logEvent(gameTime, 'stateEnd', { who: 'B', prevState: prevStateB, duration: +dur.toFixed(3) });
+        }
+        stateStartB = gameTime;
+        phaseStartB = gameTime;
+      }
+      // 阶段切换（startup→active→recovery）
+      if (fighterA.phase !== prevPhaseA) {
+        if (prevPhaseA !== 'none') {
+          const pdur = gameTime - phaseStartA;
+          logEvent(gameTime, 'phaseChange', { who: 'A', from: prevPhaseA, to: fighterA.phase, phaseDur: +pdur.toFixed(3) });
+        }
+        phaseStartA = gameTime;
+        prevPhaseA = fighterA.phase;
+      }
+      if (fighterB.phase !== prevPhaseB) {
+        if (prevPhaseB !== 'none') {
+          const pdur = gameTime - phaseStartB;
+          logEvent(gameTime, 'phaseChange', { who: 'B', from: prevPhaseB, to: fighterB.phase, phaseDur: +pdur.toFixed(3) });
+        }
+        phaseStartB = gameTime;
+        prevPhaseB = fighterB.phase;
+      }
+
       if (fighterA.state === 'lightAttack' && fighterA.phase === 'startup' && prevStateA !== 'lightAttack')
         logEvent(gameTime, 'attackStart', { who: 'A', attackType: 'light', step: fighterA.comboStep });
       if (fighterA.state === 'heavyAttack' && fighterA.phase === 'startup' && prevStateA !== 'heavyAttack')
@@ -412,45 +452,55 @@ if (LOG_MODE) {
       console.log(`  打空 A:轻${round.summary.whiffA.light||0}重${round.summary.whiffA.heavy||0}  B:轻${round.summary.whiffB.light||0}重${round.summary.whiffB.heavy||0}`);
       console.log();
 
+      let prevTime = 0;
       for (const evt of round.events) {
         const timeStr = evt.t.toFixed(2).padStart(6);
+        const delta = evt.t - prevTime;
+        const deltaStr = prevTime > 0 ? `Δ${delta.toFixed(2).padStart(5)}` : '      ';
+        prevTime = evt.t;
         const distStr = `${evt.dist}px`;
         switch (evt.type) {
           case 'attackStart':
-            console.log(`  [${timeStr}s] ${evt.who} 发起${evt.attackType === 'heavy' ? '重击' : `轻击${evt.step||''}`}  距离${distStr}  ${otherSide(evt.who)}:${getState(evt, otherSide(evt.who))}`);
+            console.log(`  [${timeStr}s] ${deltaStr} ${evt.who} 发起${evt.attackType === 'heavy' ? '重击' : `轻击${evt.step||''}`}  距离${distStr}  ${otherSide(evt.who)}:${getState(evt, otherSide(evt.who))}`);
             break;
           case 'hit':
-            console.log(`  [${timeStr}s] ⚔ ${evt.who}→${evt.target} ${evt.attackType}命中 ${evt.damage}伤  距离${distStr}  ${evt.target}当时:${evt.targetState}`);
+            console.log(`  [${timeStr}s] ${deltaStr} ⚔ ${evt.who}→${evt.target} ${evt.attackType}命中 ${evt.damage}伤  距离${distStr}  ${evt.target}当时:${evt.targetState}`);
             break;
           case 'whiff':
-            console.log(`  [${timeStr}s] ✗ ${evt.who} ${evt.attackType}打空! 原因:${whiffReason(evt.reason)}  距离${distStr}  射程${evt.range}  ${otherSide(evt.who)}:${getState(evt, otherSide(evt.who))}`);
+            console.log(`  [${timeStr}s] ${deltaStr} ✗ ${evt.who} ${evt.attackType}打空! 原因:${whiffReason(evt.reason)}  距离${distStr}  射程${evt.range}  ${otherSide(evt.who)}:${getState(evt, otherSide(evt.who))}`);
             break;
           case 'parry':
-            console.log(`  [${timeStr}s] 🛡 ${evt.blocker} ${parryName(evt.level)}格挡${evt.attacker}  距离${distStr}`);
+            console.log(`  [${timeStr}s] ${deltaStr} 🛡 ${evt.blocker} ${parryName(evt.level)}格挡${evt.attacker}  距离${distStr}`);
             break;
           case 'lightClash':
-            console.log(`  [${timeStr}s] ⚡ 轻击拼刀!  距离${distStr}`);
+            console.log(`  [${timeStr}s] ${deltaStr} ⚡ 轻击拼刀!  距离${distStr}`);
             break;
           case 'heavyClash':
-            console.log(`  [${timeStr}s] 💥 重击弹刀!  距离${distStr}`);
+            console.log(`  [${timeStr}s] ${deltaStr} 💥 重击弹刀!  距离${distStr}`);
             break;
           case 'blockBreak':
-            console.log(`  [${timeStr}s] 💔 ${evt.target} 被破防!  距离${distStr}`);
+            console.log(`  [${timeStr}s] ${deltaStr} 💔 ${evt.target} 被破防!  距离${distStr}`);
             break;
           case 'execution':
-            console.log(`  [${timeStr}s] ☠ ${evt.who} 处决 ${evt.target}! ${evt.damage}伤  距离${distStr}`);
+            console.log(`  [${timeStr}s] ${deltaStr} ☠ ${evt.who} 处决 ${evt.target}! ${evt.damage}伤  距离${distStr}`);
             break;
           case 'dodge':
-            console.log(`  [${timeStr}s] 💨 ${evt.who} 闪避  距离${distStr}  ${otherSide(evt.who)}:${getState(evt, otherSide(evt.who))}`);
+            console.log(`  [${timeStr}s] ${deltaStr} 💨 ${evt.who} 闪避  距离${distStr}  ${otherSide(evt.who)}:${getState(evt, otherSide(evt.who))}`);
             break;
           case 'perfectDodge':
-            console.log(`  [${timeStr}s] ✨ ${evt.who} 完美闪避!  距离${distStr}`);
+            console.log(`  [${timeStr}s] ${deltaStr} ✨ ${evt.who} 完美闪避!  距离${distStr}`);
             break;
           case 'blockStart':
-            console.log(`  [${timeStr}s] 🛡 ${evt.who} 举盾  距离${distStr}  ${otherSide(evt.who)}:${getState(evt, otherSide(evt.who))}`);
+            console.log(`  [${timeStr}s] ${deltaStr} 🛡 ${evt.who} 举盾  距离${distStr}  ${otherSide(evt.who)}:${getState(evt, otherSide(evt.who))}`);
+            break;
+          case 'stateEnd':
+            console.log(`  [${timeStr}s] ${deltaStr} ⏱ ${evt.who} ${evt.prevState}结束 持续${(evt.duration*1000).toFixed(0)}ms`);
+            break;
+          case 'phaseChange':
+            console.log(`  [${timeStr}s] ${deltaStr} ⏩ ${evt.who} ${evt.from}→${evt.to} (${evt.from}阶段${(evt.phaseDur*1000).toFixed(0)}ms)`);
             break;
           case 'roundEnd':
-            console.log(`  [${timeStr}s] ── 结束 ${evt.winner === 'draw' ? '平局' : evt.winner + '胜'} A:${evt.hpA}HP B:${evt.hpB}HP ──`);
+            console.log(`  [${timeStr}s] ${deltaStr} ── 结束 ${evt.winner === 'draw' ? '平局' : evt.winner + '胜'} A:${evt.hpA}HP B:${evt.hpB}HP ──`);
             break;
         }
       }

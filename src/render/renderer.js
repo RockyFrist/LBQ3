@@ -97,6 +97,9 @@ export class Renderer {
     ctx.arc(0, 0, r, 0, Math.PI * 2);
     ctx.fill();
 
+    // 朝向线（剑）— 在头部之前绘制，避免遮挡面部
+    this._drawWeapon(ctx, f);
+
     // 头部（朝向方向偏移的小圆）
     ctx.save();
     ctx.rotate(f.facing);
@@ -132,9 +135,6 @@ export class Renderer {
     ctx.stroke();
 
     ctx.globalAlpha = 1;
-
-    // 朝向线（剑）
-    this._drawWeapon(ctx, f);
 
     // 状态特效
     this._drawStateEffect(ctx, f);

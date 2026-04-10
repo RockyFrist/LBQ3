@@ -332,9 +332,14 @@ export class Enemy {
 
     // 格挡被弹状态：AI根据难度决定是否按防御（乒乓）
     if (f.state === 'parryStunned') {
-      const pingPongChance = cfg.reactChance * 0.8;
-      if (Math.random() < pingPongChance) {
-        cmd.blockHeld = true;
+      // 只在对手正在攻击时才防御（避免对手不动时莫名招架）
+      const opAttacking = pf.state === 'lightAttack' || pf.state === 'heavyAttack' ||
+                           pf.state === 'parryCounter';
+      if (opAttacking) {
+        const pingPongChance = cfg.reactChance * 0.8;
+        if (Math.random() < pingPongChance) {
+          cmd.blockHeld = true;
+        }
       }
       return cmd;
     }

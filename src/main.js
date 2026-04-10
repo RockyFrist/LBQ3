@@ -11,6 +11,30 @@ const ctx = canvas.getContext('2d');
 const controlsHelp = document.getElementById('controls-help');
 const helpOverlay = document.getElementById('help-overlay');
 
+// 帮助面板：点击遮罩层关闭
+if (helpOverlay) {
+  helpOverlay.addEventListener('click', (e) => {
+    // 点击遮罩区域（非面板内容）关闭
+    if (e.target === helpOverlay) {
+      helpOverlay.classList.add('hidden');
+    }
+  });
+  // 关闭按钮
+  const closeBtn = document.getElementById('help-close-btn');
+  if (closeBtn) {
+    closeBtn.addEventListener('click', () => {
+      helpOverlay.classList.add('hidden');
+    });
+  }
+}
+
+// 全局 H 键关闭帮助（菜单和游戏中都生效）
+window.addEventListener('keydown', (e) => {
+  if (e.code === 'KeyH' && helpOverlay && !helpOverlay.classList.contains('hidden')) {
+    helpOverlay.classList.add('hidden');
+  }
+});
+
 function resize() {
   canvas.width = Math.min(window.innerWidth, C.ARENA_W);
   canvas.height = Math.min(window.innerHeight, C.ARENA_H);
