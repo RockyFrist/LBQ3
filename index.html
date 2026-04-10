@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>冷兵器战斗系统 Demo</title>
+  <link rel="stylesheet" href="/src/style.css">
+</head>
+<body>
+  <div id="game-container">
+    <canvas id="game-canvas"></canvas>
+    <div id="controls-help">
+      WASD 移动 | 左键 轻击 | 右键 重击 | 空格 招架 | Shift+方向 闪避 | E 刷敌人 | R 重置 | H 帮助 | 1-5 难度
+    </div>
+
+    <!-- 帮助弹窗 -->
+    <div id="help-overlay" class="hidden">
+      <div class="help-panel">
+        <div class="help-header">⚔ 战斗系统指南</div>
+        <div class="help-body">
+          <div class="help-columns">
+            <div class="help-col">
+              <div class="section-title">基础操作</div>
+              <div class="help-item"><span class="help-key">WASD</span><span class="help-desc">移动</span></div>
+              <div class="help-item"><span class="help-key">鼠标</span><span class="help-desc">控制朝向</span></div>
+              <div class="help-item"><span class="help-key">左键单击</span><span class="help-desc">轻击（可连按3下组成连招）</span></div>
+              <div class="help-item"><span class="help-key">右键单击</span><span class="help-desc">重击（蓄力0.7秒，有霸体）</span></div>
+              <div class="help-item"><span class="help-key">空格按住</span><span class="help-desc">招架（精准时机格挡重击）</span></div>
+              <div class="help-item"><span class="help-key">Shift+方向</span><span class="help-desc">闪避（消耗1体力）</span></div>
+
+              <div class="section-title">变招（取消当前动作）</div>
+              <div class="help-item"><span class="help-key">攻击中按右键</span><span class="help-desc">轻击→重击（消耗2体力）</span></div>
+              <div class="help-item"><span class="help-key">攻击中按空格</span><span class="help-desc">攻击→招架（消耗2体力）</span></div>
+              <div class="help-item"><span class="help-key">重击中按左键</span><span class="help-desc">重击→轻击（消耗2体力）</span></div>
+              <div class="help-item"><span class="help-key" style="color:#aaa">闪避取消</span><span class="help-desc">攻击中按Shift闪避，不算变招（仅正常闪避消耗）</span></div>
+              <div class="help-item"><span class="help-key" style="color:#aaa">限制</span><span class="help-desc">命中目标后不可变招</span></div>
+
+              <div class="section-title">系统按键</div>
+              <div class="help-item"><span class="help-key">E</span><span class="help-desc">刷出敌人</span></div>
+              <div class="help-item"><span class="help-key">R</span><span class="help-desc">重置战场</span></div>
+              <div class="help-item"><span class="help-key">1-5</span><span class="help-desc">切换AI难度</span></div>
+              <div class="help-item"><span class="help-key" style="color:#44aaff">6</span><span class="help-desc">拼刀训练（AI只用轻击对攻）</span></div>
+              <div class="help-item"><span class="help-key" style="color:#ff88ff">7</span><span class="help-desc">格挡训练（AI用重击+招架，练乒乓）</span></div>
+              <div class="help-item"><span class="help-key">H</span><span class="help-desc">打开/关闭帮助</span></div>
+            </div>
+
+            <div class="help-col">
+              <div class="section-title">克制关系（猜拳三角）</div>
+              <div class="help-relation">
+                <span style="color:#ff8844;font-weight:bold">重击(霸体)</span>
+                <span class="arrow">▶</span>
+                <span>克制</span>
+                <span class="arrow">▶</span>
+                <span style="color:#fff;font-weight:bold">轻击</span>
+              </div>
+              <div class="help-relation">
+                <span style="color:#fff;font-weight:bold">轻击(连击)</span>
+                <span class="arrow">▶</span>
+                <span>克制</span>
+                <span class="arrow">▶</span>
+                <span style="color:#88ccff;font-weight:bold">招架</span>
+              </div>
+              <div class="help-relation">
+                <span style="color:#88ccff;font-weight:bold">招架(格挡)</span>
+                <span class="arrow">▶</span>
+                <span>克制</span>
+                <span class="arrow">▶</span>
+                <span style="color:#ff8844;font-weight:bold">重击</span>
+              </div>
+
+              <div class="section-title">格挡等级（招架时机）</div>
+              <div class="help-item"><span class="help-key hl-gold">精准格挡</span><span class="help-desc">命中前0.18秒招架，对方-2体力，下次攻击超快</span></div>
+              <div class="help-item"><span class="help-key hl-blue">半精准格挡</span><span class="help-desc">提前招架，对方-1体力，下次攻击加快</span></div>
+              <div class="help-item"><span class="help-key hl-orange">非精准格挡</span><span class="help-desc">时机差，双方各-1体力，自己也-2</span></div>
+              <div class="help-item"><span class="help-key" style="color:#66ffcc">格挡加速</span><span class="help-desc">格挡后下次攻击前摇压缩，选轻击=安全，重击=风险但可乒乓</span></div>
+
+              <div class="section-title">轻击打招架（渐进破招）</div>
+              <div class="help-item"><span class="help-key" style="color:#aaa">第1/2下</span><span class="help-desc">不破防，扣对方1体力/下</span></div>
+              <div class="help-item"><span class="help-key hl-gold">第3下横扫</span><span class="help-desc">破防！对方进入硬直</span></div>
+
+              <div class="section-title">特殊机制</div>
+              <div class="help-item"><span class="help-key hl-yellow">拼刀</span><span class="help-desc">双方轻击同时挥刀→弹开</span></div>
+              <div class="help-item"><span class="help-key hl-yellow">弹刀</span><span class="help-desc">双方重击碰撞→弹远+各-1体力</span></div>
+              <div class="help-item"><span class="help-key" style="color:#ff8844">霸体</span><span class="help-desc">重击蓄力中吸收轻击不受伤</span></div>
+              <div class="help-item"><span class="help-key hl-gold">完美闪避</span><span class="help-desc">闪避瞬间躲过攻击→不消耗体力</span></div>
+              <div class="help-item"><span class="help-key" style="color:#ff88ff">变招</span><span class="help-desc">攻击前摇中切换动作，消耗2体力（出刀时看到虚线弧预告）</span></div>
+              <div class="help-item"><span class="help-key hl-red">处决</span><span class="help-desc">体力=0时被打→扣35%最大血量</span></div>
+
+              <div class="section-title">体力系统（共5点）</div>
+              <div class="help-item"><span class="help-key" style="color:#aaa">恢复</span><span class="help-desc">每2.5秒回1点</span></div>
+              <div class="help-item"><span class="help-key" style="color:#aaa">招架中</span><span class="help-desc">暂停恢复2.5秒</span></div>
+              <div class="help-item"><span class="help-key hl-red">体力=0</span><span class="help-desc">行动变慢，可被处决</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="help-footer">按 <span class="key-badge">H</span> 关闭帮助并继续游戏</div>
+      </div>
+    </div>
+  </div>
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
