@@ -36,7 +36,7 @@ export class Player {
       }
     }
 
-    // 攻击
+    // 攻击：按下瞬间触发（配合预输入缓冲系统，不会丢输入）
     if (input.mouseLeftDown) cmd.lightAttack = true;
     if (input.mouseRightDown) cmd.heavyAttack = true;
 

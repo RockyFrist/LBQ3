@@ -1,0 +1,6286 @@
+﻿{
+  "summary": {
+    "config": {
+      "rounds": 1,
+      "diffA": 5,
+      "diffB": 5,
+      "elapsed": "0.03s"
+    },
+    "wins": {
+      "A": 1,
+      "B": 0,
+      "draw": 0,
+      "rateA": 100,
+      "rateB": 0
+    },
+    "avgDuration": 15.38,
+    "hits": {
+      "A": {
+        "light": 5,
+        "heavy": 1,
+        "total": 6
+      },
+      "B": {
+        "light": 6,
+        "heavy": 0,
+        "total": 6
+      }
+    },
+    "damage": {
+      "A": 68,
+      "B": 48
+    },
+    "parry": {
+      "A": {
+        "precise": 0,
+        "semi": 0,
+        "total": 1
+      },
+      "B": {
+        "precise": 0,
+        "semi": 1,
+        "total": 2
+      }
+    },
+    "clash": {
+      "light": 1,
+      "heavy": 1
+    },
+    "blockBreak": {
+      "A": 0,
+      "B": 0
+    },
+    "execution": {
+      "A": 2,
+      "B": 1
+    },
+    "whiff": {
+      "A": {
+        "light": 0,
+        "heavy": 0,
+        "parryCounter": 0,
+        "total": 0
+      },
+      "B": {
+        "light": 0,
+        "heavy": 0,
+        "parryCounter": 0,
+        "total": 0
+      }
+    },
+    "dodge": {
+      "A": {
+        "total": 0,
+        "perfect": 0
+      },
+      "B": {
+        "total": 0,
+        "perfect": 0
+      }
+    },
+    "feint": {
+      "A": 2,
+      "B": 3,
+      "perRound": 5,
+      "perAI": 2.5
+    },
+    "avgWinnerHp": {
+      "A": 27,
+      "B": 0
+    }
+  },
+  "rounds": [
+    {
+      "round": 1,
+      "winner": "A",
+      "duration": 15.38,
+      "hpA": 27,
+      "hpB": 0,
+      "events": [
+        {
+          "t": 0.5,
+          "type": "attackStart",
+          "dist": 34,
+          "A": {
+            "id": "A",
+            "x": 657.9,
+            "y": 448.4,
+            "hp": 100,
+            "stamina": 5,
+            "state": "lightAttack",
+            "phase": "startup",
+            "attackType": "light",
+            "facing": 0,
+            "exhausted": false
+          },
+          "B": {
+            "id": "B",
+            "x": 692.1,
+            "y": 448.4,
+            "hp": 100,
+            "stamina": 5,
+            "state": "lightAttack",
+            "phase": "startup",
+            "attackType": "light",
+            "facing": 180,
+            "exhausted": false
+          },
+          "who": "A",
+          "attackType": "light",
+          "step": 1
+        },
+        {
+          "t": 0.5,
+          "type": "attackStart",
+          "dist": 34,
+          "A": {
+            "id": "A",
+            "x": 657.9,
+            "y": 448.4,
+            "hp": 100,
+            "stamina": 5,
+            "state": "lightAttack",
+            "phase": "startup",
+            "attackType": "light",
+            "facing": 0,
+            "exhausted": false
+          },
+          "B": {
+            "id": "B",
+            "x": 692.1,
+            "y": 448.4,
+            "hp": 100,
+            "stamina": 5,
+            "state": "lightAttack",
+            "phase": "startup",
+            "attackType": "light",
+            "facing": 180,
+            "exhausted": false
+          },
+          "who": "B",
+          "attackType": "light",
+          "step": 1
+        },
+        {
+          "t": 0.517,
+          "type": "stateEnd",
+          "dist": 33,
+          "A": {
+            "id": "A",
+            "x": 658.7,
+            "y": 449.5,
+            "hp": 100,
+            "stamina": 3,
+            "state": "heavyAttack",
+            "phase": "startup",
+            "attackType": "heavy",
+            "facing": 0,
+            "exhausted": false
+          },
+          "B": {
+            "id": "B",
+            "x": 691.3,
+            "y": 449.5,
+            "hp": 100,
+            "stamina": 3,
+            "state": "heavyAttack",
+            "phase": "startup",
+            "attackType": "heavy",
+            "facing": 180,
+            "exhausted": false
+          },
+          "who": "A",
+          "prevState": "lightAttack",
+          "duration": 0.017
+        },
+        {
+          "t": 0.517,
+          "type": "stateEnd",
+          "dist": 33,
+          "A": {
+            "id": "A",
+            "x": 658.7,
+            "y": 449.5,
+            "hp": 100,
+            "stamina": 3,
+            "state": "heavyAttack",
+            "phase": "startup",
+            "attackType": "heavy",
+            "facing": 0,
+            "exhausted": false
+          },
+          "B": {
+            "id": "B",
+            "x": 691.3,
+            "y": 449.5,
+            "hp": 100,
+            "stamina": 3,
+            "state": "heavyAttack",
+            "phase": "startup",
+            "attackType": "heavy",
+            "facing": 180,
+            "exhausted": false
+          },
+          "who": "B",
+          "prevState": "lightAttack",
+          "duration": 0.017
+        },
+        {
+          "t": 0.517,
+          "type": "attackStart",
+          "dist": 33,
+          "A": {
+            "id": "A",
+            "x": 658.7,
+            "y": 449.5,
+            "hp": 100,
+            "stamina": 3,
+            "state": "heavyAttack",
+            "phase": "startup",
+            "attackType": "heavy",
+            "facing": 0,
+            "exhausted": false
+          },
+          "B": {
+            "id": "B",
+            "x": 691.3,
+            "y": 449.5,
+            "hp": 100,
+            "stamina": 3,
+            "state": "heavyAttack",
+            "phase": "startup",
+            "attackType": "heavy",
+            "facing": 180,
+            "exhausted": false
+          },
+          "who": "A",
+          "attackType": "heavy"
+        },
+        {
+          "t": 0.517,
+          "type": "attackStart",
+          "dist": 33,
+          "A": {
+            "id": "A",
+            "x": 658.7,
+            "y": 449.5,
+            "hp": 100,
+            "stamina": 3,
+            "state": "heavyAttack",
+            "phase": "startup",
+            "attackType": "heavy",
+            "facing": 0,
+            "exhausted": false
+          },
+          "B": {
+            "id": "B",
+            "x": 691.3,
+            "y": 449.5,
+            "hp": 100,
+            "stamina": 3,
+            "state": "heavyAttack",
+            "phase": "startup",
+            "attackType": "heavy",
+            "facing": 180,
+            "exhausted": false
+          },
+          "who": "B",
+          "attackType": "heavy"
+        },
+        {
+          "t": 0.767,
+          "type": "heavyClash",
+          "dist": 36,
+          "A": {
+            "id": "A",
+            "x": 656.9,
+            "y": 453.6,
+            "hp": 100,
+            "stamina": 2,
+            "state": "staggered",
+            "phase": "none",
+            "attackType": "none",
+            "facing": 0,
+            "exhausted": false
+          },
+          "B": {
+            "id": "B",
+            "x": 692.9,
+            "y": 453.6,
+            "hp": 100,
+            "stamina": 2,
+            "state": "staggered",
+            "phase": "none",
+            "attackType": "none",
+            "facing": 180,
+            "exhausted": false
+          }
+        },
+        {
+          "t": 0.783,
+          "type": "phaseChange",
+          "dist": 58,
+          "A": {
+            "id": "A",
+            "x": 646.2,
+            "y": 453.6,
+            "hp": 100,
+            "stamina": 2,
+            "state": "staggered",
+            "phase": "none",
+            "attackType": "none",
+            "facing": 0,
+            "exhausted": false
+          },
+          "B": {
+            "id": "B",
+            "x": 703.7,
+            "y": 453.6,
+            "hp": 100,
+            "stamina": 2,
+            "state": "staggered",
+            "phase": "none",
+            "attackType": "none",
+            "facing": 180,
+            "exhausted": false
+          },
+          "who": "A",
+          "from": "startup",
+          "to": "none",
+          "phaseDur": 0.267
+        },
+        {
+          "t": 0.783,
+          "type": "phaseChange",
+          "dist": 58,
+          "A": {
+            "id": "A",
+            "x": 646.2,
+            "y": 453.6,
+            "hp": 100,
+            "stamina": 2,
+            "state": "staggered",
+            "phase": "none",
+            "attackType": "none",
+            "facing": 0,
+            "exhausted": false
+          },
+          "B": {
+            "id": "B",
+            "x": 703.7,
+            "y": 453.6,
+            "hp": 100,
+            "stamina": 2,
+            "state": "staggered",
+            "phase": "none",
+            "attackType": "none",
+            "facing": 180,
+            "exhausted": false
+          },
+          "who": "B",
+          "from": "startup",
+          "to": "none",
+          "phaseDur": 0.267
+        },
+        {
+          "t": 1.183,
+          "type": "stateEnd",
+          "dist": 114,
+          "A": {
+            "id": "A",
+            "x": 618.1,
+            "y": 453.6,
+            "hp": 100,
+            "stamina": 2,
+            "state": "idle",
+            "phase": "none",
+            "attackType": "none",
+            "facing": 0,
+            "exhausted": false
+          },
+          "B": {
+            "id": "B",
+            "x": 731.8,
+            "y": 453.6,
+            "hp": 100,
+            "stamina": 2,
+            "state": "idle",
+            "phase": "none",
+            "attackType": "none",
+            "facing": 180,
+            "exhausted": false
+          },
+          "who": "A",
+          "prevState": "staggered",
+          "duration": 0.667
+        },
+        {
+          "t": 1.183,
+          "type": "stateEnd",
+          "dist": 114,
+          "A": {
+            "id": "A",
+            "x": 618.1,
+            "y": 453.6,
+            "hp": 100,
+            "stamina": 2,
+            "state": "idle",
+            "phase": "none",
+            "attackType": "none",
+            "facing": 0,
+            "exhausted": false
+          },
+          "B": {
+            "id": "B",
+            "x": 731.8,
+            "y": 453.6,
+            "hp": 100,
+            "stamina": 2,
+            "state": "idle",
+            "phase": "none",
+            "attackType": "none",
+            "facing": 180,
+            "exhausted": false
+          },
+          "who": "B",
+          "prevState": "staggered",
+          "duration": 0.667
+        },
+        {
+          "t": 1.567,
+          "type": "attackStart",
+          "dist": 37,
+          "A": {
+            "id": "A",
+            "x": 655.4,
+            "y": 482,
+            "hp": 100,
+            "stamina": 2,
+            "state": "lightAttack",
+            "phase": "startup",
+            "attackType": "light",
+            "facing": -13.6,
+            "exhausted": false
+          },
+          "B": {
+            "id": "B",
+            "x": 691.1,
+            "y": 473.4,
+            "hp": 100,
+            "stamina": 2,
+            "state": "lightAttack",
+            "phase": "startup",
+            "attackType": "light",
+            "facing": 166.4,
+            "exhausted": false
+          },
+          "who": "A",
+          "attackType": "light",
+          "step": 1
+        },
+        {
+          "t": 1.567,
+          "type": "attackStart",
+          "dist": 37,
+          "A": {
+            "id": "A",
+            "x": 655.4,
+            "y": 482,
+            "hp": 100,
+            "stamina": 2,
+            "state": "lightAttack",
+            "phase": "startup",
+            "attackType": "light",
+            "facing": -13.6,
+            "exhausted": false
+          },
+          "B": {
+            "id": "B",
+            "x": 691.1,
+            "y": 473.4,
+            "hp": 100,
+            "stamina": 2,
+            "state": "lightAttack",
+            "phase": "startup",
+            "attackType": "light",
+            "facing": 166.4,
+            "exhausted": false
+          },
+          "who": "B",
+          "attackType": "light",
+          "step": 1
+        },
+        {
+          "t": 1.633,
+          "type": "lightClash",
+          "dist": 36,
+          "A": {
+            "id": "A",
+            "x": 655,
+            "y": 478.9,
+            "hp": 100,
+            "stamina": 2,
+            "state": "staggered",
+            "phase": "none",
+            "attackType": "none",
+            "facing": -13.6,
+            "exhausted": false
+          },
+          "B": {
+            "id": "B",
+            "x": 690,
+            "y": 470.4,
+            "hp": 100,
+            "stamina": 2,
+            "state": "staggered",
+            "phase": "none",
+            "attackType": "none",
+            "facing": 166.4,
+            "exhausted": false
+          }
+        },
+        {
+          "t": 1.65,
+          "type": "phaseChange",
+          "dist": 45,
+          "A": {
+            "id": "A",
+            "x": 650.8,
+            "y": 479.9,
+            "hp": 100,
+            "stamina": 2,
+            "state": "staggered",
+            "phase": "none",
+            "attackType": "none",
+            "facing": -13.6,
+            "exhausted": false
+          },
+          "B": {
+            "id": "B",
+            "x": 694.2,
+            "y": 469.4,
+            "hp": 100,
+            "stamina": 2,
+            "state": "staggered",
+            "phase": "none",
+            "attackType": "none",
+            "facing": 166.4,
+            "exhausted": false
+          },
+          "who": "A",
+          "from": "startup",
+          "to": "none",
+          "phaseDur": 0.083
+        },
+        {
+          "t": 1.65,
+          "type": "phaseChange",
+          "dist": 45,
+          "A": {
+            "id": "A",
+            "x": 650.8,
+            "y": 479.9,
+            "hp": 100,
+            "stamina": 2,
+            "state": "staggered",
+            "phase": "none",
+            "attackType": "none",
+            "facing": -13.6,
+            "exhausted": false
+          },
+          "B": {
+            "id": "B",
+            "x": 694.2,
+            "y": 469.4,
+            "hp": 100,
+            "stamina": 2,
+            "state": "staggered",
+            "phase": "none",
+            "attackType": "none",
+            "facing": 166.4,
+            "exhausted": false
+          },
+          "who": "B",
+          "from": "startup",
+          "to": "none",
+          "phaseDur": 0.083
+        },
+        {
+          "t": 1.9,
+          "type": "stateEnd",
+          "dist": 67,
+          "A": {
+            "id": "A",
+            "x": 639.9,
+            "y": 482.5,
+            "hp": 100,
+            "stamina": 2,
+            "state": "idle",
+            "phase": "none",
+            "attackType": "none",
+            "facing": -13.6,
+            "exhausted": false
+          },
+          "B": {
+            "id": "B",
+            "x": 705.2,
+            "y": 466.8,
+            "hp": 100,
+            "stamina": 2,
+            "state": "idle",
+            "phase": "none",
+            "attackType": "none",
+            "facing": 166.4,
+            "exhausted": false
+          },
+          "who": "A",
+          "prevState": "staggered",
+          "duration": 0.333
+        },
+        {
+          "t": 1.9,
+          "type": "stateEnd",
+          "dist": 67,
+          "A": {
+            "id": "A",
+            "x": 639.9,
+            "y": 482.5,
+            "hp": 100,
+            "stamina": 2,
+            "state": "idle",
+            "phase": "none",
+            "attackType": "none",
+            "facing": -13.6,
+            "exhausted": false
+          },
+          "B": {
+            "id": "B",
+            "x": 705.2,
+            "y": 466.8,
+            "hp": 100,
+            "stamina": 2,
+            "state": "idle",
+            "phase": "none",
+            "attackType": "none",
+            "facing": 166.4,
+            "exhausted": false
+          },
+          "who": "B",
+          "prevState": "staggered",
+          "duration": 0.333
+        },
+        {
+          "t": 1.917,
+          "type": "attackStart",
+          "dist": 67,
+          "A": {
+            "id": "A",
+            "x": 639.9,
+            "y": 482.5,
+            "hp": 100,
+            "stamina": 2,
+            "state": "heavyAttack",
+            "phase": "startup",
+            "attackType": "heavy",
+            "facing": -13.6,
+            "exhausted": false
+          },
+          "B": {
+            "id": "B",
+            "x": 705.2,
+            "y": 466.8,
+            "hp": 100,
+            "stamina": 2,
+            "state": "lightAttack",
+            "phase": "startup",
+            "attackType": "light",
+            "facing": 166.4,
+            "exhausted": false
+          },
+          "who": "A",
+          "attackType": "heavy"
+        },
+        {
+          "t": 1.917,
+          "type": "attackStart",
+          "dist": 67,
+          "A": {
+            "id": "A",
+            "x": 639.9,
+            "y": 482.5,
+            "hp": 100,
+            "stamina": 2,
+            "state": "heavyAttack",
+            "phase": "startup",
+            "attackType": "heavy",
+            "facing": -13.6,
+            "exhausted": false
+          },
+          "B": {
+            "id": "B",
+            "x": 705.2,
+            "y": 466.8,
+            "hp": 100,
+            "stamina": 2,
+            "state": "lightAttack",
+            "phase": "startup",
+            "attackType": "light",
+            "facing": 166.4,
+            "exhausted": false
+          },
+          "who": "B",
+          "attackType": "light",
+          "step": 1
+        },
+        {
+          "t": 2.067,
+          "type": "phaseChange",
+          "dist": 46,
+          "A": {
+            "id": "A",
+            "x": 643.9,
+            "y": 481.5,
+            "hp": 100,
+            "stamina": 3,
+            "state": "heavyAttack",
+            "phase": "startup",
+            "attackType": "heavy",
+            "facing": -13.6,
+            "exhausted": false
+          },
+          "B": {
+            "id": "B",
+            "x": 688.1,
+            "y": 470.9,
+            "hp": 100,
+            "stamina": 3,
+            "state": "lightAttack",
+            "phase": "active",
+            "attackType": "light",
+            "facing": 166.4,
+            "exhausted": false
+          },
+          "who": "B",
+          "from": "startup",
+          "to": "active",
+          "phaseDur": 0.15
+        },
+        {
+          "t": 2.217,
+          "type": "phaseChange",
+          "dist": 34,
+          "A": {
+            "id": "A",
+            "x": 646.8,
+            "y": 480.9,
+            "hp": 100,
+            "stamina": 3,
+            "state": "heavyAttack",
+            "phase": "startup",
+            "attackType": "heavy",
+            "facing": -13.6,
+            "exhausted": false
+          },
+          "B": {
+            "id": "B",
+            "x": 679.7,
+            "y": 472.9,
+            "hp": 100,
+            "stamina": 3,
+            "state": "lightAttack",
+            "phase": "recovery",
+            "attackType": "light",
+            "facing": 166.4,
+            "exhausted": false
+          },
+          "who": "B",
+          "from": "active",
+          "to": "recovery",
+          "phaseDur": 0.15
+        },
+        {
+          "t": 2.583,
+          "type": "stateEnd",
+          "dist": 35,
+          "A": {
+            "id": "A",
+            "x": 653.9,
+            "y": 479.1,
+            "hp": 100,
+            "stamina": 3,
+            "state": "heavyAttack",
+            "phase": "startup",
+            "attackType": "heavy",
+            "facing": -13.6,
+            "exhausted": false
+          },
+          "B": {
+            "id": "B",
+            "x": 688.2,
+            "y": 470.9,
+            "hp": 100,
+            "stamina": 3,
+            "state": "idle",
+            "phase": "none",
+            "attackType": "none",
+            "facing": 166.4,
+            "exhausted": false
+          },
+          "who": "B",
+          "prevState": "lightAttack",
+          "duration": 0.667
+        },
+        {
+          "t": 2.583,
+          "type": "phaseChange",
+          "dist": 35,
+          "A": {
+            "id": "A",
+            "x": 653.9,
+            "y": 479.1,
+            "hp": 100,
+            "stamina": 3,
+            "state": "heavyAttack",
+            "phase": "startup",
+            "attackType": "heavy",
+            "facing": -13.6,
+            "exhausted": false
+          },
+          "B": {
+            "id": "B",
+            "x": 688.2,
+            "y": 470.9,
+            "hp": 100,
+            "stamina": 3,
+            "state": "idle",
+            "phase": "none",
+            "attackType": "none",
+            "facing": 166.4,
+            "exhausted": false
+          },
+          "who": "B",
+          "from": "recovery",
+          "to": "none",
+          "phaseDur": 0
+        },
+        {
+          "t": 2.617,
+          "type": "phaseChange",
+          "dist": 9,
+          "A": {
+            "id": "A",
+            "x": 679.7,
+            "y": 472.9,
+            "hp": 100,
+            "stamina": 3,
+            "state": "heavyAttack",
+            "phase": "active",
+            "attackType": "heavy",
+            "facing": -13.6,
+            "exhausted": false
+          },
+          "B": {
+            "id": "B",
+            "x": 688.9,
+            "y": 470.7,
+            "hp": 100,
+            "stamina": 3,
+            "state": "idle",
+            "phase": "none",
+            "attackType": "none",
+            "facing": 166.4,
+            "exhausted": false
+          },
+          "who": "A",
+          "from": "startup",
+          "to": "active",
+          "phaseDur": 0.7
+        },
+        {
+          "t": 2.617,
+          "type": "hit",
+          "dist": 36,
+          "A": {
+            "id": "A",
+            "x": 666.8,
+            "y": 476,
+            "hp": 100,
+            "stamina": 3,
+            "state": "heavyAttack",
+            "phase": "active",
+            "attackType": "heavy",
+            "facing": -13.6,
+            "exhausted": false
+          },
+          "B": {
+            "id": "B",
+            "x": 701.8,
+            "y": 467.6,
+            "hp": 72,
+            "stamina": 3,
+            "state": "staggered",
+            "phase": "none",
+            "attackType": "none",
+            "facing": 166.4,
+            "exhausted": false
+          },
+          "who": "A",
+          "target": "B",
+          "attackType": "heavy",
+          "damage": 28,
+          "targetState": "staggered"
+        },
+        {
+          "t": 2.8,
+          "type": "phaseChange",
+          "dist": 96,
+          "A": {
+            "id": "A",
+            "x": 675.7,
+            "y": 473.9,
+            "hp": 100,
+            "stamina": 3,
+            "state": "heavyAttack",
+            "phase": "recovery",
+            "attackType": "heavy",
+            "facing": -13.6,
+            "exhausted": false
+          },
+          "B": {
+            "id": "B",
+            "x": 769,
+            "y": 451.4,
+            "hp": 72,
+            "stamina": 3,
+            "state": "staggered",
+            "phase": "none",
+            "attackType": "none",
+            "facing": 166.4,
+            "exhausted": false
+          },
+          "who": "A",
+          "from": "active",
+          "to": "recovery",
+          "phaseDur": 0.183
+        },
+        {
+          "t": 2.95,
+          "type": "stateEnd",
+          "dist": 96,
+          "A": {
+            "id": "A",
+            "x": 675.7,
+            "y": 473.9,
+            "hp": 100,
+            "stamina": 3,
+            "state": "heavyAttack",
+            "phase": "recovery",
+            "attackType": "heavy",
+            "facing": -13.6,
+            "exhausted": false
+          },
+          "B": {
+            "id": "B",
+            "x": 769,
+            "y": 451.4,
+            "hp": 72,
+            "stamina": 3,
+            "state": "idle",
+            "phase": "none",
+            "attackType": "none",
+            "facing": 166.4,
+            "exhausted": false
+          },
+          "who": "B",
+          "prevState": "staggered",
+          "duration": 0.367
+        },
+        {
+          "t": 2.967,
+          "type": "blockStart",
+          "dist": 96,
+          "A": {
+            "id": "A",
+            "x": 675.7,
+            "y": 473.9,
+            "hp": 100,
+            "stamina": 3,
+            "state": "heavyAttack",
+            "phase": "recovery",
+            "attackType": "heavy",
+            "facing": -13.6,
+            "exhausted": false
+          },
+          "B": {
+            "id": "B",
+            "x": 769,
+            "y": 451.4,
+            "hp": 72,
+            "stamina": 3,
+            "state": "blocking",
+            "phase": "none",
+            "attackType": "none",
+            "facing": 166.4,
+            "exhausted": false
+          },
+          "who": "B"
+        },
+        {
+          "t": 3.417,
+          "type": "stateEnd",
+          "dist": 96,
+          "A": {
+            "id": "A",
+            "x": 675.7,
+            "y": 473.9,
+            "hp": 100,
+            "stamina": 3,
+            "state": "heavyAttack",
+            "phase": "recovery",
+            "attackType": "heavy",
+            "facing": -13.6,
+            "exhausted": false
+          },
+          "B": {
+            "id": "B",
+            "x": 769,
+            "y": 451.4,
+            "hp": 72,
+            "stamina": 3,
+            "state": "blockRecovery",
+            "phase": "none",
+            "attackType": "none",
+            "facing": 166.4,
+            "exhausted": false
+          },
+          "who": "B",
+          "prevState": "blocking",
+          "duration": 0.45
+        },
+        {
+          "t": 3.45,
+          "type": "stateEnd",
+          "dist": 96,
+          "A": {
+            "id": "A",
+            "x": 675.7,
+            "y": 473.9,
+            "hp": 100,
+            "stamina": 3,
+            "state": "idle",
+            "phase": "none",
+            "attackType": "none",
+            "facing": -13.6,
+            "exhausted": false
+          },
+          "B": {
+            "id": "B",
+            "x": 769,
+            "y": 451.4,
+            "hp": 72,
+            "stamina": 3,
+            "state": "blockRecovery",
+            "phase": "none",
+            "attackType": "none",
+            "facing": 166.4,
+            "exhausted": false
+          },
+          "who": "A",
+          "prevState": "heavyAttack",
+          "duration": 1.533
+        },
+        {
+          "t": 3.45,
+          "type": "phaseChange",
+          "dist": 96,
+          "A": {
+            "id": "A",
+            "x": 675.7,
+            "y": 473.9,
+            "hp": 100,
+            "stamina": 3,
+            "state": "idle",
+            "phase": "none",
+            "attackType": "none",
+            "facing": -13.6,
+            "exhausted": false
+          },
+          "B": {
+            "id": "B",
+            "x": 769,
+            "y": 451.4,
+            "hp": 72,
+            "stamina": 3,
+            "state": "blockRecovery",
+            "phase": "none",
+            "attackType": "none",
+            "facing": 166.4,
+            "exhausted": false
+          },
+          "who": "A",
+          "from": "recovery",
+          "to": "none",
+          "phaseDur": 0
+        },
+        {
+          "t": 3.55,
+          "type": "attackStart",
+          "dist": 87,
+          "A": {
+            "id": "A",
+            "x": 682.3,
+            "y": 462.4,
+            "hp": 100,
+            "stamina": 3,
+            "state": "lightAttack",
+            "phase": "startup",
+            "attackType": "light",
+            "facing": -8.4,
+            "exhausted": false
+          },
+          "B": {
+            "id": "B",
+            "x": 769,
+            "y": 451.4,
+            "hp": 72,
+            "stamina": 3,
+            "state": "blockRecovery",
+            "phase": "none",
+            "attackType": "none",
+            "facing": 171.6,
+            "exhausted": false
+          },
+          "who": "A",
+          "attackType": "light",
+          "step": 1
+        },
+        {
+          "t": 3.7,
+          "type": "phaseChange",
+          "dist": 67,
+          "A": {
+            "id": "A",
+            "x": 701.9,
+            "y": 455,
+            "hp": 100,
+            "stamina": 3,
+            "state": "lightAttack",
+            "phase": "active",
+            "attackType": "light",
+            "facing": -3.3,
+            "exhausted": false
+          },
+          "B": {
+            "id": "B",
+            "x": 769,
+            "y": 451.4,
+            "hp": 72,
+            "stamina": 3,
+            "state": "blockRecovery",
+            "phase": "none",
+            "attackType": "none",
+            "facing": 176.7,
+            "exhausted": false
+          },
+          "who": "A",
+          "from": "startup",
+          "to": "active",
+          "phaseDur": 0.15
+        },
+        {
+          "t": 3.7,
+          "type": "hit",
+          "dist": 67,
+          "A": {
+            "id": "A",
+            "x": 701.9,
+            "y": 455,
+            "hp": 100,
+            "stamina": 3,
+            "state": "lightAttack",
+            "phase": "active",
+            "attackType": "light",
+            "facing": -3.3,
+            "exhausted": false
+          },
+          "B": {
+            "id": "B",
+            "x": 769,
+            "y": 451.4,
+            "hp": 64,
+            "stamina": 3,
+            "state": "staggered",
+            "phase": "none",
+            "attackType": "none",
+            "facing": 176.7,
+            "exhausted": false
+          },
+          "who": "A",
+          "target": "B",
+          "attackType": "light",
+          "damage": 8,
+          "targetState": "staggered"
+        },
+        {
+          "t": 3.85,
+          "type": "phaseChange",
+          "dist": 81,
+          "A": {
+            "id": "A",
+            "x": 714.4,
+            "y": 453.4,
+            "hp": 100,
+            "stamina": 3,
+            "state": "lightAttack",
+            "phase": "recovery",
+            "attackType": "light",
+            "facing": -3.3,
+            "exhausted": false
+          },
+          "B": {
+            "id": "B",
+            "x": 794.9,
+            "y": 450,
+            "hp": 64,
+            "stamina": 3,
+            "state": "staggered",
+            "phase": "none",
+            "attackType": "none",
+            "facing": 176.7,
+            "exhausted": false
+          },
+          "who": "A",
+          "from": "active",
+          "to": "recovery",
+          "phaseDur": 0.15
+        },
+        {
+          "t": 4.033,
+          "type": "stateEnd",
+          "dist": 81,
+          "A": {
+            "id": "A",
+            "x": 714.4,
+            "y": 453.4,
+            "hp": 100,
+            "stamina": 4,
+            "state": "lightAttack",
+            "phase": "recovery",
+            "attackType": "light",
+            "facing": -3.3,
+            "exhausted": false
+          },
+          "B": {
+            "id": "B",
+            "x": 794.9,
+            "y": 450,
+            "hp": 64,
+            "stamina": 3,
+            "state": "idle",
+            "phase": "none",
+            "attackType": "none",
+            "facing": 176.7,
+            "exhausted": false
+          },
+          "who": "B",
+          "prevState": "staggered",
+          "duration": 0.617
+        },
+        {
+          "t": 4.05,
+          "type": "attackStart",
+          "dist": 81,
+          "A": {
+            "id": "A",
+            "x": 714.4,
+            "y": 453.4,
+            "hp": 100,
+            "stamina": 4,
+            "state": "lightAttack",
+            "phase": "recovery",
+            "attackType": "light",
+            "facing": -3.3,
+            "exhausted": false
+          },
+          "B": {
+            "id": "B",
+            "x": 794.9,
+            "y": 450,
+            "hp": 64,
+            "stamina": 3,
+            "state": "lightAttack",
+            "phase": "startup",
+            "attackType": "light",
+            "facing": 176.7,
+            "exhausted": false
+          },
+          "who": "B",
+          "attackType": "light",
+          "step": 1
+        },
+        {
+          "t": 4.2,
+          "type": "phaseChange",
+          "dist": 65,
+          "A": {
+            "id": "A",
+            "x": 714.4,
+            "y": 453.4,
+            "hp": 100,
+            "stamina": 4,
+            "state": "lightAttack",
+            "phase": "recovery",
+            "attackType": "light",
+            "facing": -3.3,
+            "exhausted": false
+          },
+          "B": {
+            "id": "B",
+            "x": 778.9,
+            "y": 450.7,
+            "hp": 64,
+            "stamina": 3,
+            "state": "lightAttack",
+            "phase": "active",
+            "attackType": "light",
+            "facing": 177.6,
+            "exhausted": false
+          },
+          "who": "B",
+          "from": "startup",
+          "to": "active",
+          "phaseDur": 0.15
+        },
+        {
+          "t": 4.2,
+          "type": "hit",
+          "dist": 65,
+          "A": {
+            "id": "A",
+            "x": 714.4,
+            "y": 453.4,
+            "hp": 92,
+            "stamina": 4,
+            "state": "staggered",
+            "phase": "none",
+            "attackType": "none",
+            "facing": -3.3,
+            "exhausted": false
+          },
+          "B": {
+            "id": "B",
+            "x": 778.9,
+            "y": 450.7,
+            "hp": 64,
+            "stamina": 3,
+            "state": "lightAttack",
+            "phase": "active",
+            "attackType": "light",
+            "facing": 177.6,
+            "exhausted": false
+          },
+          "who": "B",
+          "target": "A",
+          "attackType": "light",
+          "damage": 8,
+          "targetState": "staggered"
+        },
+        {
+          "t": 4.217,
+          "type": "phaseChange",
+          "dist": 70,
+          "A": {
+            "id": "A",
+            "x": 707.2,
+            "y": 453.7,
+            "hp": 92,
+            "stamina": 4,
+            "state": "staggered",
+            "phase": "none",
+            "attackType": "none",
+            "facing": -3.3,
+            "exhausted": false
+          },
+          "B": {
+            "id": "B",
+            "x": 777.5,
+            "y": 450.7,
+            "hp": 64,
+            "stamina": 3,
+            "state": "lightAttack",
+            "phase": "active",
+            "attackType": "light",
+            "facing": 177.6,
+            "exhausted": false
+          },
+          "who": "A",
+          "from": "recovery",
+          "to": "none",
+          "phaseDur": 0.367
+        },
+        {
+          "t": 4.35,
+          "type": "phaseChange",
+          "dist": 78,
+          "A": {
+            "id": "A",
+            "x": 688.5,
+            "y": 454.5,
+            "hp": 92,
+            "stamina": 4,
+            "state": "staggered",
+            "phase": "none",
+            "attackType": "none",
+            "facing": -3.3,
+            "exhausted": false
+          },
+          "B": {
+            "id": "B",
+            "x": 766.9,
+            "y": 451.2,
+            "hp": 64,
+            "stamina": 3,
+            "state": "lightAttack",
+            "phase": "recovery",
+            "attackType": "light",
+            "facing": 177.6,
+            "exhausted": false
+          },
+          "who": "B",
+          "from": "active",
+          "to": "recovery",
+          "phaseDur": 0.15
+        },
+        {
+          "t": 4.367,
+          "type": "phaseChange",
+          "dist": 78,
+          "A": {
+            "id": "A",
+            "x": 688.5,
+            "y": 454.5,
+            "hp": 92,
+            "stamina": 4,
+            "state": "staggered",
+            "phase": "none",
+            "attackType": "none",
+            "facing": -3.3,
+            "exhausted": false
+          },
+          "B": {
+            "id": "B",
+            "x": 766.9,
+            "y": 451.2,
+            "hp": 64,
+            "stamina": 3,
+            "state": "lightAttack",
+            "phase": "startup",
+            "attackType": "light",
+            "facing": 177.6,
+            "exhausted": false
+          },
+          "who": "B",
+          "from": "recovery",
+          "to": "startup",
+          "phaseDur": 0.017
+        },
+        {
+          "t": 4.517,
+          "type": "phaseChange",
+          "dist": 62,
+          "A": {
+            "id": "A",
+            "x": 688.5,
+            "y": 454.5,
+            "hp": 92,
+            "stamina": 4,
+            "state": "staggered",
+            "phase": "none",
+            "attackType": "none",
+            "facing": -3.3,
+            "exhausted": false
+          },
+          "B": {
+            "id": "B",
+            "x": 750.7,
+            "y": 451.8,
+            "hp": 64,
+            "stamina": 3,
+            "state": "lightAttack",
+            "phase": "active",
+            "attackType": "light",
+            "facing": 177.6,
+            "exhausted": false
+          },
+          "who": "B",
+          "from": "startup",
+          "to": "active",
+          "phaseDur": 0.15
+        },
+        {
+          "t": 4.517,
+          "type": "hit",
+          "dist": 62,
+          "A": {
+            "id": "A",
+            "x": 688.5,
+            "y": 454.5,
+            "hp": 84,
+            "stamina": 4,
+            "state": "staggered",
+            "phase": "none",
+            "attackType": "none",
+            "facing": -3.3,
+            "exhausted": false
+          },
+          "B": {
+            "id": "B",
+            "x": 750.7,
+            "y": 451.8,
+            "hp": 64,
+            "stamina": 3,
+            "state": "lightAttack",
+            "phase": "active",
+            "attackType": "light",
+            "facing": 177.6,
+            "exhausted": false
+          },
+          "who": "B",
+          "target": "A",
+          "attackType": "light",
+          "damage": 8,
+          "targetState": "staggered"
+        },
+        {
+          "t": 4.667,
+          "type": "phaseChange",
+          "dist": 76,
+          "A": {
+            "id": "A",
+            "x": 662.6,
+            "y": 455.6,
+            "hp": 84,
+            "stamina": 4,
+            "state": "staggered",
+            "phase": "none",
+            "attackType": "none",
+            "facing": -3.3,
+            "exhausted": false
+          },
+          "B": {
+            "id": "B",
+            "x": 738.7,
+            "y": 452.3,
+            "hp": 64,
+            "stamina": 3,
+            "state": "lightAttack",
+            "phase": "recovery",
+            "attackType": "light",
+            "facing": 177.6,
+            "exhausted": false
+          },
+          "who": "B",
+          "from": "active",
+          "to": "recovery",
+          "phaseDur": 0.15
+        },
+        {
+          "t": 4.85,
+          "type": "stateEnd",
+          "dist": 76,
+          "A": {
+            "id": "A",
+            "x": 662.6,
+            "y": 455.6,
+            "hp": 84,
+            "stamina": 4,
+            "state": "idle",
+            "phase": "none",
+            "attackType": "none",
+            "facing": -3.3,
+            "exhausted": false
+          },
+          "B": {
+            "id": "B",
+            "x": 738.7,
+            "y": 452.3,
+            "hp": 64,
+            "stamina": 3,
+            "state": "lightAttack",
+            "phase": "recovery",
+            "attackType": "light",
+            "facing": 177.6,
+            "exhausted": false
+          },
+          "who": "A",
+          "prevState": "staggered",
+          "duration": 1.3
+        },
+        {
+          "t": 4.867,
+          "type": "attackStart",
+          "dist": 76,
+          "A": {
+            "id": "A",
+            "x": 662.6,
+            "y": 455.6,
+            "hp": 84,
+            "stamina": 4,
+            "state": "lightAttack",
+            "phase": "startup",
+            "attackType": "light",
+            "facing": -3.3,
+            "exhausted": false
+          },
+          "B": {
+            "id": "B",
+            "x": 738.7,
+            "y": 452.3,
+            "hp": 64,
+            "stamina": 3,
+            "state": "lightAttack",
+            "phase": "recovery",
+            "attackType": "light",
+            "facing": 177.6,
+            "exhausted": false
+          },
+          "who": "A",
+          "attackType": "light",
+          "step": 1
+        },
+        {
+          "t": 5.017,
+          "type": "phaseChange",
+          "dist": 60,
+          "A": {
+            "id": "A",
+            "x": 679,
+            "y": 454.9,
+            "hp": 84,
+            "stamina": 4,
+            "state": "lightAttack",
+            "phase": "active",
+            "attackType": "light",
+            "facing": -2.4,
+            "exhausted": false
+          },
+          "B": {
+            "id": "B",
+            "x": 738.7,
+            "y": 452.3,
+            "hp": 64,
+            "stamina": 3,
+            "state": "lightAttack",
+            "phase": "recovery",
+            "attackType": "light",
+            "facing": 177.6,
+            "exhausted": false
+          },
+          "who": "A",
+          "from": "startup",
+          "to": "active",
+          "phaseDur": 0.15
+        },
+        {
+          "t": 5.017,
+          "type": "hit",
+          "dist": 60,
+          "A": {
+            "id": "A",
+            "x": 679,
+            "y": 454.9,
+            "hp": 84,
+            "stamina": 4,
+            "state": "lightAttack",
+            "phase": "active",
+            "attackType": "light",
+            "facing": -2.4,
+            "exhausted": false
+          },
+          "B": {
+            "id": "B",
+            "x": 738.7,
+            "y": 452.3,
+            "hp": 56,
+            "stamina": 3,
+            "state": "staggered",
+            "phase": "none",
+            "attackType": "none",
+            "facing": 177.6,
+            "exhausted": false
+          },
+          "who": "A",
+          "target": "B",
+          "attackType": "light",
+          "damage": 8,
+          "targetState": "staggered"
+        },
+        {
+          "t": 5.033,
+          "type": "phaseChange",
+          "dist": 66,
+          "A": {
+            "id": "A",
+            "x": 680.4,
+            "y": 454.8,
+            "hp": 84,
+            "stamina": 4,
+            "state": "lightAttack",
+            "phase": "active",
+            "attackType": "light",
+            "facing": -2.4,
+            "exhausted": false
+          },
+          "B": {
+            "id": "B",
+            "x": 745.8,
+            "y": 452,
+            "hp": 56,
+            "stamina": 3,
+            "state": "staggered",
+            "phase": "none",
+            "attackType": "none",
+            "facing": 177.6,
+            "exhausted": false
+          },
+          "who": "B",
+          "from": "recovery",
+          "to": "none",
+          "phaseDur": 0.367
+        },
+        {
+          "t": 5.167,
+          "type": "phaseChange",
+          "dist": 74,
+          "A": {
+            "id": "A",
+            "x": 691,
+            "y": 454.4,
+            "hp": 84,
+            "stamina": 4,
+            "state": "lightAttack",
+            "phase": "recovery",
+            "attackType": "light",
+            "facing": -2.4,
+            "exhausted": false
+          },
+          "B": {
+            "id": "B",
+            "x": 764.6,
+            "y": 451.3,
+            "hp": 56,
+            "stamina": 3,
+            "state": "staggered",
+            "phase": "none",
+            "attackType": "none",
+            "facing": 177.6,
+            "exhausted": false
+          },
+          "who": "A",
+          "from": "active",
+          "to": "recovery",
+          "phaseDur": 0.15
+        },
+        {
+          "t": 5.183,
+          "type": "phaseChange",
+          "dist": 74,
+          "A": {
+            "id": "A",
+            "x": 691,
+            "y": 454.4,
+            "hp": 84,
+            "stamina": 4,
+            "state": "lightAttack",
+            "phase": "startup",
+            "attackType": "light",
+            "facing": -2.4,
+            "exhausted": false
+          },
+          "B": {
+            "id": "B",
+            "x": 764.6,
+            "y": 451.3,
+            "hp": 56,
+            "stamina": 3,
+            "state": "staggered",
+            "phase": "none",
+            "attackType": "none",
+            "facing": 177.6,
+            "exhausted": false
+          },
+          "who": "A",
+          "from": "recovery",
+          "to": "startup",
+          "phaseDur": 0.017
+        },
+        {
+          "t": 5.333,
+          "type": "phaseChange",
+          "dist": 57,
+          "A": {
+            "id": "A",
+            "x": 707.7,
+            "y": 453.7,
+            "hp": 84,
+            "stamina": 4,
+            "state": "lightAttack",
+            "phase": "active",
+            "attackType": "light",
+            "facing": -2.4,
+            "exhausted": false
+          },
+          "B": {
+            "id": "B",
+            "x": 764.6,
+            "y": 451.3,
+            "hp": 56,
+            "stamina": 3,
+            "state": "staggered",
+            "phase": "none",
+            "attackType": "none",
+            "facing": 177.6,
+            "exhausted": false
+          },
+          "who": "A",
+          "from": "startup",
+          "to": "active",
+          "phaseDur": 0.15
+        },
+        {
+          "t": 5.333,
+          "type": "hit",
+          "dist": 57,
+          "A": {
+            "id": "A",
+            "x": 707.7,
+            "y": 453.7,
+            "hp": 84,
+            "stamina": 4,
+            "state": "lightAttack",
+            "phase": "active",
+            "attackType": "light",
+            "facing": -2.4,
+            "exhausted": false
+          },
+          "B": {
+            "id": "B",
+            "x": 764.6,
+            "y": 451.3,
+            "hp": 48,
+            "stamina": 3,
+            "state": "staggered",
+            "phase": "none",
+            "attackType": "none",
+            "facing": 177.6,
+            "exhausted": false
+          },
+          "who": "A",
+          "target": "B",
+          "attackType": "light",
+          "damage": 8,
+          "targetState": "staggered"
+        },
+        {
+          "t": 5.483,
+          "type": "phaseChange",
+          "dist": 71,
+          "A": {
+            "id": "A",
+            "x": 719.7,
+            "y": 453.1,
+            "hp": 84,
+            "stamina": 4,
+            "state": "lightAttack",
+            "phase": "recovery",
+            "attackType": "light",
+            "facing": -2.4,
+            "exhausted": false
+          },
+          "B": {
+            "id": "B",
+            "x": 790.5,
+            "y": 450.2,
+            "hp": 48,
+            "stamina": 3,
+            "state": "staggered",
+            "phase": "none",
+            "attackType": "none",
+            "facing": 177.6,
+            "exhausted": false
+          },
+          "who": "A",
+          "from": "active",
+          "to": "recovery",
+          "phaseDur": 0.15
+        },
+        {
+          "t": 5.667,
+          "type": "stateEnd",
+          "dist": 71,
+          "A": {
+            "id": "A",
+            "x": 719.7,
+            "y": 453.1,
+            "hp": 84,
+            "stamina": 4,
+            "state": "lightAttack",
+            "phase": "recovery",
+            "attackType": "light",
+            "facing": -2.4,
+            "exhausted": false
+          },
+          "B": {
+            "id": "B",
+            "x": 790.5,
+            "y": 450.2,
+            "hp": 48,
+            "stamina": 3,
+            "state": "idle",
+            "phase": "none",
+            "attackType": "none",
+            "facing": 177.6,
+            "exhausted": false
+          },
+          "who": "B",
+          "prevState": "staggered",
+          "duration": 1.617
+        },
+        {
+          "t": 5.683,
+          "type": "attackStart",
+          "dist": 71,
+          "A": {
+            "id": "A",
+            "x": 719.7,
+            "y": 453.1,
+            "hp": 84,
+            "stamina": 4,
+            "state": "lightAttack",
+            "phase": "recovery",
+            "attackType": "light",
+            "facing": -2.4,
+            "exhausted": false
+          },
+          "B": {
+            "id": "B",
+            "x": 790.5,
+            "y": 450.2,
+            "hp": 48,
+            "stamina": 3,
+            "state": "lightAttack",
+            "phase": "startup",
+            "attackType": "light",
+            "facing": 177.6,
+            "exhausted": false
+          },
+          "who": "B",
+          "attackType": "light",
+          "step": 1
+        },
+        {
+          "t": 5.7,
+          "type": "stateEnd",
+          "dist": 70,
+          "A": {
+            "id": "A",
+            "x": 719.7,
+            "y": 453.1,
+            "hp": 84,
+            "stamina": 4,
+            "state": "lightAttack",
+            "phase": "recovery",
+            "attackType": "light",
+            "facing": -2.4,
+            "exhausted": false
+          },
+          "B": {
+            "id": "B",
+            "x": 790.1,
+            "y": 450.2,
+            "hp": 48,
+            "stamina": 1,
+            "state": "blocking",
+            "phase": "none",
+            "attackType": "light",
+            "facing": 177.6,
+            "exhausted": false
+          },
+          "who": "B",
+          "prevState": "lightAttack",
+          "duration": 0.017
+        },
+        {
+          "t": 5.7,
+          "type": "phaseChange",
+          "dist": 70,
+          "A": {
+            "id": "A",
+            "x": 719.7,
+            "y": 453.1,
+            "hp": 84,
+            "stamina": 4,
+            "state": "lightAttack",
+            "phase": "recovery",
+            "attackType": "light",
+            "facing": -2.4,
+            "exhausted": false
+          },
+          "B": {
+            "id": "B",
+            "x": 790.1,
+            "y": 450.2,
+            "hp": 48,
+            "stamina": 1,
+            "state": "blocking",
+            "phase": "none",
+            "attackType": "light",
+            "facing": 177.6,
+            "exhausted": false
+          },
+          "who": "B",
+          "from": "startup",
+          "to": "none",
+          "phaseDur": 0
+        },
+        {
+          "t": 5.7,
+          "type": "blockStart",
+          "dist": 70,
+          "A": {
+            "id": "A",
+            "x": 719.7,
+            "y": 453.1,
+            "hp": 84,
+            "stamina": 4,
+            "state": "lightAttack",
+            "phase": "recovery",
+            "attackType": "light",
+            "facing": -2.4,
+            "exhausted": false
+          },
+          "B": {
+            "id": "B",
+            "x": 790.1,
+            "y": 450.2,
+            "hp": 48,
+            "stamina": 1,
+            "state": "blocking",
+            "phase": "none",
+            "attackType": "light",
+            "facing": 177.6,
+            "exhausted": false
+          },
+          "who": "B"
+        },
+        {
+          "t": 5.85,
+          "type": "stateEnd",
+          "dist": 70,
+          "A": {
+            "id": "A",
+            "x": 719.7,
+            "y": 453.1,
+            "hp": 84,
+            "stamina": 4,
+            "state": "idle",
+            "phase": "none",
+            "attackType": "none",
+            "facing": -2.4,
+            "exhausted": false
+          },
+          "B": {
+            "id": "B",
+            "x": 790.1,
+            "y": 450.2,
+            "hp": 48,
+            "stamina": 1,
+            "state": "blocking",
+            "phase": "none",
+            "attackType": "light",
+            "facing": 177.6,
+            "exhausted": false
+          },
+          "who": "A",
+          "prevState": "lightAttack",
+          "duration": 0.983
+        },
+        {
+          "t": 5.85,
+          "type": "phaseChange",
+          "dist": 70,
+          "A": {
+            "id": "A",
+            "x": 719.7,
+            "y": 453.1,
+            "hp": 84,
+            "stamina": 4,
+            "state": "idle",
+            "phase": "none",
+            "attackType": "none",
+            "facing": -2.4,
+            "exhausted": false
+          },
+          "B": {
+            "id": "B",
+            "x": 790.1,
+            "y": 450.2,
+            "hp": 48,
+            "stamina": 1,
+            "state": "blocking",
+            "phase": "none",
+            "attackType": "light",
+            "facing": 177.6,
+            "exhausted": false
+          },
+          "who": "A",
+          "from": "recovery",
+          "to": "none",
+          "phaseDur": 0
+        },
+        {
+          "t": 6.217,
+          "type": "stateEnd",
+          "dist": 34,
+          "A": {
+            "id": "A",
+            "x": 764.4,
+            "y": 427.2,
+            "hp": 84,
+            "stamina": 5,
+            "state": "idle",
+            "phase": "none",
+            "attackType": "none",
+            "facing": 40.4,
+            "exhausted": false
+          },
+          "B": {
+            "id": "B",
+            "x": 790.1,
+            "y": 450.2,
+            "hp": 48,
+            "stamina": 1,
+            "state": "blockRecovery",
+            "phase": "none",
+            "attackType": "light",
+            "facing": -139.6,
+            "exhausted": false
+          },
+          "who": "B",
+          "prevState": "blocking",
+          "duration": 0.517
+        },
+        {
+          "t": 6.233,
+          "type": "attackStart",
+          "dist": 35,
+          "A": {
+            "id": "A",
+            "x": 765.1,
+            "y": 427.1,
+            "hp": 84,
+            "stamina": 5,
+            "state": "lightAttack",
+            "phase": "startup",
+            "attackType": "light",
+            "facing": 41.7,
+            "exhausted": false
+          },
+          "B": {
+            "id": "B",
+            "x": 790.7,
+            "y": 450.7,
+            "hp": 48,
+            "stamina": 1,
+            "state": "blockRecovery",
+            "phase": "none",
+            "attackType": "light",
+            "facing": -138.3,
+            "exhausted": false
+          },
+          "who": "A",
+          "attackType": "light",
+          "step": 1
+        },
+        {
+          "t": 6.383,
+          "type": "phaseChange",
+          "dist": 22,
+          "A": {
+            "id": "A",
+            "x": 779.7,
+            "y": 438.7,
+            "hp": 84,
+            "stamina": 5,
+            "state": "lightAttack",
+            "phase": "active",
+            "attackType": "light",
+            "facing": 46.7,
+            "exhausted": false
+          },
+          "B": {
+            "id": "B",
+            "x": 794.6,
+            "y": 454.6,
+            "hp": 48,
+            "stamina": 1,
+            "state": "blockRecovery",
+            "phase": "none",
+            "attackType": "light",
+            "facing": -133.3,
+            "exhausted": false
+          },
+          "who": "A",
+          "from": "startup",
+          "to": "active",
+          "phaseDur": 0.15
+        },
+        {
+          "t": 6.383,
+          "type": "hit",
+          "dist": 36,
+          "A": {
+            "id": "A",
+            "x": 774.8,
+            "y": 433.5,
+            "hp": 84,
+            "stamina": 5,
+            "state": "lightAttack",
+            "phase": "active",
+            "attackType": "light",
+            "facing": 46.7,
+            "exhausted": false
+          },
+          "B": {
+            "id": "B",
+            "x": 799.4,
+            "y": 459.8,
+            "hp": 40,
+            "stamina": 1,
+            "state": "staggered",
+            "phase": "none",
+            "attackType": "none",
+            "facing": -133.3,
+            "exhausted": false
+          },
+          "who": "A",
+          "target": "B",
+          "attackType": "light",
+          "damage": 8,
+          "targetState": "staggered"
+        },
+        {
+          "t": 6.533,
+          "type": "phaseChange",
+          "dist": 49,
+          "A": {
+            "id": "A",
+            "x": 783.7,
+            "y": 442.3,
+            "hp": 84,
+            "stamina": 5,
+            "state": "lightAttack",
+            "phase": "recovery",
+            "attackType": "light",
+            "facing": 46.7,
+            "exhausted": false
+          },
+          "B": {
+            "id": "B",
+            "x": 817.1,
+            "y": 478.7,
+            "hp": 40,
+            "stamina": 1,
+            "state": "staggered",
+            "phase": "none",
+            "attackType": "none",
+            "facing": -133.3,
+            "exhausted": false
+          },
+          "who": "A",
+          "from": "active",
+          "to": "recovery",
+          "phaseDur": 0.15
+        },
+        {
+          "t": 6.55,
+          "type": "phaseChange",
+          "dist": 49,
+          "A": {
+            "id": "A",
+            "x": 783.7,
+            "y": 442.3,
+            "hp": 84,
+            "stamina": 5,
+            "state": "lightAttack",
+            "phase": "startup",
+            "attackType": "light",
+            "facing": 46.7,
+            "exhausted": false
+          },
+          "B": {
+            "id": "B",
+            "x": 817.1,
+            "y": 478.7,
+            "hp": 40,
+            "stamina": 1,
+            "state": "staggered",
+            "phase": "none",
+            "attackType": "none",
+            "facing": -133.3,
+            "exhausted": false
+          },
+          "who": "A",
+          "from": "recovery",
+          "to": "startup",
+          "phaseDur": 0.017
+        },
+        {
+          "t": 6.7,
+          "type": "phaseChange",
+          "dist": 30,
+          "A": {
+            "id": "A",
+            "x": 796.5,
+            "y": 456.3,
+            "hp": 84,
+            "stamina": 5,
+            "state": "lightAttack",
+            "phase": "active",
+            "attackType": "light",
+            "facing": 47.5,
+            "exhausted": false
+          },
+          "B": {
+            "id": "B",
+            "x": 817.1,
+            "y": 478.7,
+            "hp": 40,
+            "stamina": 1,
+            "state": "staggered",
+            "phase": "none",
+            "attackType": "none",
+            "facing": -133.3,
+            "exhausted": false
+          },
+          "who": "A",
+          "from": "startup",
+          "to": "active",
+          "phaseDur": 0.15
+        },
+        {
+          "t": 6.7,
+          "type": "hit",
+          "dist": 36,
+          "A": {
+            "id": "A",
+            "x": 794.6,
+            "y": 454.2,
+            "hp": 84,
+            "stamina": 5,
+            "state": "lightAttack",
+            "phase": "active",
+            "attackType": "light",
+            "facing": 47.5,
+            "exhausted": false
+          },
+          "B": {
+            "id": "B",
+            "x": 819,
+            "y": 480.8,
+            "hp": 32,
+            "stamina": 1,
+            "state": "staggered",
+            "phase": "none",
+            "attackType": "none",
+            "facing": -133.3,
+            "exhausted": false
+          },
+          "who": "A",
+          "target": "B",
+          "attackType": "light",
+          "damage": 8,
+          "targetState": "staggered"
+        },
+        {
+          "t": 6.85,
+          "type": "phaseChange",
+          "dist": 50,
+          "A": {
+            "id": "A",
+            "x": 802.8,
+            "y": 463.1,
+            "hp": 84,
+            "stamina": 5,
+            "state": "lightAttack",
+            "phase": "recovery",
+            "attackType": "light",
+            "facing": 47.5,
+            "exhausted": false
+          },
+          "B": {
+            "id": "B",
+            "x": 836.5,
+            "y": 499.9,
+            "hp": 32,
+            "stamina": 1,
+            "state": "staggered",
+            "phase": "none",
+            "attackType": "none",
+            "facing": -133.3,
+            "exhausted": false
+          },
+          "who": "A",
+          "from": "active",
+          "to": "recovery",
+          "phaseDur": 0.15
+        },
+        {
+          "t": 7.033,
+          "type": "stateEnd",
+          "dist": 50,
+          "A": {
+            "id": "A",
+            "x": 802.8,
+            "y": 463.1,
+            "hp": 84,
+            "stamina": 5,
+            "state": "lightAttack",
+            "phase": "recovery",
+            "attackType": "light",
+            "facing": 47.5,
+            "exhausted": false
+          },
+          "B": {
+            "id": "B",
+            "x": 836.5,
+            "y": 499.9,
+            "hp": 32,
+            "stamina": 1,
+            "state": "idle",
+            "phase": "none",
+            "attackType": "none",
+            "facing": -133.3,
+            "exhausted": false
+          },
+          "who": "B",
+          "prevState": "staggered",
+          "duration": 0.817
+        },
+        {
+          "t": 7.05,
+          "type": "attackStart",
+          "dist": 50,
+          "A": {
+            "id": "A",
+            "x": 802.8,
+            "y": 463.1,
+            "hp": 84,
+            "stamina": 5,
+            "state": "lightAttack",
+            "phase": "recovery",
+            "attackType": "light",
+            "facing": 47.5,
+            "exhausted": false
+          },
+          "B": {
+            "id": "B",
+            "x": 836.5,
+            "y": 499.9,
+            "hp": 32,
+            "stamina": 1,
+            "state": "lightAttack",
+            "phase": "startup",
+            "attackType": "light",
+            "facing": -133.3,
+            "exhausted": false
+          },
+          "who": "B",
+          "attackType": "light",
+          "step": 1
+        },
+        {
+          "t": 7.2,
+          "type": "phaseChange",
+          "dist": 31,
+          "A": {
+            "id": "A",
+            "x": 802.8,
+            "y": 463.1,
+            "hp": 84,
+            "stamina": 5,
+            "state": "lightAttack",
+            "phase": "recovery",
+            "attackType": "light",
+            "facing": 47.5,
+            "exhausted": false
+          },
+          "B": {
+            "id": "B",
+            "x": 823.7,
+            "y": 486,
+            "hp": 32,
+            "stamina": 1,
+            "state": "lightAttack",
+            "phase": "active",
+            "attackType": "light",
+            "facing": -132.5,
+            "exhausted": false
+          },
+          "who": "B",
+          "from": "startup",
+          "to": "active",
+          "phaseDur": 0.15
+        },
+        {
+          "t": 7.2,
+          "type": "hit",
+          "dist": 36,
+          "A": {
+            "id": "A",
+            "x": 801.1,
+            "y": 461.2,
+            "hp": 76,
+            "stamina": 5,
+            "state": "staggered",
+            "phase": "none",
+            "attackType": "none",
+            "facing": 47.5,
+            "exhausted": false
+          },
+          "B": {
+            "id": "B",
+            "x": 825.4,
+            "y": 487.8,
+            "hp": 32,
+            "stamina": 1,
+            "state": "lightAttack",
+            "phase": "active",
+            "attackType": "light",
+            "facing": -132.5,
+            "exhausted": false
+          },
+          "who": "B",
+          "target": "A",
+          "attackType": "light",
+          "damage": 8,
+          "targetState": "staggered"
+        },
+        {
+          "t": 7.217,
+          "type": "phaseChange",
+          "dist": 42,
+          "A": {
+            "id": "A",
+            "x": 796.2,
+            "y": 456,
+            "hp": 76,
+            "stamina": 5,
+            "state": "staggered",
+            "phase": "none",
+            "attackType": "none",
+            "facing": 47.5,
+            "exhausted": false
+          },
+          "B": {
+            "id": "B",
+            "x": 824.5,
+            "y": 486.8,
+            "hp": 32,
+            "stamina": 1,
+            "state": "lightAttack",
+            "phase": "active",
+            "attackType": "light",
+            "facing": -132.5,
+            "exhausted": false
+          },
+          "who": "A",
+          "from": "recovery",
+          "to": "none",
+          "phaseDur": 0.367
+        },
+        {
+          "t": 7.35,
+          "type": "phaseChange",
+          "dist": 50,
+          "A": {
+            "id": "A",
+            "x": 783.6,
+            "y": 442.1,
+            "hp": 76,
+            "stamina": 5,
+            "state": "staggered",
+            "phase": "none",
+            "attackType": "none",
+            "facing": 47.5,
+            "exhausted": false
+          },
+          "B": {
+            "id": "B",
+            "x": 817.3,
+            "y": 478.9,
+            "hp": 32,
+            "stamina": 1,
+            "state": "lightAttack",
+            "phase": "recovery",
+            "attackType": "light",
+            "facing": -132.5,
+            "exhausted": false
+          },
+          "who": "B",
+          "from": "active",
+          "to": "recovery",
+          "phaseDur": 0.15
+        },
+        {
+          "t": 7.367,
+          "type": "phaseChange",
+          "dist": 50,
+          "A": {
+            "id": "A",
+            "x": 783.6,
+            "y": 442.1,
+            "hp": 76,
+            "stamina": 5,
+            "state": "staggered",
+            "phase": "none",
+            "attackType": "none",
+            "facing": 47.5,
+            "exhausted": false
+          },
+          "B": {
+            "id": "B",
+            "x": 817.3,
+            "y": 478.9,
+            "hp": 32,
+            "stamina": 1,
+            "state": "lightAttack",
+            "phase": "startup",
+            "attackType": "light",
+            "facing": -132.5,
+            "exhausted": false
+          },
+          "who": "B",
+          "from": "recovery",
+          "to": "startup",
+          "phaseDur": 0.017
+        },
+        {
+          "t": 7.517,
+          "type": "phaseChange",
+          "dist": 31,
+          "A": {
+            "id": "A",
+            "x": 783.6,
+            "y": 442.1,
+            "hp": 76,
+            "stamina": 5,
+            "state": "staggered",
+            "phase": "none",
+            "attackType": "none",
+            "facing": 47.5,
+            "exhausted": false
+          },
+          "B": {
+            "id": "B",
+            "x": 804.5,
+            "y": 465,
+            "hp": 32,
+            "stamina": 1,
+            "state": "lightAttack",
+            "phase": "active",
+            "attackType": "light",
+            "facing": -132.5,
+            "exhausted": false
+          },
+          "who": "B",
+          "from": "startup",
+          "to": "active",
+          "phaseDur": 0.15
+        },
+        {
+          "t": 7.517,
+          "type": "hit",
+          "dist": 36,
+          "A": {
+            "id": "A",
+            "x": 781.9,
+            "y": 440.3,
+            "hp": 68,
+            "stamina": 5,
+            "state": "staggered",
+            "phase": "none",
+            "attackType": "none",
+            "facing": 47.5,
+            "exhausted": false
+          },
+          "B": {
+            "id": "B",
+            "x": 806.2,
+            "y": 466.8,
+            "hp": 32,
+            "stamina": 1,
+            "state": "lightAttack",
+            "phase": "active",
+            "attackType": "light",
+            "facing": -132.5,
+            "exhausted": false
+          },
+          "who": "B",
+          "target": "A",
+          "attackType": "light",
+          "damage": 8,
+          "targetState": "staggered"
+        },
+        {
+          "t": 7.667,
+          "type": "phaseChange",
+          "dist": 50,
+          "A": {
+            "id": "A",
+            "x": 764.4,
+            "y": 421.2,
+            "hp": 68,
+            "stamina": 5,
+            "state": "staggered",
+            "phase": "none",
+            "attackType": "none",
+            "facing": 47.5,
+            "exhausted": false
+          },
+          "B": {
+            "id": "B",
+            "x": 798.1,
+            "y": 458,
+            "hp": 32,
+            "stamina": 1,
+            "state": "lightAttack",
+            "phase": "recovery",
+            "attackType": "light",
+            "facing": -132.5,
+            "exhausted": false
+          },
+          "who": "B",
+          "from": "active",
+          "to": "recovery",
+          "phaseDur": 0.15
+        },
+        {
+          "t": 7.85,
+          "type": "stateEnd",
+          "dist": 50,
+          "A": {
+            "id": "A",
+            "x": 764.4,
+            "y": 421.2,
+            "hp": 68,
+            "stamina": 5,
+            "state": "idle",
+            "phase": "none",
+            "attackType": "none",
+            "facing": 47.5,
+            "exhausted": false
+          },
+          "B": {
+            "id": "B",
+            "x": 798.1,
+            "y": 458,
+            "hp": 32,
+            "stamina": 1,
+            "state": "lightAttack",
+            "phase": "recovery",
+            "attackType": "light",
+            "facing": -132.5,
+            "exhausted": false
+          },
+          "who": "A",
+          "prevState": "staggered",
+          "duration": 1.617
+        },
+        {
+          "t": 7.867,
+          "type": "attackStart",
+          "dist": 50,
+          "A": {
+            "id": "A",
+            "x": 764.4,
+            "y": 421.2,
+            "hp": 68,
+            "stamina": 5,
+            "state": "heavyAttack",
+            "phase": "startup",
+            "attackType": "heavy",
+            "facing": 47.5,
+            "exhausted": false
+          },
+          "B": {
+            "id": "B",
+            "x": 798.1,
+            "y": 458,
+            "hp": 32,
+            "stamina": 1,
+            "state": "lightAttack",
+            "phase": "recovery",
+            "attackType": "light",
+            "facing": -132.5,
+            "exhausted": false
+          },
+          "who": "A",
+          "attackType": "heavy"
+        },
+        {
+          "t": 8.033,
+          "type": "stateEnd",
+          "dist": 44,
+          "A": {
+            "id": "A",
+            "x": 768.5,
+            "y": 425.8,
+            "hp": 68,
+            "stamina": 5,
+            "state": "heavyAttack",
+            "phase": "startup",
+            "attackType": "heavy",
+            "facing": 47.5,
+            "exhausted": false
+          },
+          "B": {
+            "id": "B",
+            "x": 798.1,
+            "y": 458,
+            "hp": 32,
+            "stamina": 1,
+            "state": "idle",
+            "phase": "none",
+            "attackType": "none",
+            "facing": -132.5,
+            "exhausted": false
+          },
+          "who": "B",
+          "prevState": "lightAttack",
+          "duration": 0.983
+        },
+        {
+          "t": 8.033,
+          "type": "phaseChange",
+          "dist": 44,
+          "A": {
+            "id": "A",
+            "x": 768.5,
+            "y": 425.8,
+            "hp": 68,
+            "stamina": 5,
+            "state": "heavyAttack",
+            "phase": "startup",
+            "attackType": "heavy",
+            "facing": 47.5,
+            "exhausted": false
+          },
+          "B": {
+            "id": "B",
+            "x": 798.1,
+            "y": 458,
+            "hp": 32,
+            "stamina": 1,
+            "state": "idle",
+            "phase": "none",
+            "attackType": "none",
+            "facing": -132.5,
+            "exhausted": false
+          },
+          "who": "B",
+          "from": "recovery",
+          "to": "none",
+          "phaseDur": 0
+        },
+        {
+          "t": 8.067,
+          "type": "blockStart",
+          "dist": 42,
+          "A": {
+            "id": "A",
+            "x": 769.4,
+            "y": 426.7,
+            "hp": 68,
+            "stamina": 5,
+            "state": "heavyAttack",
+            "phase": "startup",
+            "attackType": "heavy",
+            "facing": 47.5,
+            "exhausted": false
+          },
+          "B": {
+            "id": "B",
+            "x": 798.1,
+            "y": 458,
+            "hp": 32,
+            "stamina": 1,
+            "state": "blocking",
+            "phase": "none",
+            "attackType": "none",
+            "facing": -132.5,
+            "exhausted": false
+          },
+          "who": "B"
+        },
+        {
+          "t": 8.567,
+          "type": "phaseChange",
+          "dist": 9,
+          "A": {
+            "id": "A",
+            "x": 796.6,
+            "y": 456.3,
+            "hp": 68,
+            "stamina": 5,
+            "state": "heavyAttack",
+            "phase": "active",
+            "attackType": "heavy",
+            "facing": 47.5,
+            "exhausted": false
+          },
+          "B": {
+            "id": "B",
+            "x": 803,
+            "y": 463.3,
+            "hp": 32,
+            "stamina": 1,
+            "state": "blocking",
+            "phase": "none",
+            "attackType": "none",
+            "facing": -132.5,
+            "exhausted": false
+          },
+          "who": "A",
+          "from": "startup",
+          "to": "active",
+          "phaseDur": 0.7
+        },
+        {
+          "t": 8.567,
+          "type": "parry",
+          "dist": 36,
+          "A": {
+            "id": "A",
+            "x": 787.6,
+            "y": 446.6,
+            "hp": 68,
+            "stamina": 4,
+            "state": "parryStunned",
+            "phase": "none",
+            "attackType": "none",
+            "facing": 47.5,
+            "exhausted": false
+          },
+          "B": {
+            "id": "B",
+            "x": 811.9,
+            "y": 473.1,
+            "hp": 32,
+            "stamina": 1,
+            "state": "idle",
+            "phase": "none",
+            "attackType": "none",
+            "facing": -132.5,
+            "exhausted": false
+          },
+          "blocker": "B",
+          "attacker": "A",
+          "level": "semi"
+        },
+        {
+          "t": 8.583,
+          "type": "phaseChange",
+          "dist": 38,
+          "A": {
+            "id": "A",
+            "x": 787.3,
+            "y": 446.2,
+            "hp": 68,
+            "stamina": 4,
+            "state": "parryStunned",
+            "phase": "none",
+            "attackType": "none",
+            "facing": 47.5,
+            "exhausted": false
+          },
+          "B": {
+            "id": "B",
+            "x": 812.6,
+            "y": 473.8,
+            "hp": 32,
+            "stamina": 1,
+            "state": "lightAttack",
+            "phase": "startup",
+            "attackType": "light",
+            "facing": -132.5,
+            "exhausted": false
+          },
+          "who": "A",
+          "from": "active",
+          "to": "none",
+          "phaseDur": 0.017
+        },
+        {
+          "t": 8.583,
+          "type": "attackStart",
+          "dist": 38,
+          "A": {
+            "id": "A",
+            "x": 787.3,
+            "y": 446.2,
+            "hp": 68,
+            "stamina": 4,
+            "state": "parryStunned",
+            "phase": "none",
+            "attackType": "none",
+            "facing": 47.5,
+            "exhausted": false
+          },
+          "B": {
+            "id": "B",
+            "x": 812.6,
+            "y": 473.8,
+            "hp": 32,
+            "stamina": 1,
+            "state": "lightAttack",
+            "phase": "startup",
+            "attackType": "light",
+            "facing": -132.5,
+            "exhausted": false
+          },
+          "who": "B",
+          "attackType": "light",
+          "step": 1
+        },
+        {
+          "t": 9.133,
+          "type": "phaseChange",
+          "dist": 54,
+          "A": {
+            "id": "A",
+            "x": 780.3,
+            "y": 438.6,
+            "hp": 68,
+            "stamina": 4,
+            "state": "parryStunned",
+            "phase": "none",
+            "attackType": "none",
+            "facing": 47.5,
+            "exhausted": false
+          },
+          "B": {
+            "id": "B",
+            "x": 817.1,
+            "y": 478.7,
+            "hp": 32,
+            "stamina": 1,
+            "state": "lightAttack",
+            "phase": "active",
+            "attackType": "light",
+            "facing": -132.5,
+            "exhausted": false
+          },
+          "who": "B",
+          "from": "startup",
+          "to": "active",
+          "phaseDur": 0.55
+        },
+        {
+          "t": 9.133,
+          "type": "hit",
+          "dist": 54,
+          "A": {
+            "id": "A",
+            "x": 780.3,
+            "y": 438.6,
+            "hp": 60,
+            "stamina": 4,
+            "state": "staggered",
+            "phase": "none",
+            "attackType": "none",
+            "facing": 47.5,
+            "exhausted": false
+          },
+          "B": {
+            "id": "B",
+            "x": 817.1,
+            "y": 478.7,
+            "hp": 32,
+            "stamina": 1,
+            "state": "lightAttack",
+            "phase": "active",
+            "attackType": "light",
+            "facing": -132.5,
+            "exhausted": false
+          },
+          "who": "B",
+          "target": "A",
+          "attackType": "light",
+          "damage": 8,
+          "targetState": "staggered"
+        },
+        {
+          "t": 9.65,
+          "type": "phaseChange",
+          "dist": 72,
+          "A": {
+            "id": "A",
+            "x": 761.5,
+            "y": 418.1,
+            "hp": 60,
+            "stamina": 4,
+            "state": "staggered",
+            "phase": "none",
+            "attackType": "none",
+            "facing": 47.5,
+            "exhausted": false
+          },
+          "B": {
+            "id": "B",
+            "x": 810.4,
+            "y": 471.4,
+            "hp": 32,
+            "stamina": 1,
+            "state": "lightAttack",
+            "phase": "recovery",
+            "attackType": "light",
+            "facing": -132.5,
+            "exhausted": false
+          },
+          "who": "B",
+          "from": "active",
+          "to": "recovery",
+          "phaseDur": 0.517
+        },
+        {
+          "t": 9.667,
+          "type": "phaseChange",
+          "dist": 72,
+          "A": {
+            "id": "A",
+            "x": 761.5,
+            "y": 418.1,
+            "hp": 60,
+            "stamina": 4,
+            "state": "staggered",
+            "phase": "none",
+            "attackType": "none",
+            "facing": 47.5,
+            "exhausted": false
+          },
+          "B": {
+            "id": "B",
+            "x": 810.4,
+            "y": 471.4,
+            "hp": 32,
+            "stamina": 1,
+            "state": "lightAttack",
+            "phase": "startup",
+            "attackType": "light",
+            "facing": -132.5,
+            "exhausted": false
+          },
+          "who": "B",
+          "from": "recovery",
+          "to": "startup",
+          "phaseDur": 0.017
+        },
+        {
+          "t": 9.817,
+          "type": "phaseChange",
+          "dist": 56,
+          "A": {
+            "id": "A",
+            "x": 761.5,
+            "y": 418.1,
+            "hp": 60,
+            "stamina": 4,
+            "state": "staggered",
+            "phase": "none",
+            "attackType": "none",
+            "facing": 47.5,
+            "exhausted": false
+          },
+          "B": {
+            "id": "B",
+            "x": 799,
+            "y": 459,
+            "hp": 32,
+            "stamina": 1,
+            "state": "lightAttack",
+            "phase": "active",
+            "attackType": "light",
+            "facing": -132.5,
+            "exhausted": false
+          },
+          "who": "B",
+          "from": "startup",
+          "to": "active",
+          "phaseDur": 0.15
+        },
+        {
+          "t": 9.817,
+          "type": "hit",
+          "dist": 56,
+          "A": {
+            "id": "A",
+            "x": 761.5,
+            "y": 418.1,
+            "hp": 52,
+            "stamina": 4,
+            "state": "staggered",
+            "phase": "none",
+            "attackType": "none",
+            "facing": 47.5,
+            "exhausted": false
+          },
+          "B": {
+            "id": "B",
+            "x": 799,
+            "y": 459,
+            "hp": 32,
+            "stamina": 1,
+            "state": "lightAttack",
+            "phase": "active",
+            "attackType": "light",
+            "facing": -132.5,
+            "exhausted": false
+          },
+          "who": "B",
+          "target": "A",
+          "attackType": "light",
+          "damage": 8,
+          "targetState": "staggered"
+        },
+        {
+          "t": 9.967,
+          "type": "phaseChange",
+          "dist": 70,
+          "A": {
+            "id": "A",
+            "x": 743.9,
+            "y": 399,
+            "hp": 52,
+            "stamina": 4,
+            "state": "staggered",
+            "phase": "none",
+            "attackType": "none",
+            "facing": 47.5,
+            "exhausted": false
+          },
+          "B": {
+            "id": "B",
+            "x": 790.9,
+            "y": 450.2,
+            "hp": 32,
+            "stamina": 1,
+            "state": "lightAttack",
+            "phase": "recovery",
+            "attackType": "light",
+            "facing": -132.5,
+            "exhausted": false
+          },
+          "who": "B",
+          "from": "active",
+          "to": "recovery",
+          "phaseDur": 0.15
+        },
+        {
+          "t": 10.15,
+          "type": "stateEnd",
+          "dist": 70,
+          "A": {
+            "id": "A",
+            "x": 743.9,
+            "y": 399,
+            "hp": 52,
+            "stamina": 4,
+            "state": "idle",
+            "phase": "none",
+            "attackType": "none",
+            "facing": 47.5,
+            "exhausted": false
+          },
+          "B": {
+            "id": "B",
+            "x": 790.9,
+            "y": 450.2,
+            "hp": 32,
+            "stamina": 1,
+            "state": "lightAttack",
+            "phase": "recovery",
+            "attackType": "light",
+            "facing": -132.5,
+            "exhausted": false
+          },
+          "who": "A",
+          "prevState": "staggered",
+          "duration": 2.283
+        },
+        {
+          "t": 10.167,
+          "type": "attackStart",
+          "dist": 70,
+          "A": {
+            "id": "A",
+            "x": 743.9,
+            "y": 399,
+            "hp": 52,
+            "stamina": 4,
+            "state": "heavyAttack",
+            "phase": "startup",
+            "attackType": "heavy",
+            "facing": 47.5,
+            "exhausted": false
+          },
+          "B": {
+            "id": "B",
+            "x": 790.9,
+            "y": 450.2,
+            "hp": 32,
+            "stamina": 1,
+            "state": "lightAttack",
+            "phase": "recovery",
+            "attackType": "light",
+            "facing": -132.5,
+            "exhausted": false
+          },
+          "who": "A",
+          "attackType": "heavy"
+        },
+        {
+          "t": 10.333,
+          "type": "stateEnd",
+          "dist": 65,
+          "A": {
+            "id": "A",
+            "x": 746.8,
+            "y": 402,
+            "hp": 52,
+            "stamina": 4,
+            "state": "heavyAttack",
+            "phase": "startup",
+            "attackType": "heavy",
+            "facing": 47.5,
+            "exhausted": false
+          },
+          "B": {
+            "id": "B",
+            "x": 790.9,
+            "y": 450.2,
+            "hp": 32,
+            "stamina": 1,
+            "state": "idle",
+            "phase": "none",
+            "attackType": "none",
+            "facing": -132.5,
+            "exhausted": false
+          },
+          "who": "B",
+          "prevState": "lightAttack",
+          "duration": 1.75
+        },
+        {
+          "t": 10.333,
+          "type": "phaseChange",
+          "dist": 65,
+          "A": {
+            "id": "A",
+            "x": 746.8,
+            "y": 402,
+            "hp": 52,
+            "stamina": 4,
+            "state": "heavyAttack",
+            "phase": "startup",
+            "attackType": "heavy",
+            "facing": 47.5,
+            "exhausted": false
+          },
+          "B": {
+            "id": "B",
+            "x": 790.9,
+            "y": 450.2,
+            "hp": 32,
+            "stamina": 1,
+            "state": "idle",
+            "phase": "none",
+            "attackType": "none",
+            "facing": -132.5,
+            "exhausted": false
+          },
+          "who": "B",
+          "from": "recovery",
+          "to": "none",
+          "phaseDur": 0
+        },
+        {
+          "t": 10.35,
+          "type": "attackStart",
+          "dist": 65,
+          "A": {
+            "id": "A",
+            "x": 747.1,
+            "y": 402.4,
+            "hp": 52,
+            "stamina": 4,
+            "state": "heavyAttack",
+            "phase": "startup",
+            "attackType": "heavy",
+            "facing": 47.5,
+            "exhausted": false
+          },
+          "B": {
+            "id": "B",
+            "x": 790.9,
+            "y": 450.2,
+            "hp": 32,
+            "stamina": 1,
+            "state": "heavyAttack",
+            "phase": "startup",
+            "attackType": "heavy",
+            "facing": -132.5,
+            "exhausted": false
+          },
+          "who": "B",
+          "attackType": "heavy"
+        },
+        {
+          "t": 10.383,
+          "type": "stateEnd",
+          "dist": 63,
+          "A": {
+            "id": "A",
+            "x": 747.7,
+            "y": 403,
+            "hp": 52,
+            "stamina": 2,
+            "state": "blocking",
+            "phase": "none",
+            "attackType": "heavy",
+            "facing": 47.5,
+            "exhausted": false
+          },
+          "B": {
+            "id": "B",
+            "x": 790.3,
+            "y": 449.5,
+            "hp": 32,
+            "stamina": 1,
+            "state": "heavyAttack",
+            "phase": "startup",
+            "attackType": "heavy",
+            "facing": -132.5,
+            "exhausted": false
+          },
+          "who": "A",
+          "prevState": "heavyAttack",
+          "duration": 0.217
+        },
+        {
+          "t": 10.383,
+          "type": "phaseChange",
+          "dist": 63,
+          "A": {
+            "id": "A",
+            "x": 747.7,
+            "y": 403,
+            "hp": 52,
+            "stamina": 2,
+            "state": "blocking",
+            "phase": "none",
+            "attackType": "heavy",
+            "facing": 47.5,
+            "exhausted": false
+          },
+          "B": {
+            "id": "B",
+            "x": 790.3,
+            "y": 449.5,
+            "hp": 32,
+            "stamina": 1,
+            "state": "heavyAttack",
+            "phase": "startup",
+            "attackType": "heavy",
+            "facing": -132.5,
+            "exhausted": false
+          },
+          "who": "A",
+          "from": "startup",
+          "to": "none",
+          "phaseDur": 0
+        },
+        {
+          "t": 10.383,
+          "type": "blockStart",
+          "dist": 63,
+          "A": {
+            "id": "A",
+            "x": 747.7,
+            "y": 403,
+            "hp": 52,
+            "stamina": 2,
+            "state": "blocking",
+            "phase": "none",
+            "attackType": "heavy",
+            "facing": 47.5,
+            "exhausted": false
+          },
+          "B": {
+            "id": "B",
+            "x": 790.3,
+            "y": 449.5,
+            "hp": 32,
+            "stamina": 1,
+            "state": "heavyAttack",
+            "phase": "startup",
+            "attackType": "heavy",
+            "facing": -132.5,
+            "exhausted": false
+          },
+          "who": "A"
+        },
+        {
+          "t": 11.05,
+          "type": "phaseChange",
+          "dist": 15,
+          "A": {
+            "id": "A",
+            "x": 747.7,
+            "y": 403,
+            "hp": 52,
+            "stamina": 2,
+            "state": "blocking",
+            "phase": "none",
+            "attackType": "heavy",
+            "facing": 47.5,
+            "exhausted": false
+          },
+          "B": {
+            "id": "B",
+            "x": 757.6,
+            "y": 413.9,
+            "hp": 32,
+            "stamina": 1,
+            "state": "heavyAttack",
+            "phase": "active",
+            "attackType": "heavy",
+            "facing": -132.5,
+            "exhausted": false
+          },
+          "who": "B",
+          "from": "startup",
+          "to": "active",
+          "phaseDur": 0.7
+        },
+        {
+          "t": 11.05,
+          "type": "parry",
+          "dist": 36,
+          "A": {
+            "id": "A",
+            "x": 740.5,
+            "y": 395.2,
+            "hp": 52,
+            "stamina": 0,
+            "state": "idle",
+            "phase": "none",
+            "attackType": "none",
+            "facing": 47.5,
+            "exhausted": true
+          },
+          "B": {
+            "id": "B",
+            "x": 764.8,
+            "y": 421.7,
+            "hp": 32,
+            "stamina": 0,
+            "state": "parryStunned",
+            "phase": "none",
+            "attackType": "none",
+            "facing": -132.5,
+            "exhausted": true
+          },
+          "blocker": "A",
+          "attacker": "B",
+          "level": "nonPrecise"
+        },
+        {
+          "t": 11.067,
+          "type": "phaseChange",
+          "dist": 37,
+          "A": {
+            "id": "A",
+            "x": 740.5,
+            "y": 395.2,
+            "hp": 52,
+            "stamina": 0,
+            "state": "lightAttack",
+            "phase": "startup",
+            "attackType": "light",
+            "facing": 47.5,
+            "exhausted": true
+          },
+          "B": {
+            "id": "B",
+            "x": 765.6,
+            "y": 422.6,
+            "hp": 32,
+            "stamina": 0,
+            "state": "parryStunned",
+            "phase": "none",
+            "attackType": "none",
+            "facing": -132.5,
+            "exhausted": true
+          },
+          "who": "B",
+          "from": "active",
+          "to": "none",
+          "phaseDur": 0.017
+        },
+        {
+          "t": 11.067,
+          "type": "attackStart",
+          "dist": 37,
+          "A": {
+            "id": "A",
+            "x": 740.5,
+            "y": 395.2,
+            "hp": 52,
+            "stamina": 0,
+            "state": "lightAttack",
+            "phase": "startup",
+            "attackType": "light",
+            "facing": 47.5,
+            "exhausted": true
+          },
+          "B": {
+            "id": "B",
+            "x": 765.6,
+            "y": 422.6,
+            "hp": 32,
+            "stamina": 0,
+            "state": "parryStunned",
+            "phase": "none",
+            "attackType": "none",
+            "facing": -132.5,
+            "exhausted": true
+          },
+          "who": "A",
+          "attackType": "light",
+          "step": 1
+        },
+        {
+          "t": 11.45,
+          "type": "phaseChange",
+          "dist": 33,
+          "A": {
+            "id": "A",
+            "x": 751.9,
+            "y": 407.6,
+            "hp": 52,
+            "stamina": 0,
+            "state": "lightAttack",
+            "phase": "active",
+            "attackType": "light",
+            "facing": 47.5,
+            "exhausted": true
+          },
+          "B": {
+            "id": "B",
+            "x": 774.5,
+            "y": 432.3,
+            "hp": 32,
+            "stamina": 0,
+            "state": "parryStunned",
+            "phase": "none",
+            "attackType": "none",
+            "facing": -132.5,
+            "exhausted": true
+          },
+          "who": "A",
+          "from": "startup",
+          "to": "active",
+          "phaseDur": 0.383
+        },
+        {
+          "t": 11.45,
+          "type": "execution",
+          "dist": 36,
+          "A": {
+            "id": "A",
+            "x": 751,
+            "y": 406.7,
+            "hp": 52,
+            "stamina": 0,
+            "state": "executing",
+            "phase": "none",
+            "attackType": "light",
+            "facing": 47.5,
+            "exhausted": true
+          },
+          "B": {
+            "id": "B",
+            "x": 775.4,
+            "y": 433.2,
+            "hp": 7,
+            "stamina": 0,
+            "state": "executed",
+            "phase": "none",
+            "attackType": "none",
+            "facing": -132.5,
+            "exhausted": true
+          },
+          "who": "A",
+          "target": "B",
+          "damage": 25
+        },
+        {
+          "t": 11.467,
+          "type": "phaseChange",
+          "dist": 36,
+          "A": {
+            "id": "A",
+            "x": 751,
+            "y": 406.7,
+            "hp": 52,
+            "stamina": 0,
+            "state": "executing",
+            "phase": "none",
+            "attackType": "light",
+            "facing": 47.5,
+            "exhausted": true
+          },
+          "B": {
+            "id": "B",
+            "x": 775.4,
+            "y": 433.2,
+            "hp": 7,
+            "stamina": 0,
+            "state": "executed",
+            "phase": "none",
+            "attackType": "none",
+            "facing": -132.5,
+            "exhausted": true
+          },
+          "who": "A",
+          "from": "active",
+          "to": "none",
+          "phaseDur": 0.017
+        },
+        {
+          "t": 12.533,
+          "type": "stateEnd",
+          "dist": 36,
+          "A": {
+            "id": "A",
+            "x": 751,
+            "y": 406.7,
+            "hp": 52,
+            "stamina": 0,
+            "state": "idle",
+            "phase": "none",
+            "attackType": "none",
+            "facing": 47.5,
+            "exhausted": true
+          },
+          "B": {
+            "id": "B",
+            "x": 775.4,
+            "y": 433.2,
+            "hp": 7,
+            "stamina": 3,
+            "state": "idle",
+            "phase": "none",
+            "attackType": "none",
+            "facing": -132.5,
+            "exhausted": false
+          },
+          "who": "A",
+          "prevState": "executing",
+          "duration": 1.467
+        },
+        {
+          "t": 12.533,
+          "type": "stateEnd",
+          "dist": 36,
+          "A": {
+            "id": "A",
+            "x": 751,
+            "y": 406.7,
+            "hp": 52,
+            "stamina": 0,
+            "state": "idle",
+            "phase": "none",
+            "attackType": "none",
+            "facing": 47.5,
+            "exhausted": true
+          },
+          "B": {
+            "id": "B",
+            "x": 775.4,
+            "y": 433.2,
+            "hp": 7,
+            "stamina": 3,
+            "state": "idle",
+            "phase": "none",
+            "attackType": "none",
+            "facing": -132.5,
+            "exhausted": false
+          },
+          "who": "B",
+          "prevState": "executed",
+          "duration": 2.183
+        },
+        {
+          "t": 12.567,
+          "type": "attackStart",
+          "dist": 36,
+          "A": {
+            "id": "A",
+            "x": 751,
+            "y": 406.7,
+            "hp": 52,
+            "stamina": 0,
+            "state": "heavyAttack",
+            "phase": "startup",
+            "attackType": "heavy",
+            "facing": 47.5,
+            "exhausted": true
+          },
+          "B": {
+            "id": "B",
+            "x": 775.4,
+            "y": 433.2,
+            "hp": 7,
+            "stamina": 3,
+            "state": "heavyAttack",
+            "phase": "startup",
+            "attackType": "heavy",
+            "facing": -132.5,
+            "exhausted": false
+          },
+          "who": "A",
+          "attackType": "heavy"
+        },
+        {
+          "t": 12.567,
+          "type": "attackStart",
+          "dist": 36,
+          "A": {
+            "id": "A",
+            "x": 751,
+            "y": 406.7,
+            "hp": 52,
+            "stamina": 0,
+            "state": "heavyAttack",
+            "phase": "startup",
+            "attackType": "heavy",
+            "facing": 47.5,
+            "exhausted": true
+          },
+          "B": {
+            "id": "B",
+            "x": 775.4,
+            "y": 433.2,
+            "hp": 7,
+            "stamina": 3,
+            "state": "heavyAttack",
+            "phase": "startup",
+            "attackType": "heavy",
+            "facing": -132.5,
+            "exhausted": false
+          },
+          "who": "B",
+          "attackType": "heavy"
+        },
+        {
+          "t": 12.583,
+          "type": "stateEnd",
+          "dist": 35,
+          "A": {
+            "id": "A",
+            "x": 751.5,
+            "y": 407.2,
+            "hp": 52,
+            "stamina": 0,
+            "state": "heavyAttack",
+            "phase": "startup",
+            "attackType": "heavy",
+            "facing": 47.5,
+            "exhausted": true
+          },
+          "B": {
+            "id": "B",
+            "x": 774.9,
+            "y": 432.7,
+            "hp": 7,
+            "stamina": 1,
+            "state": "blocking",
+            "phase": "none",
+            "attackType": "heavy",
+            "facing": -132.5,
+            "exhausted": false
+          },
+          "who": "B",
+          "prevState": "heavyAttack",
+          "duration": 0.017
+        },
+        {
+          "t": 12.583,
+          "type": "phaseChange",
+          "dist": 35,
+          "A": {
+            "id": "A",
+            "x": 751.5,
+            "y": 407.2,
+            "hp": 52,
+            "stamina": 0,
+            "state": "heavyAttack",
+            "phase": "startup",
+            "attackType": "heavy",
+            "facing": 47.5,
+            "exhausted": true
+          },
+          "B": {
+            "id": "B",
+            "x": 774.9,
+            "y": 432.7,
+            "hp": 7,
+            "stamina": 1,
+            "state": "blocking",
+            "phase": "none",
+            "attackType": "heavy",
+            "facing": -132.5,
+            "exhausted": false
+          },
+          "who": "B",
+          "from": "startup",
+          "to": "none",
+          "phaseDur": 0
+        },
+        {
+          "t": 12.583,
+          "type": "blockStart",
+          "dist": 35,
+          "A": {
+            "id": "A",
+            "x": 751.5,
+            "y": 407.2,
+            "hp": 52,
+            "stamina": 0,
+            "state": "heavyAttack",
+            "phase": "startup",
+            "attackType": "heavy",
+            "facing": 47.5,
+            "exhausted": true
+          },
+          "B": {
+            "id": "B",
+            "x": 774.9,
+            "y": 432.7,
+            "hp": 7,
+            "stamina": 1,
+            "state": "blocking",
+            "phase": "none",
+            "attackType": "heavy",
+            "facing": -132.5,
+            "exhausted": false
+          },
+          "who": "B"
+        },
+        {
+          "t": 13.267,
+          "type": "phaseChange",
+          "dist": 9,
+          "A": {
+            "id": "A",
+            "x": 778.9,
+            "y": 437,
+            "hp": 52,
+            "stamina": 0,
+            "state": "heavyAttack",
+            "phase": "active",
+            "attackType": "heavy",
+            "facing": 47.5,
+            "exhausted": true
+          },
+          "B": {
+            "id": "B",
+            "x": 785.2,
+            "y": 444,
+            "hp": 7,
+            "stamina": 1,
+            "state": "blocking",
+            "phase": "none",
+            "attackType": "heavy",
+            "facing": -132.5,
+            "exhausted": false
+          },
+          "who": "A",
+          "from": "startup",
+          "to": "active",
+          "phaseDur": 0.7
+        },
+        {
+          "t": 13.267,
+          "type": "parry",
+          "dist": 36,
+          "A": {
+            "id": "A",
+            "x": 769.9,
+            "y": 427.2,
+            "hp": 52,
+            "stamina": 0,
+            "state": "parryStunned",
+            "phase": "none",
+            "attackType": "none",
+            "facing": 47.5,
+            "exhausted": true
+          },
+          "B": {
+            "id": "B",
+            "x": 794.2,
+            "y": 453.8,
+            "hp": 7,
+            "stamina": 0,
+            "state": "idle",
+            "phase": "none",
+            "attackType": "none",
+            "facing": -132.5,
+            "exhausted": true
+          },
+          "blocker": "B",
+          "attacker": "A",
+          "level": "nonPrecise"
+        },
+        {
+          "t": 13.283,
+          "type": "phaseChange",
+          "dist": 37,
+          "A": {
+            "id": "A",
+            "x": 769.1,
+            "y": 426.4,
+            "hp": 52,
+            "stamina": 0,
+            "state": "parryStunned",
+            "phase": "none",
+            "attackType": "none",
+            "facing": 47.5,
+            "exhausted": true
+          },
+          "B": {
+            "id": "B",
+            "x": 794.2,
+            "y": 453.8,
+            "hp": 7,
+            "stamina": 0,
+            "state": "lightAttack",
+            "phase": "startup",
+            "attackType": "light",
+            "facing": -132.5,
+            "exhausted": true
+          },
+          "who": "A",
+          "from": "active",
+          "to": "none",
+          "phaseDur": 0.017
+        },
+        {
+          "t": 13.283,
+          "type": "attackStart",
+          "dist": 37,
+          "A": {
+            "id": "A",
+            "x": 769.1,
+            "y": 426.4,
+            "hp": 52,
+            "stamina": 0,
+            "state": "parryStunned",
+            "phase": "none",
+            "attackType": "none",
+            "facing": 47.5,
+            "exhausted": true
+          },
+          "B": {
+            "id": "B",
+            "x": 794.2,
+            "y": 453.8,
+            "hp": 7,
+            "stamina": 0,
+            "state": "lightAttack",
+            "phase": "startup",
+            "attackType": "light",
+            "facing": -132.5,
+            "exhausted": true
+          },
+          "who": "B",
+          "attackType": "light",
+          "step": 1
+        },
+        {
+          "t": 13.667,
+          "type": "stateEnd",
+          "dist": 33,
+          "A": {
+            "id": "A",
+            "x": 760.2,
+            "y": 416.6,
+            "hp": 52,
+            "stamina": 0,
+            "state": "blocking",
+            "phase": "none",
+            "attackType": "none",
+            "facing": 47.5,
+            "exhausted": true
+          },
+          "B": {
+            "id": "B",
+            "x": 782.8,
+            "y": 441.3,
+            "hp": 7,
+            "stamina": 0,
+            "state": "lightAttack",
+            "phase": "active",
+            "attackType": "light",
+            "facing": -132.5,
+            "exhausted": true
+          },
+          "who": "A",
+          "prevState": "parryStunned",
+          "duration": 1.1
+        },
+        {
+          "t": 13.667,
+          "type": "phaseChange",
+          "dist": 33,
+          "A": {
+            "id": "A",
+            "x": 760.2,
+            "y": 416.6,
+            "hp": 52,
+            "stamina": 0,
+            "state": "blocking",
+            "phase": "none",
+            "attackType": "none",
+            "facing": 47.5,
+            "exhausted": true
+          },
+          "B": {
+            "id": "B",
+            "x": 782.8,
+            "y": 441.3,
+            "hp": 7,
+            "stamina": 0,
+            "state": "lightAttack",
+            "phase": "active",
+            "attackType": "light",
+            "facing": -132.5,
+            "exhausted": true
+          },
+          "who": "B",
+          "from": "startup",
+          "to": "active",
+          "phaseDur": 0.383
+        },
+        {
+          "t": 13.667,
+          "type": "blockStart",
+          "dist": 33,
+          "A": {
+            "id": "A",
+            "x": 760.2,
+            "y": 416.6,
+            "hp": 52,
+            "stamina": 0,
+            "state": "blocking",
+            "phase": "none",
+            "attackType": "none",
+            "facing": 47.5,
+            "exhausted": true
+          },
+          "B": {
+            "id": "B",
+            "x": 782.8,
+            "y": 441.3,
+            "hp": 7,
+            "stamina": 0,
+            "state": "lightAttack",
+            "phase": "active",
+            "attackType": "light",
+            "facing": -132.5,
+            "exhausted": true
+          },
+          "who": "A"
+        },
+        {
+          "t": 13.883,
+          "type": "stateEnd",
+          "dist": 35,
+          "A": {
+            "id": "A",
+            "x": 756.1,
+            "y": 412.2,
+            "hp": 52,
+            "stamina": 0,
+            "state": "blockRecovery",
+            "phase": "none",
+            "attackType": "none",
+            "facing": 47.5,
+            "exhausted": true
+          },
+          "B": {
+            "id": "B",
+            "x": 779.5,
+            "y": 437.8,
+            "hp": 7,
+            "stamina": 0,
+            "state": "lightAttack",
+            "phase": "active",
+            "attackType": "light",
+            "facing": -132.5,
+            "exhausted": true
+          },
+          "who": "A",
+          "prevState": "blocking",
+          "duration": 0.217
+        },
+        {
+          "t": 13.9,
+          "type": "phaseChange",
+          "dist": 35,
+          "A": {
+            "id": "A",
+            "x": 755.7,
+            "y": 411.7,
+            "hp": 52,
+            "stamina": 0,
+            "state": "blockRecovery",
+            "phase": "none",
+            "attackType": "none",
+            "facing": 47.5,
+            "exhausted": true
+          },
+          "B": {
+            "id": "B",
+            "x": 779.1,
+            "y": 437.3,
+            "hp": 7,
+            "stamina": 0,
+            "state": "lightAttack",
+            "phase": "recovery",
+            "attackType": "light",
+            "facing": -132.5,
+            "exhausted": true
+          },
+          "who": "B",
+          "from": "active",
+          "to": "recovery",
+          "phaseDur": 0.233
+        },
+        {
+          "t": 13.917,
+          "type": "phaseChange",
+          "dist": 36,
+          "A": {
+            "id": "A",
+            "x": 755.2,
+            "y": 411.2,
+            "hp": 52,
+            "stamina": 0,
+            "state": "blockRecovery",
+            "phase": "none",
+            "attackType": "none",
+            "facing": 47.5,
+            "exhausted": true
+          },
+          "B": {
+            "id": "B",
+            "x": 779.5,
+            "y": 437.8,
+            "hp": 7,
+            "stamina": 0,
+            "state": "lightAttack",
+            "phase": "startup",
+            "attackType": "light",
+            "facing": -132.5,
+            "exhausted": true
+          },
+          "who": "B",
+          "from": "recovery",
+          "to": "startup",
+          "phaseDur": 0.017
+        },
+        {
+          "t": 14.067,
+          "type": "phaseChange",
+          "dist": 22,
+          "A": {
+            "id": "A",
+            "x": 753.2,
+            "y": 409.1,
+            "hp": 52,
+            "stamina": 0,
+            "state": "blockRecovery",
+            "phase": "none",
+            "attackType": "none",
+            "facing": 47.5,
+            "exhausted": true
+          },
+          "B": {
+            "id": "B",
+            "x": 768.1,
+            "y": 425.3,
+            "hp": 7,
+            "stamina": 0,
+            "state": "lightAttack",
+            "phase": "active",
+            "attackType": "light",
+            "facing": -132.5,
+            "exhausted": true
+          },
+          "who": "B",
+          "from": "startup",
+          "to": "active",
+          "phaseDur": 0.15
+        },
+        {
+          "t": 14.067,
+          "type": "execution",
+          "dist": 36,
+          "A": {
+            "id": "A",
+            "x": 748.5,
+            "y": 403.9,
+            "hp": 27,
+            "stamina": 0,
+            "state": "executed",
+            "phase": "none",
+            "attackType": "none",
+            "facing": 47.5,
+            "exhausted": true
+          },
+          "B": {
+            "id": "B",
+            "x": 772.8,
+            "y": 430.4,
+            "hp": 7,
+            "stamina": 0,
+            "state": "executing",
+            "phase": "none",
+            "attackType": "light",
+            "facing": -132.5,
+            "exhausted": true
+          },
+          "who": "B",
+          "target": "A",
+          "damage": 25
+        },
+        {
+          "t": 14.083,
+          "type": "phaseChange",
+          "dist": 36,
+          "A": {
+            "id": "A",
+            "x": 748.5,
+            "y": 403.9,
+            "hp": 27,
+            "stamina": 0,
+            "state": "executed",
+            "phase": "none",
+            "attackType": "none",
+            "facing": 47.5,
+            "exhausted": true
+          },
+          "B": {
+            "id": "B",
+            "x": 772.8,
+            "y": 430.4,
+            "hp": 7,
+            "stamina": 0,
+            "state": "executing",
+            "phase": "none",
+            "attackType": "light",
+            "facing": -132.5,
+            "exhausted": true
+          },
+          "who": "B",
+          "from": "active",
+          "to": "none",
+          "phaseDur": 0.017
+        },
+        {
+          "t": 15.067,
+          "type": "stateEnd",
+          "dist": 36,
+          "A": {
+            "id": "A",
+            "x": 748.5,
+            "y": 403.9,
+            "hp": 27,
+            "stamina": 3,
+            "state": "idle",
+            "phase": "none",
+            "attackType": "none",
+            "facing": 47.5,
+            "exhausted": false
+          },
+          "B": {
+            "id": "B",
+            "x": 772.8,
+            "y": 430.4,
+            "hp": 7,
+            "stamina": 0,
+            "state": "idle",
+            "phase": "none",
+            "attackType": "none",
+            "facing": -132.5,
+            "exhausted": true
+          },
+          "who": "A",
+          "prevState": "executed",
+          "duration": 1.183
+        },
+        {
+          "t": 15.067,
+          "type": "stateEnd",
+          "dist": 36,
+          "A": {
+            "id": "A",
+            "x": 748.5,
+            "y": 403.9,
+            "hp": 27,
+            "stamina": 3,
+            "state": "idle",
+            "phase": "none",
+            "attackType": "none",
+            "facing": 47.5,
+            "exhausted": false
+          },
+          "B": {
+            "id": "B",
+            "x": 772.8,
+            "y": 430.4,
+            "hp": 7,
+            "stamina": 0,
+            "state": "idle",
+            "phase": "none",
+            "attackType": "none",
+            "facing": -132.5,
+            "exhausted": true
+          },
+          "who": "B",
+          "prevState": "executing",
+          "duration": 1.783
+        },
+        {
+          "t": 15.083,
+          "type": "blockStart",
+          "dist": 36,
+          "A": {
+            "id": "A",
+            "x": 748.5,
+            "y": 403.9,
+            "hp": 27,
+            "stamina": 3,
+            "state": "idle",
+            "phase": "none",
+            "attackType": "none",
+            "facing": 47.5,
+            "exhausted": false
+          },
+          "B": {
+            "id": "B",
+            "x": 772.8,
+            "y": 430.4,
+            "hp": 7,
+            "stamina": 0,
+            "state": "blocking",
+            "phase": "none",
+            "attackType": "none",
+            "facing": -132.5,
+            "exhausted": true
+          },
+          "who": "B"
+        },
+        {
+          "t": 15.217,
+          "type": "stateEnd",
+          "dist": 42,
+          "A": {
+            "id": "A",
+            "x": 748.5,
+            "y": 403.9,
+            "hp": 27,
+            "stamina": 3,
+            "state": "idle",
+            "phase": "none",
+            "attackType": "none",
+            "facing": 51.8,
+            "exhausted": false
+          },
+          "B": {
+            "id": "B",
+            "x": 773.9,
+            "y": 436.9,
+            "hp": 7,
+            "stamina": 0,
+            "state": "blockRecovery",
+            "phase": "none",
+            "attackType": "none",
+            "facing": -128.2,
+            "exhausted": true
+          },
+          "who": "B",
+          "prevState": "blocking",
+          "duration": 0.133
+        },
+        {
+          "t": 15.233,
+          "type": "attackStart",
+          "dist": 42,
+          "A": {
+            "id": "A",
+            "x": 748.5,
+            "y": 403.9,
+            "hp": 27,
+            "stamina": 3,
+            "state": "lightAttack",
+            "phase": "startup",
+            "attackType": "light",
+            "facing": 52.4,
+            "exhausted": false
+          },
+          "B": {
+            "id": "B",
+            "x": 774,
+            "y": 437.6,
+            "hp": 7,
+            "stamina": 0,
+            "state": "blockRecovery",
+            "phase": "none",
+            "attackType": "none",
+            "facing": -127.6,
+            "exhausted": true
+          },
+          "who": "A",
+          "attackType": "light",
+          "step": 1
+        },
+        {
+          "t": 15.383,
+          "type": "phaseChange",
+          "dist": 25,
+          "A": {
+            "id": "A",
+            "x": 759.8,
+            "y": 419.7,
+            "hp": 27,
+            "stamina": 3,
+            "state": "lightAttack",
+            "phase": "active",
+            "attackType": "light",
+            "facing": 54.5,
+            "exhausted": false
+          },
+          "B": {
+            "id": "B",
+            "x": 774.3,
+            "y": 440.1,
+            "hp": 7,
+            "stamina": 0,
+            "state": "blockRecovery",
+            "phase": "none",
+            "attackType": "none",
+            "facing": -125.5,
+            "exhausted": true
+          },
+          "who": "A",
+          "from": "startup",
+          "to": "active",
+          "phaseDur": 0.15
+        },
+        {
+          "t": 15.383,
+          "type": "execution",
+          "dist": 36,
+          "A": {
+            "id": "A",
+            "x": 756.7,
+            "y": 415.2,
+            "hp": 27,
+            "stamina": 3,
+            "state": "executing",
+            "phase": "none",
+            "attackType": "light",
+            "facing": 54.5,
+            "exhausted": false
+          },
+          "B": {
+            "id": "B",
+            "x": 777.5,
+            "y": 444.6,
+            "hp": 0,
+            "stamina": 0,
+            "state": "executed",
+            "phase": "none",
+            "attackType": "none",
+            "facing": -125.5,
+            "exhausted": true
+          },
+          "who": "A",
+          "target": "B",
+          "damage": 25
+        },
+        {
+          "t": 15.383,
+          "type": "roundEnd",
+          "dist": 36,
+          "A": {
+            "id": "A",
+            "x": 756.7,
+            "y": 415.2,
+            "hp": 27,
+            "stamina": 3,
+            "state": "executing",
+            "phase": "none",
+            "attackType": "light",
+            "facing": 54.5,
+            "exhausted": false
+          },
+          "B": {
+            "id": "B",
+            "x": 777.5,
+            "y": 444.6,
+            "hp": 0,
+            "stamina": 0,
+            "state": "executed",
+            "phase": "none",
+            "attackType": "none",
+            "facing": -125.5,
+            "exhausted": true
+          },
+          "winner": "A",
+          "hpA": 27,
+          "hpB": 0
+        }
+      ],
+      "aiDecisionsA": [
+        {
+          "time": 0.483,
+          "reason": "decide",
+          "action": "attack",
+          "dist": 39,
+          "combo": 3
+        },
+        {
+          "time": 0.5,
+          "reason": "feint_init",
+          "action": "light"
+        },
+        {
+          "time": 0.517,
+          "reason": "feint_exec",
+          "action": "light_to_heavy"
+        },
+        {
+          "time": 0.55,
+          "reason": "feint_react",
+          "action": "heavy_vs_heavy",
+          "opState": "heavyAttack"
+        },
+        {
+          "time": 1.55,
+          "reason": "decide",
+          "action": "attack",
+          "dist": 42,
+          "combo": 3
+        },
+        {
+          "time": 1.817,
+          "reason": "stagger_guess",
+          "action": "light",
+          "dist": 67,
+          "opState": "staggered"
+        },
+        {
+          "time": 1.833,
+          "reason": "stagger_guess",
+          "action": "light",
+          "dist": 67,
+          "opState": "staggered"
+        },
+        {
+          "time": 1.85,
+          "reason": "stagger_guess",
+          "action": "light",
+          "dist": 67,
+          "opState": "staggered"
+        },
+        {
+          "time": 1.867,
+          "reason": "stagger_guess",
+          "action": "heavy",
+          "dist": 67,
+          "opState": "staggered"
+        },
+        {
+          "time": 3.867,
+          "reason": "feint_combo",
+          "action": "mid_combo",
+          "combo": 1
+        },
+        {
+          "time": 4.217,
+          "reason": "stagger_react",
+          "action": "dodge",
+          "dist": 65,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 4.233,
+          "reason": "stagger_react",
+          "action": "dodge",
+          "dist": 70,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 4.25,
+          "reason": "stagger_react",
+          "action": "dodge",
+          "dist": 75,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 4.267,
+          "reason": "stagger_react",
+          "action": "dodge",
+          "dist": 79,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 4.283,
+          "reason": "stagger_react",
+          "action": "dodge",
+          "dist": 81,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 4.3,
+          "reason": "stagger_react",
+          "action": "dodge",
+          "dist": 82,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 4.317,
+          "reason": "stagger_react",
+          "action": "heavy_trade",
+          "dist": 82
+        },
+        {
+          "time": 4.333,
+          "reason": "stagger_react",
+          "action": "dodge",
+          "dist": 81,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 4.35,
+          "reason": "stagger_react",
+          "action": "dodge",
+          "dist": 80,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 4.383,
+          "reason": "stagger_react",
+          "action": "dodge",
+          "dist": 78,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 4.4,
+          "reason": "stagger_react",
+          "action": "dodge",
+          "dist": 78,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 4.417,
+          "reason": "stagger_react",
+          "action": "dodge",
+          "dist": 78,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 4.433,
+          "reason": "stagger_react",
+          "action": "dodge",
+          "dist": 77,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 4.45,
+          "reason": "stagger_react",
+          "action": "dodge",
+          "dist": 77,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 4.467,
+          "reason": "stagger_react",
+          "action": "dodge",
+          "dist": 77,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 4.483,
+          "reason": "stagger_react",
+          "action": "dodge",
+          "dist": 76,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 4.517,
+          "reason": "stagger_react",
+          "action": "dodge",
+          "dist": 76,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 4.533,
+          "reason": "stagger_react",
+          "action": "dodge",
+          "dist": 62,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 4.55,
+          "reason": "stagger_react",
+          "action": "dodge",
+          "dist": 68,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 4.567,
+          "reason": "stagger_react",
+          "action": "dodge",
+          "dist": 73,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 4.583,
+          "reason": "stagger_react",
+          "action": "dodge",
+          "dist": 76,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 4.6,
+          "reason": "stagger_react",
+          "action": "dodge",
+          "dist": 79,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 4.617,
+          "reason": "stagger_react",
+          "action": "dodge",
+          "dist": 80,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 4.633,
+          "reason": "stagger_react",
+          "action": "dodge",
+          "dist": 80,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 4.65,
+          "reason": "stagger_react",
+          "action": "dodge",
+          "dist": 79,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 4.667,
+          "reason": "stagger_react",
+          "action": "dodge",
+          "dist": 77,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 4.683,
+          "reason": "stagger_guess",
+          "action": "light",
+          "dist": 76,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 4.7,
+          "reason": "stagger_guess",
+          "action": "light",
+          "dist": 76,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 4.75,
+          "reason": "stagger_guess",
+          "action": "light",
+          "dist": 76,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 4.8,
+          "reason": "stagger_guess",
+          "action": "light",
+          "dist": 76,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 4.817,
+          "reason": "stagger_guess",
+          "action": "heavy",
+          "dist": 76,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 4.833,
+          "reason": "stagger_guess",
+          "action": "heavy",
+          "dist": 76,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 4.85,
+          "reason": "stagger_guess",
+          "action": "light",
+          "dist": 76,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 7.217,
+          "reason": "stagger_react",
+          "action": "dodge",
+          "dist": 36,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 7.233,
+          "reason": "stagger_react",
+          "action": "dodge",
+          "dist": 42,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 7.267,
+          "reason": "stagger_react",
+          "action": "dodge",
+          "dist": 50,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 7.283,
+          "reason": "stagger_react",
+          "action": "dodge",
+          "dist": 52,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 7.3,
+          "reason": "stagger_react",
+          "action": "dodge",
+          "dist": 54,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 7.317,
+          "reason": "stagger_react",
+          "action": "dodge",
+          "dist": 54,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 7.333,
+          "reason": "stagger_react",
+          "action": "dodge",
+          "dist": 53,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 7.35,
+          "reason": "stagger_react",
+          "action": "dodge",
+          "dist": 51,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 7.367,
+          "reason": "stagger_guess",
+          "action": "light",
+          "dist": 50,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 7.383,
+          "reason": "stagger_react",
+          "action": "dodge",
+          "dist": 49,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 7.4,
+          "reason": "stagger_react",
+          "action": "dodge",
+          "dist": 49,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 7.417,
+          "reason": "stagger_react",
+          "action": "heavy_trade",
+          "dist": 48
+        },
+        {
+          "time": 7.433,
+          "reason": "stagger_react",
+          "action": "dodge",
+          "dist": 48,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 7.45,
+          "reason": "stagger_react",
+          "action": "dodge",
+          "dist": 47,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 7.467,
+          "reason": "stagger_react",
+          "action": "dodge",
+          "dist": 46,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 7.483,
+          "reason": "stagger_react",
+          "action": "dodge",
+          "dist": 46,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 7.5,
+          "reason": "stagger_react",
+          "action": "dodge",
+          "dist": 45,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 7.517,
+          "reason": "stagger_react",
+          "action": "dodge",
+          "dist": 44,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 7.533,
+          "reason": "stagger_react",
+          "action": "heavy_trade",
+          "dist": 36
+        },
+        {
+          "time": 7.55,
+          "reason": "stagger_react",
+          "action": "dodge",
+          "dist": 42,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 7.567,
+          "reason": "stagger_react",
+          "action": "dodge",
+          "dist": 47,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 7.583,
+          "reason": "stagger_react",
+          "action": "dodge",
+          "dist": 50,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 7.6,
+          "reason": "stagger_react",
+          "action": "dodge",
+          "dist": 52,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 7.633,
+          "reason": "stagger_react",
+          "action": "heavy_trade",
+          "dist": 54
+        },
+        {
+          "time": 7.65,
+          "reason": "stagger_react",
+          "action": "dodge",
+          "dist": 53,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 7.667,
+          "reason": "stagger_react",
+          "action": "heavy_trade",
+          "dist": 51
+        },
+        {
+          "time": 7.683,
+          "reason": "stagger_guess",
+          "action": "light",
+          "dist": 50,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 7.7,
+          "reason": "stagger_guess",
+          "action": "heavy",
+          "dist": 50,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 7.733,
+          "reason": "stagger_guess",
+          "action": "heavy",
+          "dist": 50,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 7.75,
+          "reason": "stagger_guess",
+          "action": "light",
+          "dist": 50,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 7.767,
+          "reason": "stagger_guess",
+          "action": "heavy",
+          "dist": 50,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 7.833,
+          "reason": "stagger_guess",
+          "action": "light",
+          "dist": 50,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 7.85,
+          "reason": "stagger_guess",
+          "action": "heavy",
+          "dist": 50,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 8.654,
+          "reason": "stagger_react",
+          "action": "dodge",
+          "dist": 54,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 8.659,
+          "reason": "stagger_react",
+          "action": "heavy_trade",
+          "dist": 57
+        },
+        {
+          "time": 8.662,
+          "reason": "stagger_react",
+          "action": "heavy_trade",
+          "dist": 58
+        },
+        {
+          "time": 8.664,
+          "reason": "stagger_react",
+          "action": "dodge",
+          "dist": 59,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 8.672,
+          "reason": "stagger_react",
+          "action": "dodge",
+          "dist": 63,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 8.674,
+          "reason": "stagger_react",
+          "action": "dodge",
+          "dist": 64,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 8.677,
+          "reason": "stagger_react",
+          "action": "dodge",
+          "dist": 64,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 8.679,
+          "reason": "stagger_react",
+          "action": "heavy_trade",
+          "dist": 65
+        },
+        {
+          "time": 8.682,
+          "reason": "stagger_react",
+          "action": "dodge",
+          "dist": 66,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 8.684,
+          "reason": "stagger_react",
+          "action": "dodge",
+          "dist": 67,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 8.689,
+          "reason": "stagger_react",
+          "action": "dodge",
+          "dist": 68,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 8.692,
+          "reason": "stagger_react",
+          "action": "dodge",
+          "dist": 69,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 8.694,
+          "reason": "stagger_react",
+          "action": "dodge",
+          "dist": 70,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 8.697,
+          "reason": "stagger_react",
+          "action": "dodge",
+          "dist": 70,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 8.699,
+          "reason": "stagger_react",
+          "action": "dodge",
+          "dist": 71,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 8.702,
+          "reason": "stagger_react",
+          "action": "dodge",
+          "dist": 71,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 8.704,
+          "reason": "stagger_react",
+          "action": "dodge",
+          "dist": 72,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 8.707,
+          "reason": "stagger_react",
+          "action": "dodge",
+          "dist": 72,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 8.712,
+          "reason": "stagger_react",
+          "action": "dodge",
+          "dist": 73,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 8.714,
+          "reason": "stagger_react",
+          "action": "dodge",
+          "dist": 74,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 8.717,
+          "reason": "stagger_react",
+          "action": "dodge",
+          "dist": 74,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 8.733,
+          "reason": "stagger_react",
+          "action": "dodge",
+          "dist": 75,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 8.767,
+          "reason": "stagger_react",
+          "action": "dodge",
+          "dist": 76,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 8.783,
+          "reason": "stagger_react",
+          "action": "heavy_trade",
+          "dist": 75
+        },
+        {
+          "time": 8.8,
+          "reason": "stagger_react",
+          "action": "dodge",
+          "dist": 74,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 8.817,
+          "reason": "stagger_guess",
+          "action": "light",
+          "dist": 72,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 8.833,
+          "reason": "stagger_react",
+          "action": "dodge",
+          "dist": 72,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 8.85,
+          "reason": "stagger_react",
+          "action": "dodge",
+          "dist": 72,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 8.867,
+          "reason": "stagger_react",
+          "action": "dodge",
+          "dist": 71,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 8.883,
+          "reason": "stagger_react",
+          "action": "dodge",
+          "dist": 71,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 8.9,
+          "reason": "stagger_react",
+          "action": "dodge",
+          "dist": 70,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 8.917,
+          "reason": "stagger_react",
+          "action": "dodge",
+          "dist": 70,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 8.933,
+          "reason": "stagger_react",
+          "action": "dodge",
+          "dist": 70,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 8.95,
+          "reason": "stagger_react",
+          "action": "dodge",
+          "dist": 69,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 8.967,
+          "reason": "stagger_react",
+          "action": "dodge",
+          "dist": 69,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 8.983,
+          "reason": "stagger_react",
+          "action": "dodge",
+          "dist": 56,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 9,
+          "reason": "stagger_react",
+          "action": "dodge",
+          "dist": 61,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 9.017,
+          "reason": "stagger_react",
+          "action": "dodge",
+          "dist": 66,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 9.033,
+          "reason": "stagger_react",
+          "action": "dodge",
+          "dist": 70,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 9.05,
+          "reason": "stagger_react",
+          "action": "dodge",
+          "dist": 72,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 9.067,
+          "reason": "stagger_react",
+          "action": "dodge",
+          "dist": 73,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 9.083,
+          "reason": "stagger_react",
+          "action": "dodge",
+          "dist": 73,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 9.1,
+          "reason": "stagger_react",
+          "action": "heavy_trade",
+          "dist": 72
+        },
+        {
+          "time": 9.117,
+          "reason": "stagger_react",
+          "action": "dodge",
+          "dist": 71,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 9.133,
+          "reason": "stagger_guess",
+          "action": "heavy",
+          "dist": 70,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 9.15,
+          "reason": "stagger_guess",
+          "action": "light",
+          "dist": 70,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 9.167,
+          "reason": "stagger_guess",
+          "action": "light",
+          "dist": 70,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 9.183,
+          "reason": "stagger_guess",
+          "action": "light",
+          "dist": 70,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 9.2,
+          "reason": "stagger_guess",
+          "action": "light",
+          "dist": 70,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 9.233,
+          "reason": "stagger_guess",
+          "action": "heavy",
+          "dist": 70,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 9.283,
+          "reason": "stagger_guess",
+          "action": "heavy",
+          "dist": 70,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 9.317,
+          "reason": "decide",
+          "action": "feint_plan"
+        },
+        {
+          "time": 9.533,
+          "reason": "feint_react",
+          "action": "heavy_vs_heavy",
+          "opState": "heavyAttack"
+        }
+      ],
+      "aiDecisionsB": [
+        {
+          "time": 0.483,
+          "reason": "decide",
+          "action": "attack",
+          "dist": 39,
+          "combo": 2
+        },
+        {
+          "time": 0.5,
+          "reason": "feint_init",
+          "action": "light"
+        },
+        {
+          "time": 0.517,
+          "reason": "feint_exec",
+          "action": "light_to_heavy"
+        },
+        {
+          "time": 0.533,
+          "reason": "feint_react",
+          "action": "heavy_vs_heavy",
+          "opState": "heavyAttack"
+        },
+        {
+          "time": 0.65,
+          "reason": "feint_react",
+          "action": "heavy_vs_heavy",
+          "opState": "heavyAttack"
+        },
+        {
+          "time": 1.55,
+          "reason": "decide",
+          "action": "attack",
+          "dist": 42,
+          "combo": 1
+        },
+        {
+          "time": 1.8,
+          "reason": "stagger_guess",
+          "action": "light",
+          "dist": 67,
+          "opState": "staggered"
+        },
+        {
+          "time": 1.817,
+          "reason": "stagger_guess",
+          "action": "heavy",
+          "dist": 67,
+          "opState": "staggered"
+        },
+        {
+          "time": 1.833,
+          "reason": "stagger_guess",
+          "action": "light",
+          "dist": 67,
+          "opState": "staggered"
+        },
+        {
+          "time": 1.883,
+          "reason": "stagger_guess",
+          "action": "light",
+          "dist": 67,
+          "opState": "staggered"
+        },
+        {
+          "time": 2.633,
+          "reason": "stagger_react",
+          "action": "block",
+          "dist": 36,
+          "opState": "heavyAttack",
+          "opPhase": "active"
+        },
+        {
+          "time": 2.65,
+          "reason": "stagger_react",
+          "action": "block",
+          "dist": 54,
+          "opState": "heavyAttack",
+          "opPhase": "active"
+        },
+        {
+          "time": 2.667,
+          "reason": "stagger_react",
+          "action": "block",
+          "dist": 70,
+          "opState": "heavyAttack",
+          "opPhase": "active"
+        },
+        {
+          "time": 2.683,
+          "reason": "stagger_react",
+          "action": "block",
+          "dist": 82,
+          "opState": "heavyAttack",
+          "opPhase": "active"
+        },
+        {
+          "time": 2.7,
+          "reason": "stagger_react",
+          "action": "block",
+          "dist": 91,
+          "opState": "heavyAttack",
+          "opPhase": "active"
+        },
+        {
+          "time": 2.717,
+          "reason": "stagger_react",
+          "action": "block",
+          "dist": 97,
+          "opState": "heavyAttack",
+          "opPhase": "active"
+        },
+        {
+          "time": 2.733,
+          "reason": "stagger_react",
+          "action": "block",
+          "dist": 100,
+          "opState": "heavyAttack",
+          "opPhase": "active"
+        },
+        {
+          "time": 2.75,
+          "reason": "stagger_react",
+          "action": "block",
+          "dist": 99,
+          "opState": "heavyAttack",
+          "opPhase": "active"
+        },
+        {
+          "time": 2.783,
+          "reason": "stagger_react",
+          "action": "block",
+          "dist": 98,
+          "opState": "heavyAttack",
+          "opPhase": "active"
+        },
+        {
+          "time": 2.8,
+          "reason": "stagger_react",
+          "action": "block",
+          "dist": 97,
+          "opState": "heavyAttack",
+          "opPhase": "active"
+        },
+        {
+          "time": 2.833,
+          "reason": "stagger_react",
+          "action": "block",
+          "dist": 96,
+          "opState": "heavyAttack",
+          "opPhase": "recovery"
+        },
+        {
+          "time": 2.85,
+          "reason": "stagger_react",
+          "action": "block",
+          "dist": 96,
+          "opState": "heavyAttack",
+          "opPhase": "recovery"
+        },
+        {
+          "time": 2.867,
+          "reason": "stagger_react",
+          "action": "block",
+          "dist": 96,
+          "opState": "heavyAttack",
+          "opPhase": "recovery"
+        },
+        {
+          "time": 2.883,
+          "reason": "stagger_react",
+          "action": "block",
+          "dist": 96,
+          "opState": "heavyAttack",
+          "opPhase": "recovery"
+        },
+        {
+          "time": 2.9,
+          "reason": "stagger_react",
+          "action": "block",
+          "dist": 96,
+          "opState": "heavyAttack",
+          "opPhase": "recovery"
+        },
+        {
+          "time": 2.917,
+          "reason": "stagger_react",
+          "action": "block",
+          "dist": 96,
+          "opState": "heavyAttack",
+          "opPhase": "recovery"
+        },
+        {
+          "time": 2.933,
+          "reason": "stagger_react",
+          "action": "block",
+          "dist": 96,
+          "opState": "heavyAttack",
+          "opPhase": "recovery"
+        },
+        {
+          "time": 2.95,
+          "reason": "stagger_react",
+          "action": "block",
+          "dist": 96,
+          "opState": "heavyAttack",
+          "opPhase": "recovery"
+        },
+        {
+          "time": 3.717,
+          "reason": "stagger_react",
+          "action": "dodge",
+          "dist": 67,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 3.733,
+          "reason": "stagger_react",
+          "action": "dodge",
+          "dist": 73,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 3.75,
+          "reason": "stagger_react",
+          "action": "dodge",
+          "dist": 78,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 3.783,
+          "reason": "stagger_react",
+          "action": "dodge",
+          "dist": 83,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 3.8,
+          "reason": "stagger_react",
+          "action": "dodge",
+          "dist": 84,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 3.817,
+          "reason": "stagger_react",
+          "action": "dodge",
+          "dist": 84,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 3.833,
+          "reason": "stagger_react",
+          "action": "heavy_trade",
+          "dist": 83
+        },
+        {
+          "time": 3.85,
+          "reason": "stagger_react",
+          "action": "dodge",
+          "dist": 82,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 3.867,
+          "reason": "stagger_guess",
+          "action": "light",
+          "dist": 81,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 3.933,
+          "reason": "stagger_guess",
+          "action": "light",
+          "dist": 81,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 3.95,
+          "reason": "stagger_guess",
+          "action": "light",
+          "dist": 81,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 3.983,
+          "reason": "stagger_guess",
+          "action": "heavy",
+          "dist": 81,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 4.017,
+          "reason": "stagger_guess",
+          "action": "light",
+          "dist": 81,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 5.033,
+          "reason": "stagger_react",
+          "action": "dodge",
+          "dist": 60,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 5.05,
+          "reason": "stagger_react",
+          "action": "heavy_trade",
+          "dist": 66
+        },
+        {
+          "time": 5.067,
+          "reason": "stagger_react",
+          "action": "heavy_trade",
+          "dist": 70
+        },
+        {
+          "time": 5.083,
+          "reason": "stagger_react",
+          "action": "dodge",
+          "dist": 74,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 5.1,
+          "reason": "stagger_react",
+          "action": "dodge",
+          "dist": 76,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 5.133,
+          "reason": "stagger_react",
+          "action": "dodge",
+          "dist": 77,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 5.15,
+          "reason": "stagger_react",
+          "action": "dodge",
+          "dist": 76,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 5.167,
+          "reason": "stagger_react",
+          "action": "dodge",
+          "dist": 75,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 5.2,
+          "reason": "stagger_react",
+          "action": "dodge",
+          "dist": 73,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 5.233,
+          "reason": "stagger_react",
+          "action": "dodge",
+          "dist": 73,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 5.25,
+          "reason": "stagger_react",
+          "action": "dodge",
+          "dist": 72,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 5.267,
+          "reason": "stagger_react",
+          "action": "dodge",
+          "dist": 72,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 5.283,
+          "reason": "stagger_react",
+          "action": "dodge",
+          "dist": 71,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 5.3,
+          "reason": "stagger_react",
+          "action": "dodge",
+          "dist": 71,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 5.333,
+          "reason": "stagger_react",
+          "action": "dodge",
+          "dist": 70,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 5.35,
+          "reason": "stagger_react",
+          "action": "dodge",
+          "dist": 57,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 5.383,
+          "reason": "stagger_react",
+          "action": "dodge",
+          "dist": 67,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 5.417,
+          "reason": "stagger_react",
+          "action": "heavy_trade",
+          "dist": 73
+        },
+        {
+          "time": 5.433,
+          "reason": "stagger_react",
+          "action": "heavy_trade",
+          "dist": 75
+        },
+        {
+          "time": 5.45,
+          "reason": "stagger_react",
+          "action": "dodge",
+          "dist": 75,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 5.467,
+          "reason": "stagger_react",
+          "action": "dodge",
+          "dist": 74,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 5.533,
+          "reason": "stagger_guess",
+          "action": "heavy",
+          "dist": 71,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 5.55,
+          "reason": "stagger_guess",
+          "action": "heavy",
+          "dist": 71,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 5.567,
+          "reason": "stagger_guess",
+          "action": "heavy",
+          "dist": 71,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 5.583,
+          "reason": "stagger_guess",
+          "action": "block",
+          "dist": 71,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 5.65,
+          "reason": "stagger_guess",
+          "action": "light",
+          "dist": 71,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 5.683,
+          "reason": "decide",
+          "action": "feint_plan"
+        },
+        {
+          "time": 5.7,
+          "reason": "feint_exec",
+          "action": "light_to_block"
+        },
+        {
+          "time": 6.3,
+          "reason": "decide",
+          "action": "attack",
+          "dist": 35,
+          "combo": 2
+        },
+        {
+          "time": 6.4,
+          "reason": "stagger_react",
+          "action": "heavy_trade",
+          "dist": 36
+        },
+        {
+          "time": 6.417,
+          "reason": "stagger_react",
+          "action": "dodge",
+          "dist": 42,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 6.45,
+          "reason": "stagger_react",
+          "action": "dodge",
+          "dist": 50,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 6.467,
+          "reason": "stagger_react",
+          "action": "heavy_trade",
+          "dist": 52
+        },
+        {
+          "time": 6.483,
+          "reason": "stagger_react",
+          "action": "heavy_trade",
+          "dist": 53
+        },
+        {
+          "time": 6.517,
+          "reason": "stagger_react",
+          "action": "dodge",
+          "dist": 52,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 6.533,
+          "reason": "stagger_react",
+          "action": "heavy_trade",
+          "dist": 51
+        },
+        {
+          "time": 6.567,
+          "reason": "stagger_react",
+          "action": "heavy_trade",
+          "dist": 49
+        },
+        {
+          "time": 6.583,
+          "reason": "stagger_react",
+          "action": "dodge",
+          "dist": 48,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 6.6,
+          "reason": "stagger_react",
+          "action": "heavy_trade",
+          "dist": 48
+        },
+        {
+          "time": 6.633,
+          "reason": "stagger_react",
+          "action": "dodge",
+          "dist": 46,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 6.65,
+          "reason": "stagger_react",
+          "action": "dodge",
+          "dist": 46,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 6.667,
+          "reason": "stagger_react",
+          "action": "dodge",
+          "dist": 45,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 6.683,
+          "reason": "stagger_react",
+          "action": "dodge",
+          "dist": 44,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 6.7,
+          "reason": "stagger_react",
+          "action": "dodge",
+          "dist": 44,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 6.717,
+          "reason": "stagger_react",
+          "action": "dodge",
+          "dist": 36,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 6.733,
+          "reason": "stagger_react",
+          "action": "dodge",
+          "dist": 42,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 6.75,
+          "reason": "stagger_react",
+          "action": "dodge",
+          "dist": 47,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 6.767,
+          "reason": "stagger_react",
+          "action": "dodge",
+          "dist": 50,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 6.783,
+          "reason": "stagger_react",
+          "action": "dodge",
+          "dist": 52,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 6.8,
+          "reason": "stagger_react",
+          "action": "dodge",
+          "dist": 54,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 6.817,
+          "reason": "stagger_react",
+          "action": "heavy_trade",
+          "dist": 54
+        },
+        {
+          "time": 6.833,
+          "reason": "stagger_react",
+          "action": "dodge",
+          "dist": 53,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 6.867,
+          "reason": "stagger_guess",
+          "action": "heavy",
+          "dist": 50,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 6.883,
+          "reason": "stagger_guess",
+          "action": "block",
+          "dist": 50,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 6.9,
+          "reason": "stagger_guess",
+          "action": "light",
+          "dist": 50,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 6.933,
+          "reason": "stagger_guess",
+          "action": "heavy",
+          "dist": 50,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 7,
+          "reason": "stagger_guess",
+          "action": "heavy",
+          "dist": 50,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 7.033,
+          "reason": "stagger_guess",
+          "action": "light",
+          "dist": 50,
+          "opState": "lightAttack"
+        },
+        {
+          "time": 11.338,
+          "reason": "decide",
+          "action": "feint_plan"
+        },
+        {
+          "time": 11.338,
+          "reason": "feint_recover",
+          "action": "plan",
+          "dist": 36
+        },
+        {
+          "time": 11.372,
+          "reason": "feint_exec",
+          "action": "heavy_to_block"
+        }
+      ],
+      "summary": {
+        "hitsA": {
+          "light": 5,
+          "heavy": 1
+        },
+        "hitsB": {
+          "light": 6,
+          "heavy": 0
+        },
+        "whiffA": {
+          "light": 0,
+          "heavy": 0,
+          "parryCounter": 0
+        },
+        "whiffB": {
+          "light": 0,
+          "heavy": 0,
+          "parryCounter": 0
+        },
+        "damageA": 68,
+        "damageB": 48
+      }
+    }
+  ]
+}

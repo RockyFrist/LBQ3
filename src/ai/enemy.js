@@ -130,6 +130,25 @@ export class Enemy {
       this._clearPlan();
     }
     this._checkPlanTriggers(f, pf, d, cfg);
+
+    // 二次博弈：格挡相关状态转换后重置AI决策，避免旧定时器阻止行动
+    const justExitedParryStunned = this._prevFighterState === 'parryStunned' && f.state !== 'parryStunned';
+    const hasParryBoost = f.parryBoost && f.parryBoost.timer > 0;
+    if (justExitedParryStunned) {
+      // AI攻击被格挡后恢复：清除recover定时器，允许立即行动
+      this.aiState = 'approach';
+      this.aiTimer = 0;
+      this.attackCooldown = 0;
+      this.thinkCD = 0;
+    }
+    if (hasParryBoost && !this._wasParryBoosted && f.state === 'idle') {
+      // AI成功格挡获得parryBoost → 立即切换到进攻模式利用增益
+      this.aiState = 'approach';
+      this.aiTimer = 0;
+      this.attackCooldown = 0;
+      this.thinkCD = 0;
+    }
+
     this._prevFighterState = f.state;
     this._wasParryBoosted = f.parryBoost && f.parryBoost.timer > 0;
 

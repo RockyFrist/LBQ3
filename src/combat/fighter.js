@@ -80,11 +80,18 @@ export class Fighter {
 
     // 击退
     this.knockbackTimer = 0;
+    this.knockbackDuration = C.KNOCKBACK_SLIDE_DURATION;
     this.knockbackVx = 0;
     this.knockbackVy = 0;
 
     // 变招视觉反馈
     this.feinted = false;
+
+    // 格挡架开动画（被格挡方武器偏转）
+    this.parryDeflect = 0; // 剩余时间，> 0 时武器被架开
+
+    // 延迟拉近（格挡弹开武器后再拉近）
+    this.pendingPull = null; // { angle, distance, slideDuration, delay }
 
     // 预输入缓冲
     this.inputBuffer = null;       // { action, params, timer }
@@ -221,6 +228,19 @@ export class Fighter {
       if (this.inputBuffer.timer <= 0) this.inputBuffer = null;
     }
 
+    // 格挡架开动画衰减
+    if (this.parryDeflect > 0) this.parryDeflect -= dt;
+
+    // 延迟拉近：弹开武器动画播完后再向攻击方滑动靠近
+    if (this.pendingPull) {
+      this.pendingPull.delay -= dt;
+      if (this.pendingPull.delay <= 0) {
+        const p = this.pendingPull;
+        this.applyKnockback(p.angle, p.distance, p.slideDuration);
+        this.pendingPull = null;
+      }
+    }
+
     // 格挡加速增益衰减
     if (this.parryBoost.timer > 0) {
       this.parryBoost.timer -= dt;
@@ -240,9 +260,19 @@ export class Fighter {
     this.updateMovement(dt, commands);
   }
 
-  // 缓存输入（在无法行动时记录操作意图）
+  // 预输入缓冲：在无法行动时记录操作意图，状态结束后立即执行
+  // 新输入覆盖旧输入（只保留最后一次操作意图）
   bufferInput(action, params = {}) {
     this.inputBuffer = { action, params, timer: C.INPUT_BUFFER_DURATION };
+  }
+
+  // 通用预输入采集：在任何锁定状态中持续检测玩家/AI输入
+  _bufferFromCmd(cmd) {
+    if (!cmd) return;
+    if (cmd.lightAttack) this.bufferInput('lightAttack');
+    else if (cmd.heavyAttack) this.bufferInput('heavyAttack');
+    else if (cmd.blockHeld) this.bufferInput('block');
+    else if (cmd.dodge) this.bufferInput('dodge', { angle: cmd.dodgeAngle });
   }
 
   // 消费缓冲输入（回到idle时调用）
@@ -348,6 +378,9 @@ export class Fighter {
       this.x += Math.cos(this.facing) * drift * dt;
       this.y += Math.sin(this.facing) * drift * dt;
 
+      // 预输入缓冲：active阶段无法操作，记录下一步意图
+      this._bufferFromCmd(cmd);
+
       if (this.phaseTimer >= d.active) {
         // 打空检测：active→recovery时如果没命中任何目标
         if (this.hasHit.size === 0) {
@@ -437,19 +470,13 @@ export class Fighter {
 
   update_blockRecovery(dt, cmd) {
     if (cmd && cmd.faceAngle !== undefined) this.facing = cmd.faceAngle;
-    // 预输入缓冲：后摇中按攻击/防御/闪避
-    if (cmd) {
-      if (cmd.lightAttack) this.bufferInput('lightAttack');
-      else if (cmd.heavyAttack) this.bufferInput('heavyAttack');
-      else if (cmd.blockHeld) this.bufferInput('block');
-      else if (cmd.dodge) this.bufferInput('dodge', { angle: cmd.dodgeAngle });
-    }
+    this._bufferFromCmd(cmd);
     if (this.stateTimer >= C.BLOCK_RECOVERY_TIME) {
       this.setState('idle');
     }
   }
 
-  update_dodging(dt) {
+  update_dodging(dt, cmd) {
     const t = this.stateTimer;
     const speed = C.DODGE_SPEED * this.speedMult;
     this.vx = Math.cos(this.dodgeAngle) * speed;
@@ -459,6 +486,9 @@ export class Fighter {
     if (t < C.DODGE_INVULN_END) {
       this.afterimages.push({ x: this.x, y: this.y, alpha: 0.5, timer: 0.2 });
     }
+
+    // 预输入缓冲：闪避中记录下一步意图
+    this._bufferFromCmd(cmd);
 
     // 完美闪避退还体力
     if (this.perfectDodged && this.stamina < C.STAMINA_MAX) {
@@ -474,13 +504,7 @@ export class Fighter {
   }
 
   update_staggered(dt, cmd) {
-    // 预输入缓冲：硬直中按操作
-    if (cmd) {
-      if (cmd.lightAttack) this.bufferInput('lightAttack');
-      else if (cmd.heavyAttack) this.bufferInput('heavyAttack');
-      else if (cmd.blockHeld) this.bufferInput('block');
-      else if (cmd.dodge) this.bufferInput('dodge', { angle: cmd.dodgeAngle });
-    }
+    this._bufferFromCmd(cmd);
     if (this.stateTimer >= this.staggerDuration) {
       this.setState('idle');
     }
@@ -488,11 +512,13 @@ export class Fighter {
 
   // 格挡被弹后：可以按防御进入blocking（乒乓），或者硬吃反击
   update_parryStunned(dt, cmd, gameTime) {
-    if (cmd && cmd.blockHeld && this.stateTimer >= 0.12) {
-      // 允许在被弹后0.12s起按防御（给人类可操作的反应缓冲）
+    if (cmd && cmd.blockHeld && this.stateTimer >= 0.18) {
+      // 0.18s延迟：保证格挡方增益轻击能可靠命中
       this.setState('blocking', { time: gameTime });
       return;
     }
+    // 预输入缓冲（在被弹期间记录操作意图）
+    this._bufferFromCmd(cmd);
     if (this.stateTimer >= this.staggerDuration) {
       this.setState('idle');
     }
@@ -518,7 +544,7 @@ export class Fighter {
     if (this.knockbackTimer > 0) {
       // 击退滑动（线性减速，由快到慢，总位移 = distance）
       this.knockbackTimer -= dt;
-      const ratio = Math.max(0, this.knockbackTimer) / C.KNOCKBACK_SLIDE_DURATION;
+      const ratio = Math.max(0, this.knockbackTimer) / this.knockbackDuration;
       this.vx = this.knockbackVx * ratio;
       this.vy = this.knockbackVy * ratio;
     } else {
@@ -593,12 +619,13 @@ export class Fighter {
     }
   }
 
-  applyKnockback(angle, distance) {
+  applyKnockback(angle, distance, duration) {
     // 线性减速滑动 — v(t) = v0*(1-t/T), 总位移 = distance 像素
-    const dur = C.KNOCKBACK_SLIDE_DURATION;
+    const dur = duration || C.KNOCKBACK_SLIDE_DURATION;
     const speed = 2 * distance / dur;
     this.knockbackVx = Math.cos(angle) * speed;
     this.knockbackVy = Math.sin(angle) * speed;
+    this.knockbackDuration = dur;
     this.knockbackTimer = dur;
   }
 

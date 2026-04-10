@@ -178,16 +178,50 @@ export class CombatSystem {
       target.drainStamina(result.selfCost);
     }
 
-    // 攻击方进入格挡被弹状态（可招架但不可闪避/移动）
+    // 攻击方进入格挡被弹状态（可招架但不可闪避/移动，原地不动）
     attacker.setState('parryStunned', { duration: result.parryStagger });
-    attacker.applyKnockback(ang + Math.PI, result.parryKnockback);
+    // 停止攻击方一切位移（lunge/drift残余速度清零）
+    attacker.vx = 0;
+    attacker.vy = 0;
+    attacker.knockbackTimer = 0;
 
-    // 招架方向攻击方步进靠近（只狼识破前冲效果，确保反击不会打空）
+    // 格挡后保证最小间距（至少1/3身位），防止贴脸
+    const minGap = C.FIGHTER_RADIUS * 2 + C.FIGHTER_RADIUS * 0.88;
+    const curDist = dist(attacker, target);
+    if (curDist < minGap) {
+      const pushBack = (minGap - curDist) / 2;
+      // 双方各退一半
+      attacker.x += Math.cos(ang + Math.PI) * pushBack;
+      attacker.y += Math.sin(ang + Math.PI) * pushBack;
+      target.x += Math.cos(ang) * pushBack;
+      target.y += Math.sin(ang) * pushBack;
+    }
+
+    // 攻击方武器被架开（视觉动画）
+    const deflectDuration = parryLevel === 'precise' ? 0.45 : parryLevel === 'semi' ? 0.35 : 0.25;
+    attacker.parryDeflect = deflectDuration;
+
+    // 强制双方面对面（格挡拉近后的对峙感）
+    attacker.facing = ang;           // 攻击方面向防守方
+    target.facing = ang + Math.PI;   // 防守方面向攻击方
+
+    // 招架方在弹开武器动画结束后，再向攻击方步进靠近
     const pullDist = parryLevel === 'precise' ? C.PARRY_PULL_PRECISE
       : parryLevel === 'semi' ? C.PARRY_PULL_SEMI : C.PARRY_PULL_NONPRECISE;
     if (pullDist > 0) {
-      // 平滑滑动靠近（复用击退系统，方向朝向攻击方）
-      target.applyKnockback(ang, pullDist);
+      // 限制拉近距离：确保拉近后不低于最小间距
+      const curD = dist(attacker, target);
+      const maxPull = Math.max(0, curD - minGap);
+      const actualPull = Math.min(pullDist, maxPull);
+      if (actualPull > 0) {
+        // 延迟拉近：等武器弹开动画播完后再滑动靠近
+        target.pendingPull = {
+          angle: ang + Math.PI,
+          distance: actualPull,
+          slideDuration: C.PARRY_PULL_SLIDE_DURATION,
+          delay: deflectDuration,
+        };
+      }
     }
 
     // 招架方回到idle（手动选择后续行动，形成二次博弈）

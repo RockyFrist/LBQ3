@@ -147,12 +147,20 @@ export class Renderer {
     const len = r * 2.0;
     ctx.save();
 
-    // 攻击前摇时武器后拉动画
+    // 武器角度偏移
     let weaponOffset = 0;
+    // 攻击前摇时武器后拉动画
     if (f.phase === 'startup' && f.attackData &&
         (f.state === 'lightAttack' || f.state === 'heavyAttack' || f.state === 'parryCounter')) {
       const progress = Math.min(1, f.phaseTimer / f.attackData.startup);
       weaponOffset = -Math.PI * 0.3 * (1 - progress * progress);
+    }
+    // 格挡架开动画（武器被弹向侧面）
+    if (f.parryDeflect > 0) {
+      const t = Math.min(1, f.parryDeflect / 0.35);
+      // 先快速弹开再缓慢回正: easeOutQuad
+      const ease = t * (2 - t);
+      weaponOffset = Math.PI * 0.55 * ease;
     }
     ctx.rotate(f.facing + weaponOffset);
 
