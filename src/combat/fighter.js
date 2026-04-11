@@ -540,10 +540,10 @@ export class Fighter {
     // 预输入缓冲：闪避中记录下一步意图
     this._bufferFromCmd(cmd);
 
-    // 完美闪避退还体力
-    if (this.perfectDodged && this.stamina < C.STAMINA_MAX) {
-      this.stamina = Math.min(this.stamina + C.DODGE_COST, C.STAMINA_MAX);
-      this.perfectDodged = 'refunded'; // 标记已退还，防止重复
+    // 完美闪避回复1点体力（闪避消耗1 + 回复2 = 净回复1点）
+    if (this.perfectDodged && this.perfectDodged !== 'refunded') {
+      this.stamina = Math.min(this.stamina + C.DODGE_COST + 1, C.STAMINA_MAX);
+      this.perfectDodged = 'refunded'; // 标记已回复，防止重复
     }
 
     if (t >= C.DODGE_DURATION) {
@@ -582,7 +582,8 @@ export class Fighter {
 
   update_executed(dt) {
     if (this.stateTimer >= C.EXECUTION_DURATION) {
-      this.stamina = C.EXHAUSTED_RESTORE;
+      // 被处决后回满体力
+      this.stamina = C.STAMINA_MAX;
       this.isExhausted = false;
       this.speedMult = 1;
       this.setState('idle');
@@ -692,6 +693,8 @@ export class Fighter {
   }
 
   hasHyperArmor() {
+    // 体力耗尽时重击失去霸体，使处决更容易触发
+    if (this.isExhausted) return false;
     return this.state === 'heavyAttack' && (this.phase === 'startup' || this.phase === 'active');
   }
 

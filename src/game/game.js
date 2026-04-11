@@ -10,7 +10,10 @@ import { UI } from '../ui/ui.js';
 import { extractState, actionToCommand } from '../nn/nn-agent.js';
 import { eventLogMethods } from './event-log.js';
 import { testModeMethods } from './test-mode.js';
-import { JIANGHU_STAGES, JIANGHU_MAX_LIVES, JIANGHU_HEAL_RATIO } from './jianghu-stages.js';
+import { jianghuModeMethods } from './jianghu-mode.js';
+import { settingsPanelMethods } from './settings-panel.js';
+import { effectsMethods } from './effects.js';
+import { JIANGHU_MAX_LIVES } from './jianghu-stages.js';
 
 export class Game {
   constructor(canvas, input, opts = {}) {
@@ -44,6 +47,11 @@ export class Game {
       this.playerAI.fighter.name = `AI-${diffA}(蓝)`;
       this.playerAI.fighter.color = '#4499ff';
     }
+
+    // 告知战斗系统玩家角色（用于判断是否触发镜头/特效）
+    // 观战/测试模式下 playerFighter 为 null → 所有战斗都触发特效
+    this.combat.playerFighter =
+      (this.mode !== 'spectate' && this.mode !== 'test') ? this.player.fighter : null;
 
     // 武圣(神经网络)模式
     this.nnWeights = opts.nnWeights || null; // NeuralNetwork 实例
@@ -100,6 +108,10 @@ export class Game {
     this.jianghuPhase = 'story';  // 'story' | 'fight' | 'victory' | 'defeat' | 'complete'
     this.jianghuStoryTimer = 0;
     this.jianghuFadeTimer = 0;
+
+    // ===== 连战模式 =====
+    this.chainKills = 0;         // 连战击杀数
+    this._chainSpawnDelay = 0;   // 击杀后延迟spawn
 
     this._rebuildFighterList();
 
@@ -285,7 +297,7 @@ export class Game {
     }
 
     // 帮助/暂停切换（仅对战/训练模式）
-    if ((this.mode === 'pvai' || this.mode === 'training') && input.pressed('KeyH')) {
+    if ((this.mode === 'pvai' || this.mode === 'training' || this.mode === 'chainKill') && input.pressed('KeyH')) {
       this.showHelp = !this.showHelp;
       this.paused = this.showHelp;
       if (this.helpOverlay) {
@@ -313,7 +325,7 @@ export class Game {
     }
 
     // 难度切换 (1-7)（仅对战/训练模式）
-    if (this.mode === 'pvai' || this.mode === 'training') {
+    if (this.mode === 'pvai' || this.mode === 'training' || this.mode === 'chainKill') {
       for (let i = 1; i <= 7; i++) {
         if (input.pressed(`Digit${i}`)) {
           this.difficulty = i;
@@ -364,7 +376,7 @@ export class Game {
       this.hitFreezeTimer -= dt;
 
       // 冻结期间仍然采集玩家输入到缓冲（防止点击被吞）
-      if (this.mode === 'pvai' || this.mode === 'wusheng' || this.mode === 'training') {
+      if (this.mode === 'pvai' || this.mode === 'wusheng' || this.mode === 'training' || this.mode === 'chainKill') {
         const freezeCmd = this.player.getCommands(this.input);
         const pf = this.player.fighter;
         // 只缓冲攻击/闪避意图，不缓冲持续按住的格挡（避免格挡后误入blocking）
@@ -396,10 +408,10 @@ export class Game {
     const input = this.input;
 
     // 对战模式按键
-    if (this.mode === 'pvai' || this.mode === 'wusheng' || this.mode === 'training') {
-      if (input.pressed('KeyU') && this._victoryTimer < 0) this.spawnEnemy();
+    if (this.mode === 'pvai' || this.mode === 'wusheng' || this.mode === 'training' || this.mode === 'chainKill') {
+      if (input.pressed('KeyE') && this._victoryTimer < 0) this.spawnEnemy();
       if (input.pressed('KeyI') && this._victoryTimer < 0) this.spawnAlly();
-      if (input.pressed('KeyR')) { this._victoryTimer = -1; this.reset(); return; }
+      if (input.pressed('KeyR')) { this._victoryTimer = -1; this.chainKills = 0; this.reset(); return; }
     }
     // 观战模式按键
     if (this.mode === 'spectate' || this.mode === 'wusheng_spectate') {
@@ -413,7 +425,7 @@ export class Game {
       const pf = this.player.fighter;
       const enemy0 = this.enemies[0]?.fighter;
       const noop = { moveX: 0, moveY: 0, faceAngle: 0, lightAttack: false, heavyAttack: false, blockHeld: false, dodge: false, dodgeAngle: 0 };
-      const isPlayerMode = this.mode === 'pvai' || this.mode === 'wusheng' || this.mode === 'jianghu' || this.mode === 'training';
+      const isPlayerMode = this.mode === 'pvai' || this.mode === 'wusheng' || this.mode === 'jianghu' || this.mode === 'training' || this.mode === 'chainKill';
 
       if (pf.alive) {
         if (isPlayerMode) {
@@ -478,16 +490,22 @@ export class Game {
 
     pf.update(dt, pCmd, this.gameTime);
 
-    // 敌人更新
+    // 敌人更新（选择最近的对手为目标，不一定是玩家）
     for (const enemy of this.enemies) {
       const ef = enemy.fighter;
       if (!ef.alive) continue;
       let eCmd;
       if (enemy._isNN && this.nnWeights) {
-        // 武圣挑战: NN 控制敌人
         eCmd = this._getNNCommand(dt, ef, pf);
       } else {
-        eCmd = enemy.getCommands(dt, pf);
+        // 找最近的敌对目标（玩家 + 队友）
+        let target = pf, minD = pf.alive ? dist(ef, pf) : Infinity;
+        for (const ally of this.allies) {
+          if (!ally.fighter.alive) continue;
+          const d = dist(ef, ally.fighter);
+          if (d < minD) { minD = d; target = ally.fighter; }
+        }
+        eCmd = target && target.alive ? enemy.getCommands(dt, target) : { moveX: 0, moveY: 0, faceAngle: 0, lightAttack: false, heavyAttack: false, blockHeld: false, dodge: false, dodgeAngle: 0 };
       }
       ef.update(dt, eCmd, this.gameTime);
     }
@@ -554,7 +572,35 @@ export class Game {
         const winner = timeout ? 'draw' : (aAlive ? 'A' : bAlive ? 'B' : 'draw');
         this._endTestRound(winner);
       }
-    } else if (this.mode !== 'jianghu' && this._victoryTimer < 0 && this.enemies.length > 0) {
+    } else if (this.mode === 'chainKill' && this._victoryTimer < 0 && this.enemies.length > 0) {
+      const aAlive = pf.alive;
+      const bAlive = this.enemies.some(e => e.fighter.alive);
+      if (!aAlive || !bAlive) {
+        if (aAlive) {
+          // 连战胜利：增加击杀数，玩家变大，自动spawn下一个
+          this.chainKills++;
+          const newScale = 1 + this.chainKills * 0.08;
+          pf.scale = newScale;
+          pf.radius = C.FIGHTER_RADIUS * newScale;
+          this.ui.addLog(`连斩 ×${this.chainKills}!`);
+          this.addFloatingText(pf.x, pf.y - 50, `连斩 ×${this.chainKills}`, '#ff6633', 28, 1.5, -30);
+          // 恢复40%HP
+          pf.hp = Math.min(pf.maxHp, pf.hp + Math.floor(pf.maxHp * 0.4));
+          // 延迟1秒后自动spawn
+          this._chainSpawnDelay = 1.0;
+          this.enemies = [];
+          this._rebuildFighterList();
+        } else {
+          this._victoryTimer = 0;
+          this.ui.addLog(`连战结束! 总计连斩 ×${this.chainKills}`);
+        }
+      }
+    } else if (this.mode === 'chainKill' && this._chainSpawnDelay > 0) {
+      this._chainSpawnDelay -= dt;
+      if (this._chainSpawnDelay <= 0) {
+        this.spawnEnemy();
+      }
+    } else if (this.mode !== 'jianghu' && this.mode !== 'chainKill' && this._victoryTimer < 0 && this.enemies.length > 0) {
       const aAlive = pf.alive;
       const bAlive = this.enemies.some(e => e.fighter.alive);
       if (!aAlive || !bAlive) {
@@ -602,37 +648,6 @@ export class Game {
       this._nnLastAction = action;
     }
     return actionToCommand(this._nnLastAction, me, opponent);
-  }
-
-  addFloatingText(x, y, text, color, size = 18, duration = 1.2, vy = -50) {
-    // 自动散开：检查附近是否已有文字，有则偏移
-    for (const ft of this.floatingTexts) {
-      if (ft.timer > ft.maxTimer * 0.7 && Math.abs(ft.x - x) < 60 && Math.abs(ft.y - y) < 20) {
-        y -= 22;
-      }
-    }
-    this.floatingTexts.push({
-      x, y, text, color,
-      fontSize: size,
-      timer: duration,
-      maxTimer: duration,
-      vy
-    });
-  }
-
-  flashScreen(color, duration = 0.12) {
-    this.screenFlash = { color, timer: duration, maxTimer: duration };
-  }
-
-  applyHitFreeze(duration) {
-    this.hitFreezeTimer = Math.max(this.hitFreezeTimer, duration);
-  }
-
-  applyTimeScale(scale, duration) {
-    // 只接受更强的减速效果
-    if (this.timeScaleTimer > 0 && scale >= this.timeScale) return;
-    this.timeScale = scale;
-    this.timeScaleTimer = duration;
   }
 
   render() {
@@ -691,7 +706,7 @@ export class Game {
 
     // HUD
     const target = this._getTarget();
-    this.ui.draw(this.player.fighter, target, this.enemies, this.difficulty);
+    this.ui.draw(this.player.fighter, target, this.enemies.map(e => e.fighter), this.difficulty);
 
     // 模式标签
     if (this.mode === 'spectate') {
@@ -703,6 +718,8 @@ export class Game {
       this._drawModeLabel(`🏔 江湖行 · 第${this.jianghuStage + 1}关 ${stage ? stage.name : ''} · ❤×${this.jianghuLives}`);
     } else if (this.mode === 'training') {
       this._drawModeLabel(`🎯 自由训练 · U召敌 · I召队友 · R重置 · 1-5难度(当前${this.difficulty})`);
+    } else if (this.mode === 'chainKill') {
+      this._drawModeLabel(`⚔ 连战模式 · 连斩 ×${this.chainKills} · R重置 · ESC返回`);
     }
 
     // 江湖行覆盖层（剧情/过关/失败）
@@ -751,412 +768,11 @@ export class Game {
     this.camera.setTarget(tx, ty);
   }
 
-  // ===================== 设置面板 =====================
-  _getSettingsBtnRect() {
-    const lw = this.canvas._logicW || this.canvas.width;
-    return { x: lw - 44, y: 6, w: 36, h: 36 };
-  }
-
-  _drawSettingsBtn() {
-    const ctx = this.canvas.getContext('2d');
-    const r = this._getSettingsBtnRect();
-    const mx = this.input.mouseX;
-    const my = this.input.mouseY;
-    const hovered = mx >= r.x && mx <= r.x + r.w && my >= r.y && my <= r.y + r.h;
-
-    ctx.fillStyle = hovered ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.06)';
-    ctx.fillRect(r.x, r.y, r.w, r.h);
-    ctx.strokeStyle = hovered ? 'rgba(255,255,255,0.4)' : 'rgba(255,255,255,0.15)';
-    ctx.lineWidth = 1;
-    ctx.strokeRect(r.x, r.y, r.w, r.h);
-    ctx.fillStyle = hovered ? '#fff' : '#999';
-    ctx.font = '18px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText('⚙', r.x + r.w / 2, r.y + r.h / 2 + 6);
-  }
-
-  _getSettingsLayout() {
-    const lw = this.canvas._logicW || this.canvas.width;
-    const lh = this.canvas._logicH || this.canvas.height;
-    const panelW = 320;
-    const panelH = 200;
-    const px = (lw - panelW) / 2;
-    const py = (lh - panelH) / 2;
-    const sliderW = 200;
-    const sliderH = 20;
-    const sliderX = px + (panelW - sliderW) / 2;
-    const zoomSliderY = py + 80;
-    return {
-      px, py, panelW, panelH,
-      sliderX, sliderW, sliderH,
-      zoomSliderY,
-      resetBtn: { x: px + panelW / 2 - 50, y: py + 130, w: 100, h: 32 },
-      closeBtn: { x: px + panelW / 2 - 50, y: py + panelH - 40, w: 100, h: 30 },
-    };
-  }
-
-  _updateSettings(dt) {
-    this._settingsClickCd -= dt;
-    const input = this.input;
-    const L = this._getSettingsLayout();
-    const mx = input.mouseX;
-    const my = input.mouseY;
-
-    // Escape 关闭
-    if (input.pressed('Escape')) {
-      this.settingsOpen = false;
-      return;
-    }
-
-    if (!input.mouseLeftDown) return;
-    if (this._settingsClickCd > 0) return;
-
-    // 缩放滑块拖拽
-    if (mx >= L.sliderX && mx <= L.sliderX + L.sliderW &&
-        my >= L.zoomSliderY - 5 && my <= L.zoomSliderY + L.sliderH + 5) {
-      const t = (mx - L.sliderX) / L.sliderW;
-      this.camera.zoomExtra = this.camera.zoomMin + t * (this.camera.zoomMax - this.camera.zoomMin);
-      return;
-    }
-
-    // 恢复默认
-    const rb = L.resetBtn;
-    if (mx >= rb.x && mx <= rb.x + rb.w && my >= rb.y && my <= rb.y + rb.h) {
-      this.camera.zoomExtra = this.camera.zoomExtraDefault;
-      this._settingsClickCd = 0.2;
-      return;
-    }
-
-    // 关闭按钮
-    const cb = L.closeBtn;
-    if (mx >= cb.x && mx <= cb.x + cb.w && my >= cb.y && my <= cb.y + cb.h) {
-      this.settingsOpen = false;
-      this._settingsClickCd = 0.3;
-      return;
-    }
-
-    // 点击面板外关闭
-    if (mx < L.px || mx > L.px + L.panelW || my < L.py || my > L.py + L.panelH) {
-      this.settingsOpen = false;
-      this._settingsClickCd = 0.3;
-    }
-  }
-
-  _drawSettings() {
-    const ctx = this.canvas.getContext('2d');
-    const lw = this.canvas._logicW || this.canvas.width;
-    const lh = this.canvas._logicH || this.canvas.height;
-    const L = this._getSettingsLayout();
-    const mx = this.input.mouseX;
-    const my = this.input.mouseY;
-
-    // 暗化背景
-    ctx.fillStyle = 'rgba(0,0,0,0.6)';
-    ctx.fillRect(0, 0, lw, lh);
-
-    // 面板
-    ctx.fillStyle = 'rgba(20,22,40,0.95)';
-    ctx.fillRect(L.px, L.py, L.panelW, L.panelH);
-    ctx.strokeStyle = 'rgba(100,150,255,0.3)';
-    ctx.lineWidth = 1;
-    ctx.strokeRect(L.px, L.py, L.panelW, L.panelH);
-
-    // 标题
-    ctx.fillStyle = '#e8e0d0';
-    ctx.font = 'bold 18px "Microsoft YaHei", sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText('⚙ 设置', L.px + L.panelW / 2, L.py + 30);
-
-    // 缩放标签
-    ctx.fillStyle = '#aaa';
-    ctx.font = '13px "Microsoft YaHei", sans-serif';
-    const zoomPct = Math.round(this.camera.zoomExtra * 100);
-    ctx.fillText(`视角缩放: ${zoomPct}%`, L.px + L.panelW / 2, L.zoomSliderY - 8);
-
-    // 缩放滑块
-    const sliderBg = L.sliderX;
-    ctx.fillStyle = '#333';
-    ctx.fillRect(sliderBg, L.zoomSliderY, L.sliderW, L.sliderH);
-    const t = (this.camera.zoomExtra - this.camera.zoomMin) / (this.camera.zoomMax - this.camera.zoomMin);
-    ctx.fillStyle = '#4499ff';
-    ctx.fillRect(sliderBg, L.zoomSliderY, L.sliderW * t, L.sliderH);
-    ctx.strokeStyle = 'rgba(255,255,255,0.2)';
-    ctx.strokeRect(sliderBg, L.zoomSliderY, L.sliderW, L.sliderH);
-    // 滑块把手
-    const handleX = sliderBg + L.sliderW * t;
-    ctx.fillStyle = '#fff';
-    ctx.fillRect(handleX - 3, L.zoomSliderY - 2, 6, L.sliderH + 4);
-
-    // 恢复默认按钮
-    const rb = L.resetBtn;
-    const rbHover = mx >= rb.x && mx <= rb.x + rb.w && my >= rb.y && my <= rb.y + rb.h;
-    ctx.fillStyle = rbHover ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.05)';
-    ctx.fillRect(rb.x, rb.y, rb.w, rb.h);
-    ctx.strokeStyle = rbHover ? '#ffcc33' : 'rgba(255,255,255,0.2)';
-    ctx.strokeRect(rb.x, rb.y, rb.w, rb.h);
-    ctx.fillStyle = rbHover ? '#fff' : '#aaa';
-    ctx.font = '13px "Microsoft YaHei", sans-serif';
-    ctx.fillText('恢复默认', rb.x + rb.w / 2, rb.y + rb.h / 2 + 5);
-
-    // 关闭按钮
-    const cb = L.closeBtn;
-    const cbHover = mx >= cb.x && mx <= cb.x + cb.w && my >= cb.y && my <= cb.y + cb.h;
-    ctx.fillStyle = cbHover ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.05)';
-    ctx.fillRect(cb.x, cb.y, cb.w, cb.h);
-    ctx.strokeStyle = cbHover ? '#4499ff' : 'rgba(255,255,255,0.2)';
-    ctx.strokeRect(cb.x, cb.y, cb.w, cb.h);
-    ctx.fillStyle = cbHover ? '#fff' : '#aaa';
-    ctx.fillText('关闭', cb.x + cb.w / 2, cb.y + cb.h / 2 + 5);
-  }
-
-  // ===================== 江湖行逻辑 =====================
-  _updateJianghu(dt) {
-    const input = this.input;
-
-    if (this.jianghuPhase === 'story') {
-      this.jianghuStoryTimer += dt;
-      // 点击或空格跳过剧情
-      if (this.jianghuStoryTimer > 0.5 &&
-          (input.pressed('Space') || input.mouseLeftDown)) {
-        this._startJianghuFight();
-      }
-      return;
-    }
-
-    if (this.jianghuPhase === 'fight') {
-      this._tick(dt);
-      // 检测胜负
-      const pf = this.player.fighter;
-      const enemyAlive = this.enemies.some(e => e.fighter.alive);
-      if (!pf.alive) {
-        // 玩家被击败
-        this.jianghuLives--;
-        if (this.jianghuLives <= 0) {
-          this.jianghuPhase = 'defeat';
-        } else {
-          // 还有剩余生命，重试当前关
-          this.jianghuPhase = 'story';
-          this.jianghuStoryTimer = 0;
-          this.ui.addLog(`剩余生命: ${this.jianghuLives}`);
-        }
-        this.jianghuFadeTimer = 0;
-      } else if (!enemyAlive && this._victoryTimer < 0) {
-        this._victoryTimer = 0;
-        // 短暂胜利展示后推进
-        this.jianghuFadeTimer = 0;
-        this.jianghuPhase = 'victory';
-        this.ui.addLog(`${JIANGHU_STAGES[this.jianghuStage].enemy.name} 被击败!`);
-      }
-      return;
-    }
-
-    if (this.jianghuPhase === 'victory') {
-      this.jianghuFadeTimer += dt;
-      if (this.jianghuFadeTimer > 1.0 &&
-          (input.pressed('Space') || input.mouseLeftDown)) {
-        this.jianghuStage++;
-        if (this.jianghuStage >= JIANGHU_STAGES.length) {
-          this.jianghuPhase = 'complete';
-          this.jianghuFadeTimer = 0;
-        } else {
-          // 回复部分HP进入下一关
-          const pf = this.player.fighter;
-          const heal = Math.round(pf.maxHp * JIANGHU_HEAL_RATIO);
-          pf.hp = Math.min(pf.maxHp, pf.hp + heal);
-          this.jianghuPhase = 'story';
-          this.jianghuStoryTimer = 0;
-        }
-      }
-      return;
-    }
-
-    if (this.jianghuPhase === 'defeat' || this.jianghuPhase === 'complete') {
-      this.jianghuFadeTimer += dt;
-      if (this.jianghuFadeTimer > 1.0 &&
-          (input.pressed('Space') || input.mouseLeftDown || input.pressed('Escape'))) {
-        if (this.onExit) this.onExit();
-      }
-      return;
-    }
-  }
-
-  _startJianghuFight() {
-    this.jianghuPhase = 'fight';
-    this._victoryTimer = -1;
-
-    // 重置玩家位置（保留HP）
-    const pf = this.player.fighter;
-    const prevHp = pf.hp;
-    const prevMaxHp = pf.maxHp;
-    pf.x = C.ARENA_W / 2;
-    pf.y = C.ARENA_H / 2;
-    pf.vx = 0;
-    pf.vy = 0;
-    pf.facing = 0;
-    pf.state = 'idle';
-    pf.stateTimer = 0;
-    pf.phase = 'none';
-    pf.stamina = C.STAMINA_MAX;
-    pf.isExhausted = false;
-    pf.speedMult = 1;
-    pf.blockSuppressed = false;
-    pf.parryActionDelay = 0;
-    pf.knockbackTimer = 0;
-    pf.inputBuffer = null;
-    pf.alive = true;
-    // 首关或重试时回满HP
-    if (this.jianghuStage === 0 || prevHp <= 0) {
-      pf.hp = prevMaxHp;
-    } else {
-      pf.hp = prevHp;
-    }
-
-    this.enemies = [];
-    this.particles.particles = [];
-    this._rebuildFighterList();
-    this._spawnJianghuEnemy();
-    this.gameTime = 0;
-    this.floatingTexts = [];
-  }
-
-  _drawJianghuOverlay() {
-    const ctx = this.canvas.getContext('2d');
-    const cw = this.canvas._logicW || this.canvas.width;
-    const ch = this.canvas._logicH || this.canvas.height;
-    const stage = JIANGHU_STAGES[this.jianghuStage];
-
-    if (this.jianghuPhase === 'story' && stage) {
-      // 全屏暗幕 + 剧情文字
-      ctx.fillStyle = 'rgba(0,0,0,0.85)';
-      ctx.fillRect(0, 0, cw, ch);
-
-      ctx.textAlign = 'center';
-      ctx.fillStyle = '#ffcc44';
-      ctx.font = 'bold 28px "Microsoft YaHei", sans-serif';
-      ctx.fillText(`第${stage.id}关 · ${stage.name}`, cw / 2, ch * 0.28);
-
-      ctx.fillStyle = '#ccc';
-      ctx.font = '16px "Microsoft YaHei", sans-serif';
-      // 自动换行
-      this._drawWrappedText(ctx, stage.story, cw / 2, ch * 0.42, cw * 0.7, 26);
-
-      // 敌人信息
-      ctx.fillStyle = stage.enemy.color;
-      ctx.font = 'bold 18px "Microsoft YaHei", sans-serif';
-      ctx.fillText(`对手: ${stage.enemy.name}`, cw / 2, ch * 0.62);
-
-      const scaleText = stage.enemy.scale !== 1 ? ` · 体型×${stage.enemy.scale}` : '';
-      const hpText = stage.enemy.hpMult !== 1 ? ` · 血量×${stage.enemy.hpMult}` : '';
-      ctx.fillStyle = '#888';
-      ctx.font = '13px "Microsoft YaHei", sans-serif';
-      ctx.fillText(`难度 ${stage.enemy.difficulty}${scaleText}${hpText}`, cw / 2, ch * 0.67);
-
-      // 生命
-      ctx.fillStyle = '#ff4444';
-      ctx.font = '16px "Microsoft YaHei", sans-serif';
-      ctx.fillText('❤'.repeat(this.jianghuLives) + '♡'.repeat(JIANGHU_MAX_LIVES - this.jianghuLives), cw / 2, ch * 0.75);
-
-      // 提示
-      const alpha = 0.4 + 0.3 * Math.sin(this.jianghuStoryTimer * 3);
-      ctx.fillStyle = `rgba(255,255,255,${alpha})`;
-      ctx.font = '14px "Microsoft YaHei", sans-serif';
-      ctx.fillText('点击或按空格开始战斗', cw / 2, ch * 0.88);
-    }
-
-    if (this.jianghuPhase === 'victory' && stage) {
-      const alpha = Math.min(1, this.jianghuFadeTimer / 0.5);
-      ctx.fillStyle = `rgba(0,0,0,${0.6 * alpha})`;
-      ctx.fillRect(0, 0, cw, ch);
-
-      ctx.textAlign = 'center';
-      ctx.fillStyle = `rgba(255,204,68,${alpha})`;
-      ctx.font = 'bold 32px "Microsoft YaHei", sans-serif';
-      ctx.fillText('胜!', cw / 2, ch * 0.35);
-
-      ctx.fillStyle = `rgba(200,200,200,${alpha})`;
-      ctx.font = '16px "Microsoft YaHei", sans-serif';
-      ctx.fillText(`${stage.enemy.name} 已被击败`, cw / 2, ch * 0.45);
-
-      if (this.jianghuStage < JIANGHU_STAGES.length - 1) {
-        ctx.fillStyle = `rgba(136,255,136,${alpha})`;
-        ctx.font = '14px "Microsoft YaHei", sans-serif';
-        ctx.fillText(`回复 ${Math.round(JIANGHU_HEAL_RATIO * 100)}% HP · 进入下一关`, cw / 2, ch * 0.55);
-      }
-
-      if (this.jianghuFadeTimer > 1.0) {
-        const pa = 0.4 + 0.3 * Math.sin(this.jianghuFadeTimer * 3);
-        ctx.fillStyle = `rgba(255,255,255,${pa})`;
-        ctx.font = '14px "Microsoft YaHei", sans-serif';
-        ctx.fillText('点击或按空格继续', cw / 2, ch * 0.70);
-      }
-    }
-
-    if (this.jianghuPhase === 'defeat') {
-      const alpha = Math.min(1, this.jianghuFadeTimer / 0.5);
-      ctx.fillStyle = `rgba(0,0,0,${0.8 * alpha})`;
-      ctx.fillRect(0, 0, cw, ch);
-
-      ctx.textAlign = 'center';
-      ctx.fillStyle = `rgba(255,68,68,${alpha})`;
-      ctx.font = 'bold 32px "Microsoft YaHei", sans-serif';
-      ctx.fillText('江湖路断', cw / 2, ch * 0.35);
-
-      ctx.fillStyle = `rgba(200,200,200,${alpha})`;
-      ctx.font = '16px "Microsoft YaHei", sans-serif';
-      ctx.fillText(`止步第${this.jianghuStage + 1}关 · ${stage ? stage.name : ''}`, cw / 2, ch * 0.45);
-
-      if (this.jianghuFadeTimer > 1.0) {
-        const pa = 0.4 + 0.3 * Math.sin(this.jianghuFadeTimer * 3);
-        ctx.fillStyle = `rgba(255,255,255,${pa})`;
-        ctx.font = '14px "Microsoft YaHei", sans-serif';
-        ctx.fillText('点击或按ESC返回菜单', cw / 2, ch * 0.60);
-      }
-    }
-
-    if (this.jianghuPhase === 'complete') {
-      const alpha = Math.min(1, this.jianghuFadeTimer / 0.5);
-      ctx.fillStyle = `rgba(0,0,0,${0.85 * alpha})`;
-      ctx.fillRect(0, 0, cw, ch);
-
-      ctx.textAlign = 'center';
-      ctx.fillStyle = `rgba(255,215,0,${alpha})`;
-      ctx.font = 'bold 36px "Microsoft YaHei", sans-serif';
-      ctx.fillText('🏆 江湖行 · 通关!', cw / 2, ch * 0.30);
-
-      ctx.fillStyle = `rgba(255,204,100,${alpha})`;
-      ctx.font = '18px "Microsoft YaHei", sans-serif';
-      ctx.fillText('你历经十关磨难，终成一代宗师。', cw / 2, ch * 0.42);
-      ctx.fillText(`剩余生命: ${'❤'.repeat(this.jianghuLives)}`, cw / 2, ch * 0.52);
-
-      if (this.jianghuFadeTimer > 1.0) {
-        const pa = 0.4 + 0.3 * Math.sin(this.jianghuFadeTimer * 3);
-        ctx.fillStyle = `rgba(255,255,255,${pa})`;
-        ctx.font = '14px "Microsoft YaHei", sans-serif';
-        ctx.fillText('点击或按ESC返回菜单', cw / 2, ch * 0.68);
-      }
-    }
-  }
-
-  /** 自动换行绘制文字 */
-  _drawWrappedText(ctx, text, x, y, maxWidth, lineHeight) {
-    const chars = text.split('');
-    let line = '';
-    let curY = y;
-    for (const ch of chars) {
-      const test = line + ch;
-      if (ctx.measureText(test).width > maxWidth && line.length > 0) {
-        ctx.fillText(line, x, curY);
-        line = ch;
-        curY += lineHeight;
-      } else {
-        line = test;
-      }
-    }
-    if (line) ctx.fillText(line, x, curY);
-  }
-
 }
 
 // 混入提取的模块方法
 Object.assign(Game.prototype, eventLogMethods);
 Object.assign(Game.prototype, testModeMethods);
+Object.assign(Game.prototype, jianghuModeMethods);
+Object.assign(Game.prototype, settingsPanelMethods);
+Object.assign(Game.prototype, effectsMethods);

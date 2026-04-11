@@ -1,11 +1,13 @@
 // ===================== 开始菜单（多页设计） =====================
+const GAME_VERSION = 'v0.8.0';
+
 export class Menu {
   constructor(canvas, input) {
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d');
     this.input = input;
 
-    this.page = 'main'; // 'main' | 'pvai' | 'spectate' | 'test' | 'wusheng' | 'jianghu' | 'training'
+    this.page = 'main'; // 'main' | 'pvai' | 'spectate' | 'test' | 'wusheng' | 'jianghu' | 'training' | 'entertainment' | 'chainKill'
     this.pvaiDiff = 3;
     this.nnWeightsLoaded = false;
     this.nnLoadError = null;
@@ -43,6 +45,8 @@ export class Menu {
       case 'wusheng': this._updateWusheng(mx, my); break;
       case 'jianghu': this._updateJianghu(mx, my); break;
       case 'training': this._updateTraining(mx, my); break;
+      case 'entertainment': this._updateEntertainment(mx, my); break;
+      case 'chainKill': this._updateChainKill(mx, my); break;
     }
   }
 
@@ -58,6 +62,12 @@ export class Menu {
         this._clickCooldown = 0.2;
         return;
       }
+    }
+    // 自动测试按钮（左下角）
+    if (this._hit(mx, my, L.testBtn.x, L.testBtn.y, L.testBtn.w, L.testBtn.h)) {
+      this.page = 'test';
+      this._clickCooldown = 0.2;
+      return;
     }
     // 新手引导按钮
     if (this._hit(mx, my, L.helpBtn.x, L.helpBtn.y, L.helpBtn.w, L.helpBtn.h)) {
@@ -186,6 +196,8 @@ export class Menu {
       case 'wusheng': this._drawWusheng(); break;
       case 'jianghu': this._drawJianghu(); break;
       case 'training': this._drawTraining(); break;
+      case 'entertainment': this._drawEntertainment(); break;
+      case 'chainKill': this._drawChainKill(); break;
     }
   }
 
@@ -232,6 +244,15 @@ export class Menu {
     ctx.textAlign = 'center';
     ctx.fillText('选择模式开始 · 按 ESC 可随时返回菜单', cw / 2, ch - 24);
 
+    // 版本号（左下角）
+    ctx.fillStyle = '#444';
+    ctx.font = '11px "Segoe UI", sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText(GAME_VERSION, 12, ch - 52);
+
+    // 自动测试按钮（左下角）
+    this._drawActionBtn(ctx, L.testBtn, '📊 自动测试', '#44ff88', mx, my);
+
     // 新手引导按钮（右下角）
     this._drawActionBtn(ctx, L.helpBtn, '📖 操作帮助', '#888', mx, my);
   }
@@ -243,24 +264,19 @@ export class Menu {
     const btnW = 340;
     const btnH = 64;
     const gap = 18;
-    const startY = ch * 0.22;
+    const startY = ch * 0.25;
 
     return {
       buttons: [
-        { id: 'jianghu', label: '🏔 江湖行', desc: '十关爬塔，3条命，闯荡江湖', accent: '#ffcc44',
-          x: cx - btnW / 2, y: startY, w: btnW, h: btnH },
         { id: 'pvai', label: '⚔ 对战模式', desc: '玩家 vs AI，键鼠操作', accent: '#4499ff',
+          x: cx - btnW / 2, y: startY, w: btnW, h: btnH },
+        { id: 'entertainment', label: '🎮 娱乐模式', desc: '江湖行 · 武圣挑战 · 连战 · 自由训练', accent: '#ff00ff',
           x: cx - btnW / 2, y: startY + btnH + gap, w: btnW, h: btnH },
         { id: 'spectate', label: '🦗 斗蛐蛐', desc: '选择双方AI难度，观看互斗', accent: '#ffaa33',
           x: cx - btnW / 2, y: startY + (btnH + gap) * 2, w: btnW, h: btnH },
-        { id: 'test', label: '📊 自动测试', desc: '批量对战数据统计与分析', accent: '#44ff88',
-          x: cx - btnW / 2, y: startY + (btnH + gap) * 3, w: btnW, h: btnH },
-        { id: 'wusheng', label: '🏆 挑战武圣', desc: '对战神经网络训练的终极AI', accent: '#ff00ff',
-          x: cx - btnW / 2, y: startY + (btnH + gap) * 4, w: btnW, h: btnH },
-        { id: 'training', label: '🎯 自由训练', desc: '无敌人干扰，自由移动练习操作', accent: '#66ccff',
-          x: cx - btnW / 2, y: startY + (btnH + gap) * 5, w: btnW, h: btnH },
       ],
       helpBtn: { x: cw - 110, y: ch - 44, w: 96, h: 32 },
+      testBtn: { x: 12, y: ch - 44, w: 106, h: 32 },
     };
   }
 
@@ -491,7 +507,7 @@ export class Menu {
       return;
     }
     if (this._hit(mx, my, L.backBtn.x, L.backBtn.y, L.backBtn.w, L.backBtn.h)) {
-      this.page = 'main';
+      this.page = 'entertainment';
       this._clickCooldown = 0.2;
     }
   }
@@ -542,7 +558,7 @@ export class Menu {
       return;
     }
     if (this._hit(mx, my, L.backBtn.x, L.backBtn.y, L.backBtn.w, L.backBtn.h)) {
-      this.page = 'main';
+      this.page = 'entertainment';
       this._clickCooldown = 0.2;
     }
   }
@@ -639,9 +655,9 @@ export class Menu {
       this._clickCooldown = 0.3;
       return;
     }
-    // 返回
+    // 返回（从武圣页返回到娱乐模式）
     if (this._hit(mx, my, L.backBtn.x, L.backBtn.y, L.backBtn.w, L.backBtn.h)) {
-      this.page = 'main';
+      this.page = 'entertainment';
       this._clickCooldown = 0.2;
     }
   }
@@ -803,6 +819,135 @@ export class Menu {
       // 占位
       pauseBtn: { x: -999, y: -999, w: 0, h: 0 },
       stopBtn:  { x: -999, y: -999, w: 0, h: 0 },
+    };
+  }
+
+  // ---- 娱乐模式页（入口） ----
+  _updateEntertainment(mx, my) {
+    const L = this._layoutEntertainment();
+    if (this._hit(mx, my, L.jianghuBtn.x, L.jianghuBtn.y, L.jianghuBtn.w, L.jianghuBtn.h)) {
+      this.page = 'jianghu';
+      this._clickCooldown = 0.2;
+      return;
+    }
+    if (this._hit(mx, my, L.wushengBtn.x, L.wushengBtn.y, L.wushengBtn.w, L.wushengBtn.h)) {
+      this.page = 'wusheng';
+      this._clickCooldown = 0.2;
+      return;
+    }
+    if (this._hit(mx, my, L.chainBtn.x, L.chainBtn.y, L.chainBtn.w, L.chainBtn.h)) {
+      this.page = 'chainKill';
+      this._clickCooldown = 0.2;
+      return;
+    }
+    if (this._hit(mx, my, L.trainingBtn.x, L.trainingBtn.y, L.trainingBtn.w, L.trainingBtn.h)) {
+      this.page = 'training';
+      this._clickCooldown = 0.2;
+      return;
+    }
+    if (this._hit(mx, my, L.backBtn.x, L.backBtn.y, L.backBtn.w, L.backBtn.h)) {
+      this.page = 'main';
+      this._clickCooldown = 0.2;
+    }
+  }
+
+  _drawEntertainment() {
+    const ctx = this.ctx;
+    const cw = this.canvas._logicW || this.canvas.width;
+    const mx = this.input.mouseX;
+    const my = this.input.mouseY;
+    const L = this._layoutEntertainment();
+
+    this._drawSubHeader(ctx, cw, '🎮 娱乐模式', '选择挑战方式');
+    this._drawActionBtn(ctx, L.jianghuBtn, '🏔 江湖行', '#ffcc44', mx, my);
+    this._drawActionBtn(ctx, L.wushengBtn, '🏆 挑战武圣', '#ff00ff', mx, my);
+    this._drawActionBtn(ctx, L.chainBtn, '⚔ 连战模式', '#ff6633', mx, my);
+    this._drawActionBtn(ctx, L.trainingBtn, '🎯 自由训练', '#66ccff', mx, my);
+
+    // 简要说明
+    ctx.fillStyle = '#666';
+    ctx.font = '12px "Microsoft YaHei", sans-serif';
+    ctx.textAlign = 'center';
+    const descY = L.trainingBtn.y + L.trainingBtn.h + 16;
+    ctx.fillText('江湖行: 十关爬塔  |  武圣: 对战神经网络  |  连战: 无尽挑战  |  训练: 自由练习', cw / 2, descY);
+
+    this._drawActionBtn(ctx, L.backBtn, '← 返回', '#666', mx, my);
+  }
+
+  _layoutEntertainment() {
+    const cw = this.canvas._logicW || this.canvas.width;
+    const ch = this.canvas._logicH || this.canvas.height;
+    const cx = cw / 2;
+    const btnW = 280;
+    const btnH = 44;
+    const gap = 14;
+    const startY = ch * 0.28;
+    return {
+      jianghuBtn:  { x: cx - btnW / 2, y: startY, w: btnW, h: btnH },
+      wushengBtn:  { x: cx - btnW / 2, y: startY + (btnH + gap), w: btnW, h: btnH },
+      chainBtn:    { x: cx - btnW / 2, y: startY + (btnH + gap) * 2, w: btnW, h: btnH },
+      trainingBtn: { x: cx - btnW / 2, y: startY + (btnH + gap) * 3, w: btnW, h: btnH },
+      backBtn:     { x: cx - 60, y: startY + (btnH + gap) * 4 + 16, w: 120, h: 34 },
+    };
+  }
+
+  // ---- 连战模式页 ----
+  _updateChainKill(mx, my) {
+    const L = this._layoutChainKill();
+    // 难度选择
+    for (let i = 0; i < 5; i++) {
+      const bx = L.diffX + i * 42;
+      if (this._hit(mx, my, bx, L.diffY, 36, 30)) {
+        this.pvaiDiff = i + 1;
+        this._clickCooldown = 0.12;
+        return;
+      }
+    }
+    if (this._hit(mx, my, L.startBtn.x, L.startBtn.y, L.startBtn.w, L.startBtn.h)) {
+      this.result = { mode: 'chainKill', diffA: 1, diffB: this.pvaiDiff, rounds: 0, simOnly: false };
+      this._clickCooldown = 0.3;
+      return;
+    }
+    if (this._hit(mx, my, L.backBtn.x, L.backBtn.y, L.backBtn.w, L.backBtn.h)) {
+      this.page = 'entertainment';
+      this._clickCooldown = 0.2;
+    }
+  }
+
+  _drawChainKill() {
+    const ctx = this.ctx;
+    const cw = this.canvas._logicW || this.canvas.width;
+    const ch = this.canvas._logicH || this.canvas.height;
+    const mx = this.input.mouseX;
+    const my = this.input.mouseY;
+    const L = this._layoutChainKill();
+
+    this._drawSubHeader(ctx, cw, '⚔ 连战模式', '击杀敌人 → 体型变大 → 继续挑战');
+    this._drawDiffSelector(ctx, L.diffX, L.diffY, '起始难度', this.pvaiDiff, '#ff4444', mx, my);
+
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#aaa';
+    ctx.font = '14px "Microsoft YaHei", sans-serif';
+    ctx.fillText('每击杀1个敌人，你的体型增大一圈', cw / 2, L.diffY + 62);
+    ctx.fillText('看看你能连斩多少人!', cw / 2, L.diffY + 82);
+
+    this._drawActionBtn(ctx, L.startBtn, '⚔ 开始连战', '#ff6633', mx, my);
+    this._drawActionBtn(ctx, L.backBtn, '← 返回', '#666', mx, my);
+  }
+
+  _layoutChainKill() {
+    const cw = this.canvas._logicW || this.canvas.width;
+    const ch = this.canvas._logicH || this.canvas.height;
+    const cx = cw / 2;
+    const selectorW = 5 * 42;
+    const btnW = 280;
+    const btnH = 44;
+    const diffX = cx - selectorW / 2;
+    const diffY = ch * 0.38;
+    return {
+      diffX, diffY,
+      startBtn: { x: cx - btnW / 2, y: diffY + 130, w: btnW, h: btnH },
+      backBtn:  { x: cx - 60, y: diffY + 190, w: 120, h: 34 },
     };
   }
 }

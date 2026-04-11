@@ -28,6 +28,8 @@ export class Enemy {
     // AI 节奏控制
     this.attackCooldown = 0;
     this._idleTimer = 0;
+    this._heavyCD = 0;          // 重击专属冷却
+    this._staggerReacted = false; // 硬直中是否已做过决策
 
     // 走位系统
     this._strafeDir = Math.random() < 0.5 ? 1 : -1; // 横向移动方向
@@ -111,6 +113,11 @@ export class Enemy {
     const cfg = this._cfg;
     this._gameTime += dt;
 
+    // 懒初始化：确保 fighter 上有完美闪避概率（test-runner 可能替换 fighter）
+    if (f.perfectDodgeChance === undefined) {
+      f.perfectDodgeChance = cfg.perfectDodgeChance ?? 1.0;
+    }
+
     const cmd = {
       moveX: 0, moveY: 0,
       faceAngle: ang,
@@ -125,7 +132,11 @@ export class Enemy {
     this.aiTimer -= dt;
     this.attackCooldown -= dt;
     if (this.blockCooldown > 0) this.blockCooldown -= dt;
+    if (this._heavyCD > 0) this._heavyCD -= dt;
     this._trackPlayer(pf);
+
+    // 硬直决策保护：离开硬直状态后重置标志
+    if (f.state !== 'staggered') this._staggerReacted = false;
 
     // HTN 计划管理
     if (this._hasPlan() && (f.state === 'staggered' || f.state === 'executed' || !f.alive)) {
@@ -152,6 +163,50 @@ export class Enemy {
       this.thinkCD = 0;
     }
 
+    // 被击后防御意识：出硬直后短暂观望，打破AI互相交替砍的循环
+    // 高难度AI更善于打破"你打我两下我打你两下"的死循环
+    const justExitedStagger = this._prevFighterState === 'staggered' && f.state === 'idle';
+    if (justExitedStagger && d < 100) {
+      // D1=15% D2=30% D3=45% D4=60% D5=75%
+      const cautionChance = 0.15 + (this.difficulty - 1) / 4 * 0.60;
+      if (Math.random() < cautionChance) {
+        const roll = Math.random();
+        if (roll < 0.45) {
+          // 后退拉开距离
+          this.aiState = 'retreat';
+          this.aiTimer = 0.2 + Math.random() * 0.3;
+        } else if (roll < 0.75 && f.stamina >= C.DODGE_COST) {
+          // 侧闪脱离
+          cmd.dodge = true;
+          cmd.dodgeAngle = ang + (Math.random() < 0.5 ? Math.PI / 2 : -Math.PI / 2);
+          this.aiState = 'recover';
+          this.aiTimer = 0.4;
+        } else if (roll < 0.90) {
+          // 霸体重击交换（打断对手节奏）— 冷却中转轻击
+          if (this._heavyCD > 0) {
+            cmd.lightAttack = true;
+            this.comboTarget = 1;
+            this.comboCount = 1;
+            this.aiState = 'recover';
+            this.aiTimer = 0.5;
+          } else {
+            cmd.heavyAttack = true;
+            this.aiState = 'recover';
+            this.aiTimer = 1.0;
+            this._heavyCD = cfg.heavyCooldown || 0;
+          }
+        } else {
+          // 轻击抢拼刀（可能触发拼刀打断循环）
+          cmd.lightAttack = true;
+          this.comboTarget = 1;
+          this.comboCount = 1;
+          this.aiState = 'recover';
+          this.aiTimer = 0.5;
+        }
+        this.attackCooldown = 0.15;
+      }
+    }
+
     this._prevFighterState = f.state;
 
     // _checkPlanTriggers 需要旧的 _wasParryBoosted 值来检测首次获得 parryBoost
@@ -166,9 +221,9 @@ export class Enemy {
     const wasAttacking = this._wasAttacking || false;
     if (isAttacking && !wasAttacking) {
       // 刚进入攻击状态，一次性投掷承诺
-      // 二次方缩放：高难度AI更多读招机会 D1=0% D3=9% D4=20% D5=35%
+      // 二次方缩放：高难度AI更多读招机会 D1=0% D3=14% D4=31% D5=55%
       const diffScale = (this.difficulty - 1) / 4;
-      const commitBreakChance = diffScale * diffScale * 0.35;
+      const commitBreakChance = diffScale * diffScale * 0.55;
       this._attackCommitted = Math.random() > commitBreakChance;
     } else if (!isAttacking) {
       this._attackCommitted = false;
@@ -270,8 +325,8 @@ export class Enemy {
         }
       }
 
-      // 硬直中二次博弈：拼刀/被击后的猜拳决策
-      if (f.state === 'staggered' && d < 100) {
+      // 硬直中二次博弈：拼刀/被击后的猜拳决策（每次硬直只决策一次）
+      if (f.state === 'staggered' && d < 100 && !this._staggerReacted) {
         // 区分轻击和重击/格反（排除已结束的recovery阶段）
         const incomingLight = pf.state === 'lightAttack' && pf.phase !== 'recovery';
         const incomingHeavy = pf.state === 'heavyAttack' ||
@@ -282,6 +337,7 @@ export class Enemy {
           cmd.blockHeld = true;
           this.aiState = 'defend';
           this.aiTimer = 0.25 + Math.random() * 0.15;
+          this._staggerReacted = true;
           this._logDecision(this._gameTime, 'stagger_react', 'block', { dist: +d.toFixed(0), opState: pf.state, opPhase: pf.phase });
         } else if (incomingLight) {
           // 轻击来袭 → 闪避或霸体交换
@@ -291,26 +347,33 @@ export class Enemy {
             cmd.dodgeAngle = ang + (Math.random() < 0.5 ? Math.PI / 2 : -Math.PI / 2);
             this.aiState = 'recover';
             this.aiTimer = 0.4;
+            this._staggerReacted = true;
             this._logDecision(this._gameTime, 'stagger_react', 'dodge', { dist: +d.toFixed(0), opState: pf.state });
-          } else if (Math.random() < diffScaleD * 0.5) {
-            // 高难度：霸体重击交换（吸收轻击，重击反打）
+          } else if (this._heavyCD <= 0 && Math.random() < diffScaleD * 0.5) {
+            // 高难度：霸体重击交换（吸收轻击，重击反打）— 冷却中不触发
             cmd.heavyAttack = true;
             this.aiState = 'recover';
             this.aiTimer = 1.2;
+            this._staggerReacted = true;
+            this._heavyCD = cfg.heavyCooldown || 0;
             this._logDecision(this._gameTime, 'stagger_react', 'heavy_trade', { dist: +d.toFixed(0) });
           }
           // else: 接受命中后自然恢复（不白白浪费体力举盾）
         } else if (!incomingLight && !incomingHeavy && f.stateTimer > f.staggerDuration * 0.4) {
           // 对手还没出招 → 主动博弈
           const diffScaleG = (this.difficulty - 1) / 4;
-          const guessChance = diffScaleG * 0.50;
+          const guessChance = diffScaleG * 0.65; // D3=0.33 D4=0.49 D5=0.65
           if (Math.random() < guessChance) {
             const guess = Math.random();
             const opHeavyRateG = this._getPlayerHeavyRate();
-            if (guess < 0.40) {
+            // 低难度偏重击（笨），高难度偏轻击（快速精准）
+            const heavyGuessThresh = 0.60 - diffScaleG * 0.30; // D3=0.45 D5=0.30
+            if (guess < heavyGuessThresh && this._heavyCD <= 0) {
               cmd.heavyAttack = true;
               this.aiState = 'recover';
               this.aiTimer = 1.2;
+              this._staggerReacted = true;
+              this._heavyCD = cfg.heavyCooldown || 0;
               this._logDecision(this._gameTime, 'stagger_guess', 'heavy', { dist: +d.toFixed(0), opState: pf.state });
             } else {
               cmd.lightAttack = true;
@@ -318,6 +381,7 @@ export class Enemy {
               this.comboCount = 1;
               this.aiState = 'recover';
               this.aiTimer = 0.6;
+              this._staggerReacted = true;
               this._logDecision(this._gameTime, 'stagger_guess', 'light', { dist: +d.toFixed(0), opState: pf.state });
             }
           }
@@ -364,7 +428,7 @@ export class Enemy {
         this.aiState = 'recover';
         this.aiTimer = 0.10;
         this.attackCooldown = 0;
-        this.blockCooldown = 5.0; // 格挡结束后冷却防止频繁举盾
+        this.blockCooldown = cfg.blockCooldownBase || 5.0; // 格挡结束后冷却防止频繁举盾
       }
       return cmd;
     }
@@ -388,6 +452,7 @@ export class Enemy {
     // ===== 优先级1：智能应对玩家重击蓄力（不受thinkCD限制，始终持续监控） =====
     const heavyStartup = pf.state === 'heavyAttack' && pf.phase === 'startup';
     if (heavyStartup && d < cfg.heavyReactDist &&
+        pf.stateTimer >= (cfg.heavyReactDelay || 0) &&
         this.aiState !== 'defend' && this.aiState !== 'heavy_read') {
       this._reactToHeavy(pf, d, ang, cmd, cfg);
       return cmd;
@@ -519,15 +584,18 @@ export class Enemy {
           // 中距离时添加横向移动（走位感）
           if (d < cfg.approachDist + 80 && this.difficulty >= 2) {
             this._strafeTimer += dt;
-            if (this._strafeTimer > 0.6 + Math.random() * 0.4) {
+            // 低难度变向慢（可预测），高难度变向快
+            const strafePeriod = 1.2 - (this.difficulty - 1) * 0.15; // D2=1.05 D5=0.60
+            if (this._strafeTimer > strafePeriod + Math.random() * 0.3) {
               this._strafeTimer = 0;
-              this._strafeDir = -this._strafeDir; // 变换方向
+              this._strafeDir = -this._strafeDir;
             }
             const perpX = -fwdY * this._strafeDir;
             const perpY = fwdX * this._strafeDir;
             const strafe = 0.4 + (this.difficulty - 1) * 0.1; // D2=0.5, D5=0.8
-            cmd.moveX = fwdX * 0.7 + perpX * strafe;
-            cmd.moveY = fwdY * 0.7 + perpY * strafe;
+            const fwd = 0.9 - (this.difficulty - 1) * 0.05; // D2=0.85(直冲) D5=0.70(斜切)
+            cmd.moveX = fwdX * fwd + perpX * strafe;
+            cmd.moveY = fwdY * fwd + perpY * strafe;
           } else {
             cmd.moveX = fwdX;
             cmd.moveY = fwdY;
@@ -575,12 +643,23 @@ export class Enemy {
       }
       case 'heavy': {
         if (this.attackCooldown > 0) { this.aiState = 'approach'; break; }
+        // 重击冷却中 → 转为轻击（防止低难度AI无限重击）
+        if (this._heavyCD > 0) {
+          cmd.lightAttack = true;
+          this.comboTarget = 1;
+          this.comboCount = 1;
+          this.aiState = 'recover';
+          this.aiTimer = 0.5;
+          this.attackCooldown = C.AI_MIN_ATTACK_INTERVAL;
+          break;
+        }
         // 高难度重击变招（概率与轻击持平）
         if (cfg.feintChance > 0 && Math.random() < cfg.feintChance &&
             f.stamina >= C.FEINT_COST + 1) {
           cmd.heavyAttack = true;
           this.aiState = 'feint_wait';
           this.attackCooldown = C.AI_MIN_ATTACK_INTERVAL;
+          this._heavyCD = cfg.heavyCooldown || 0;
           this._logDecision(this._gameTime, 'feint_init', 'heavy', {});
           return cmd;
         }
@@ -588,12 +667,13 @@ export class Enemy {
         this.aiState = 'recover';
         this.aiTimer = 1.2;
         this.attackCooldown = C.AI_MIN_ATTACK_INTERVAL;
+        this._heavyCD = cfg.heavyCooldown || 0;
         break;
       }
       case 'defend': {
         cmd.blockHeld = true;
         if (this.aiTimer <= 0) {
-          this.blockCooldown = 5.0; // 格挡结束后冷却防止频繁举盾
+          this.blockCooldown = cfg.blockCooldownBase || 5.0; // 格挡结束后冷却防止频繁举盾
           // 防御结束后：近距离优先反击，远距离回到接近
           if (d < 80 && this.attackCooldown <= 0) {
             if (cfg.feintChance > 0.2 && f.stamina >= C.FEINT_COST + 1 &&
@@ -673,10 +753,19 @@ export class Enemy {
             this.aiState = 'recover';
             this.aiTimer = 0.4;
           } else {
-            // 硬吃/交换 — 用霸体重击交换
-            cmd.heavyAttack = true;
-            this.aiState = 'recover';
-            this.aiTimer = 1.2;
+            // 硬吃/交换 — 用霸体重击交换（冷却中转轻击）
+            if (this._heavyCD > 0) {
+              cmd.lightAttack = true;
+              this.comboTarget = 1;
+              this.comboCount = 1;
+              this.aiState = 'recover';
+              this.aiTimer = 0.5;
+            } else {
+              cmd.heavyAttack = true;
+              this.aiState = 'recover';
+              this.aiTimer = 1.2;
+              this._heavyCD = cfg.heavyCooldown || 0;
+            }
           }
         } else {
           // 蓄力中 → 等待释放，不提前举盾
@@ -732,15 +821,16 @@ export class Enemy {
         const perpX = -fwdY * this._strafeDir;
         const perpY = fwdX * this._strafeDir;
         const targetDist = cfg.approachDist;
+        const footsieStrafe = 0.15 + (this.difficulty - 1) * 0.06; // D3=0.27 D5=0.39
         if (this._footsiePhase === 0) {
           // 前探：走进攻击范围
-          cmd.moveX = fwdX * 0.6 + perpX * 0.3;
-          cmd.moveY = fwdY * 0.6 + perpY * 0.3;
+          cmd.moveX = fwdX * 0.6 + perpX * footsieStrafe;
+          cmd.moveY = fwdY * 0.6 + perpY * footsieStrafe;
           if (d < targetDist - 10) this._footsiePhase = 1;
         } else {
           // 后撤：退出攻击范围
-          cmd.moveX = -fwdX * 0.5 + perpX * 0.4;
-          cmd.moveY = -fwdY * 0.5 + perpY * 0.4;
+          cmd.moveX = -fwdX * 0.5 + perpX * footsieStrafe;
+          cmd.moveY = -fwdY * 0.5 + perpY * footsieStrafe;
           if (d > targetDist + 15) this._footsiePhase = 0;
         }
         // 对手出招则立即反应

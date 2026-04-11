@@ -15,8 +15,7 @@
       <div>右键 重击</div>
       <div>空格 招架</div>
       <div>Shift+方向 闪避</div>
-      <div>U 刷敌人</div>
-      <div>I 刷队友</div>
+      <div>E 刷敌人</div>
       <div>R 重置</div>
       <div>H 帮助</div>
       <div>1-5 难度</div>
@@ -33,7 +32,7 @@
               <div class="help-item"><span class="help-key">WASD</span><span class="help-desc">移动</span></div>
               <div class="help-item"><span class="help-key">鼠标</span><span class="help-desc">控制朝向</span></div>
               <div class="help-item"><span class="help-key">左键单击</span><span class="help-desc">轻击（可连按3下组成连招）</span></div>
-              <div class="help-item"><span class="help-key">右键单击</span><span class="help-desc">重击（蓄力0.7秒，有霸体）</span></div>
+              <div class="help-item"><span class="help-key">右键单击</span><span class="help-desc">重击（蓄力0.7秒，有霸体，<b style="color:#ff6666">0体力时无霸体</b>）</span></div>
               <div class="help-item"><span class="help-key">空格按住</span><span class="help-desc">招架（精准时机格挡重击）</span></div>
               <div class="help-item"><span class="help-key">Shift+方向</span><span class="help-desc">闪避（消耗1体力）</span></div>
 
@@ -46,8 +45,7 @@
               <div class="help-item"><span class="help-key" style="color:#aaa">限制</span><span class="help-desc">命中目标后不可变招</span></div>
 
               <div class="section-title">系统按键</div>
-              <div class="help-item"><span class="help-key">U</span><span class="help-desc">刷出敌人</span></div>
-              <div class="help-item"><span class="help-key">I</span><span class="help-desc">刷出队友</span></div>
+              <div class="help-item"><span class="help-key">E</span><span class="help-desc">刷出敌人</span></div>
               <div class="help-item"><span class="help-key">R</span><span class="help-desc">重置战场</span></div>
               <div class="help-item"><span class="help-key">1-5</span><span class="help-desc">切换AI难度</span></div>
               <div class="help-item"><span class="help-key" style="color:#44aaff">6</span><span class="help-desc">拼刀训练（AI只用轻击对攻）</span></div>
@@ -92,15 +90,15 @@
               <div class="section-title">特殊机制</div>
               <div class="help-item"><span class="help-key hl-yellow">拼刀</span><span class="help-desc">双方轻击同时挥刀→弹开</span></div>
               <div class="help-item"><span class="help-key hl-yellow">弹刀</span><span class="help-desc">双方重击碰撞→弹远+各-1体力</span></div>
-              <div class="help-item"><span class="help-key" style="color:#ff8844">霸体</span><span class="help-desc">重击蓄力中吸收轻击不受伤</span></div>
-              <div class="help-item"><span class="help-key hl-gold">完美闪避</span><span class="help-desc">闪避瞬间躲过攻击→不消耗体力</span></div>
+              <div class="help-item"><span class="help-key" style="color:#ff8844">霸体</span><span class="help-desc">重击蓄力中吸收轻击（<b style="color:#ff6666">0体力时失去霸体</b>）</span></div>
+              <div class="help-item"><span class="help-key hl-gold">完美闪避</span><span class="help-desc">闪避瞬间躲过攻击→退还消耗+额外回1体力</span></div>
               <div class="help-item"><span class="help-key" style="color:#ff88ff">变招</span><span class="help-desc">攻击前摇中切换动作，消耗2体力（出刀时看到虚线弧预告）</span></div>
-              <div class="help-item"><span class="help-key hl-red">处决</span><span class="help-desc">体力=0时被打→扣25%最大血量</span></div>
+              <div class="help-item"><span class="help-key hl-red">处决</span><span class="help-desc">体力=0时被打→扣25%最大血量，处决后恢复满体力</span></div>
 
               <div class="section-title">体力系统（共5点）</div>
               <div class="help-item"><span class="help-key" style="color:#aaa">恢复</span><span class="help-desc">每2.0秒回1点</span></div>
               <div class="help-item"><span class="help-key" style="color:#aaa">招架中</span><span class="help-desc">暂停恢复2.5秒</span></div>
-              <div class="help-item"><span class="help-key hl-red">体力=0</span><span class="help-desc">行动变慢，可被处决</span></div>
+              <div class="help-item"><span class="help-key hl-red">体力=0</span><span class="help-desc">速度减半，重击无霸体，可被处决</span></div>
             </div>
           </div>
         </div>

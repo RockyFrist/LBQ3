@@ -55,7 +55,15 @@ export const planMethods = {
         break;
       case 'heavy':
         if (f.state === 'idle') {
-          cmd.heavyAttack = true;
+          // 重击冷却中 → 转为轻击
+          if (this._heavyCD > 0) {
+            cmd.lightAttack = true;
+            this.comboTarget = 1;
+            this.comboCount = 1;
+          } else {
+            cmd.heavyAttack = true;
+            this._heavyCD = this._cfg.heavyCooldown || 0;
+          }
           this.attackCooldown = C.AI_MIN_ATTACK_INTERVAL;
           if (step.feint && f.stamina >= C.FEINT_COST + 1) {
             this.aiState = 'feint_wait';
@@ -248,6 +256,7 @@ export const planMethods = {
     const cfg = this._cfg;
     const plans = [];
 
+    // 基础计划（所有难度可用）
     plans.push([
       { act: 'heavy', dur: 1.5, feint: true },
       { act: 'light', dur: 1.0, combo: 2 },
@@ -258,20 +267,25 @@ export const planMethods = {
       { act: 'heavy', dur: 1.5 },
     ]);
 
-    const opHeavyRate = this._getPlayerHeavyRate();
-    if (opHeavyRate > 0.25) {
-      plans.push([
-        { act: 'heavy', dur: 1.5, feint: true },
-        { act: 'block', dur: 0.5 },
-      ]);
-    } else {
-      plans.push([
-        { act: 'heavy', dur: 1.5, feint: true },
-        { act: 'heavy', dur: 1.5 },
-      ]);
+    // D3+ 解锁：带读招的变招
+    if (this.difficulty >= 3) {
+      const opHeavyRate = this._getPlayerHeavyRate();
+      if (opHeavyRate > 0.25) {
+        plans.push([
+          { act: 'heavy', dur: 1.5, feint: true },
+          { act: 'block', dur: 0.5 },
+        ]);
+      } else {
+        plans.push([
+          { act: 'heavy', dur: 1.5, feint: true },
+          { act: 'heavy', dur: 1.5 },
+        ]);
+      }
     }
 
+    // D4+ 解锁：三步复杂变招链
     if (this.difficulty >= 4) {
+      const opHeavyRate = this._getPlayerHeavyRate();
       plans.push([
         { act: 'heavy', dur: 1.5, feint: true },
         { act: 'light', dur: 1.0, feint: true },
@@ -292,7 +306,8 @@ export const planMethods = {
       }
     }
 
-    if (d > 60) {
+    // D3+ 解锁：远距离接近变招
+    if (d > 60 && this.difficulty >= 3) {
       plans.push([
         { act: 'approach', dur: 0.4, dist: 50 },
         { act: 'heavy', dur: 1.5, feint: true },
@@ -351,12 +366,13 @@ export const planMethods = {
     const staminaLow = this.fighter.stamina <= 2;
     const smartness = cfg.heavyReactMult;
 
-    // 权重分配：格挡只是选项之一，不是默认反应
-    let wBlock = 0.18;
-    let wRead  = 0.00;  // 移除heavy_read（其本质就是延迟格挡）
-    let wDodge = 0.22;
-    let wTrade = 0.18;
-    let wHeavy = 0.05;
+    // 权重分配：按难度分级（低难度偏笨拙，高难度偏精准）
+    const s = smartness; // 0.10(D1) ~ 0.99(D5)
+    let wBlock = 0.08 + s * 0.15;   // D1=0.10  D5=0.23
+    let wRead  = 0.00;
+    let wDodge = 0.08 + s * 0.15;   // D1=0.10  D5=0.23
+    let wTrade = 0.30 - s * 0.10;   // D1=0.29  D5=0.20 (低难度爱硬扛)
+    let wHeavy = 0.25 - s * 0.15;   // D1=0.24  D5=0.10 (低难度爱无脑对冲)
 
     // 对手经常真释放重击 → 格挡收益高，提高格挡权重
     if (releaseRate > 0.80) {
@@ -421,10 +437,22 @@ export const planMethods = {
       return;
     }
 
+    // 重击冷却中 → 转为轻击
+    if (this._heavyCD > 0) {
+      cmd.lightAttack = true;
+      this.comboTarget = 1;
+      this.comboCount = 1;
+      this.aiState = 'recover';
+      this.aiTimer = 0.5;
+      this.attackCooldown = C.AI_MIN_ATTACK_INTERVAL;
+      return;
+    }
+
     cmd.heavyAttack = true;
     this.aiState = 'recover';
     this.aiTimer = 1.2;
     this.attackCooldown = C.AI_MIN_ATTACK_INTERVAL;
+    this._heavyCD = this._cfg.heavyCooldown || 0;
   },
 
   // ===================== 训练模式6：拼刀训练 =====================

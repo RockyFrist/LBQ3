@@ -127,7 +127,7 @@ function setupTrainCallbacks(m) {
 
 function startGame(result) {
   appState = 'playing';
-  if (controlsHelp) controlsHelp.style.display = result.mode === 'pvai' || result.mode === 'wusheng' || result.mode === 'jianghu' || result.mode === 'training' ? '' : 'none';
+  if (controlsHelp) controlsHelp.style.display = result.mode === 'pvai' || result.mode === 'wusheng' || result.mode === 'jianghu' || result.mode === 'training' || result.mode === 'chainKill' ? '' : 'none';
   game = new Game(canvas, input, {
     mode: result.mode,
     diffA: result.diffA,

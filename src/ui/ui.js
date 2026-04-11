@@ -23,183 +23,101 @@ export class UI {
     const cw = this.canvas._logicW || this.canvas.width;
     const ch = this.canvas._logicH || this.canvas.height;
 
-    // ===== 异人之下/格斗游戏风格顶部血条 =====
-    const topY = 16;           // 顶部起始Y
-    const barH = 20;           // 血条高度
-    const barGap = 12;         // 左右条之间间隔
-    const barMaxW = Math.min(cw * 0.38, 360); // 每侧血条最大宽度
-    const centerX = cw / 2;
-    const staminaH = 8;        // 体力条高度
-    const staminaY = topY + barH + 4;
+    // ===== 左上角：玩家信息 =====
+    this._drawCharInfo(ctx, player, 14, 14, false);
 
-    // --- 玩家（左侧，从中间向左延伸）---
-    this._drawFightingBar(ctx, player, centerX - barGap / 2, topY, barMaxW, barH, staminaY, staminaH, false);
-
-    // --- 敌人（右侧，从中间向右延伸）---
+    // ===== 右上角：目标敌人信息 =====
     if (targetEnemy && targetEnemy.alive) {
-      this._drawFightingBar(ctx, targetEnemy, centerX + barGap / 2, topY, barMaxW, barH, staminaY, staminaH, true);
+      this._drawCharInfo(ctx, targetEnemy, cw - 14, 14, true);
     }
 
-    // VS标识
-    ctx.fillStyle = 'rgba(255,255,255,0.15)';
-    ctx.font = 'bold 12px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText('VS', centerX, topY + barH / 2 + 4);
-
-    // 顶部中央难度（在VS下方）
+    // ===== 顶部中央：难度显示 =====
     const diffNames = ['新手', '普通', '熟练', '困难', '大师', '拼刀训练', '格挡训练'];
     const diffColors = ['#66cc66', '#cccc66', '#ff9933', '#ff5555', '#ff2222', '#44aaff', '#ff88ff'];
     ctx.font = '11px "Segoe UI", sans-serif';
     ctx.textAlign = 'center';
     ctx.fillStyle = diffColors[difficulty - 1] || '#fff';
-    ctx.fillText(`难度 ${diffNames[difficulty - 1] || difficulty}`, centerX, staminaY + staminaH + 14);
+    ctx.fillText(`难度 ${diffNames[difficulty - 1] || difficulty}`, cw / 2, 24);
+
+    // ===== 敌人数量 =====
+    const aliveCount = enemies.filter(e => e.alive).length;
+    if (aliveCount > 1) {
+      ctx.fillStyle = '#ff8888';
+      ctx.font = '12px "Segoe UI", sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(`敌人 ×${aliveCount}`, cw / 2, 40);
+    }
 
     // 战斗日志
     this._drawCombatLog(ctx, cw);
   }
 
-  _drawFightingBar(ctx, f, edgeX, topY, maxW, barH, staminaY, staminaH, isRight) {
+  /** 绘制角色简要信息面板（名字 + HP + 体力 + 状态） */
+  _drawCharInfo(ctx, f, x, y, alignRight) {
+    ctx.save();
+    const nameColor = f.team === 0 ? '#88bbff' : '#ff8888';
+
+    // 名字
+    ctx.fillStyle = nameColor;
+    ctx.font = 'bold 13px "Segoe UI", sans-serif';
+    ctx.textAlign = alignRight ? 'right' : 'left';
+    ctx.fillText(f.name, x, y + 12);
+
+    // HP文字
     const hpRatio = Math.max(0, f.hp / f.maxHp);
-
-    // 血条背景
-    const bgX = isRight ? edgeX : edgeX - maxW;
-    ctx.fillStyle = 'rgba(0,0,0,0.6)';
-    ctx.fillRect(bgX, topY, maxW, barH);
-
-    // 血条填充（从中间向外延伸）
-    const hpW = maxW * hpRatio;
-    const hpColor = hpRatio > 0.5 ? '#44cc44' : hpRatio > 0.25 ? '#ccaa22' : '#cc3333';
+    const hpColor = hpRatio > 0.5 ? '#66dd66' : hpRatio > 0.25 ? '#ddaa33' : '#dd4444';
     ctx.fillStyle = hpColor;
-    if (isRight) {
-      ctx.fillRect(edgeX, topY, hpW, barH);
-    } else {
-      ctx.fillRect(edgeX - hpW, topY, hpW, barH);
-    }
+    ctx.font = '12px "Segoe UI", sans-serif';
+    ctx.fillText(`HP ${f.hp}/${f.maxHp}`, x, y + 28);
 
-    // 低血量脉冲效果
-    if (hpRatio <= 0.25 && hpRatio > 0) {
-      const pulse = Math.sin(Date.now() * 0.008) * 0.15 + 0.15;
-      ctx.fillStyle = `rgba(255,50,50,${pulse})`;
-      if (isRight) {
-        ctx.fillRect(edgeX, topY, hpW, barH);
-      } else {
-        ctx.fillRect(edgeX - hpW, topY, hpW, barH);
-      }
-    }
-
-    // 血条边框
-    ctx.strokeStyle = 'rgba(255,255,255,0.25)';
-    ctx.lineWidth = 1;
-    ctx.strokeRect(bgX, topY, maxW, barH);
-
-    // 血量数字
-    ctx.fillStyle = '#fff';
-    ctx.font = 'bold 12px "Segoe UI", sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText(`${f.hp}/${f.maxHp}`, bgX + maxW / 2, topY + barH / 2 + 4);
-
-    // 名字（外侧）
-    ctx.fillStyle = isRight ? '#ff8888' : '#88bbff';
-    ctx.font = 'bold 12px "Segoe UI", sans-serif';
-    ctx.textAlign = isRight ? 'right' : 'left';
-    const nameX = isRight ? edgeX + maxW - 4 : edgeX - maxW + 4;
-    ctx.fillText(f.name, nameX, topY - 3);
-
-    // ===== 体力条（分段式） =====
-    const stBgX = bgX;
-    const segGap = 2;
-    const totalGap = segGap * (C.STAMINA_MAX - 1);
-    const segW = (maxW - totalGap) / C.STAMINA_MAX;
-
+    // 体力点
+    const stX = alignRight ? x - (C.STAMINA_MAX - 1) * 10 : x;
+    const stY = y + 40;
     for (let i = 0; i < C.STAMINA_MAX; i++) {
-      const idx = isRight ? i : (C.STAMINA_MAX - 1 - i);
-      const sx = stBgX + idx * (segW + segGap);
-
-      // 背景
-      ctx.fillStyle = 'rgba(255,255,255,0.08)';
-      ctx.fillRect(sx, staminaY, segW, staminaH);
-
-      // 填充
+      const cx = stX + i * 10;
       if (i < f.stamina) {
         ctx.fillStyle = f.isExhausted ? '#ff4444' : '#ffcc33';
-        ctx.fillRect(sx, staminaY, segW, staminaH);
+        ctx.beginPath();
+        ctx.arc(cx, stY, 3.5, 0, Math.PI * 2);
+        ctx.fill();
+      } else {
+        ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.arc(cx, stY, 3.5, 0, Math.PI * 2);
+        ctx.stroke();
       }
     }
 
-    // 体力耗尽闪烁
-    if (f.isExhausted) {
-      const flash = Math.sin(Date.now() * 0.01) * 0.3 + 0.3;
-      ctx.fillStyle = `rgba(255,50,50,${flash})`;
-      ctx.fillRect(stBgX, staminaY, maxW, staminaH);
-    }
-
-    // 状态标签（血条下方）
-    const stateY = staminaY + staminaH + 12;
+    // 状态文字
     let stateText = '';
     let stateColor = '#888';
     switch (f.state) {
-      case 'lightAttack':
-        stateText = `轻击 ${f.comboStep}/3`;
-        stateColor = '#fff';
-        break;
-      case 'heavyAttack':
-        stateText = f.phase === 'startup' ? '重击蓄力...' : '重击!';
-        stateColor = '#ff6633';
-        break;
-      case 'blocking':
-        stateText = '招架中';
-        stateColor = '#66aaff';
-        break;
-      case 'blockRecovery':
-        stateText = '招架后摇';
-        stateColor = '#4488aa';
-        break;
-      case 'dodging':
-        stateText = f.perfectDodged ? '完美闪避!' : '闪避';
-        stateColor = f.perfectDodged ? '#ffff00' : '#aaa';
-        break;
-      case 'staggered':
-        stateText = '硬直';
-        stateColor = '#ff8800';
-        break;
-      case 'parryStunned':
-        stateText = '武器被弹!';
-        stateColor = '#ffcc33';
-        break;
-      case 'parryCounter':
-        stateText = '格挡反击!';
-        stateColor = '#00ddff';
-        break;
-      case 'executing':
-        stateText = '处决!';
-        stateColor = '#ff0000';
-        break;
-      case 'executed':
-        stateText = '被处决...';
-        stateColor = '#ff0000';
-        break;
+      case 'lightAttack': stateText = `轻击 ${f.comboStep}/3`; stateColor = '#fff'; break;
+      case 'heavyAttack': stateText = f.phase === 'startup' ? '蓄力...' : '重击!'; stateColor = '#ff6633'; break;
+      case 'blocking': stateText = '招架'; stateColor = '#66aaff'; break;
+      case 'dodging': stateText = f.perfectDodged ? '完美闪避!' : '闪避'; stateColor = f.perfectDodged ? '#ffff00' : '#aaa'; break;
+      case 'staggered': stateText = '硬直'; stateColor = '#ff8800'; break;
+      case 'parryStunned': stateText = '被弹!'; stateColor = '#ffcc33'; break;
+      case 'parryCounter': stateText = '反击!'; stateColor = '#00ddff'; break;
+      case 'executing': stateText = '处决!'; stateColor = '#ff0000'; break;
+      case 'executed': stateText = '被处决'; stateColor = '#ff0000'; break;
       default:
-        if (f.isExhausted) {
-          stateText = '体力耗尽!';
-          stateColor = '#ff4444';
-        } else if (f.parryBoost && f.parryBoost.timer > 0) {
-          stateText = '加速反击!';
-          stateColor = '#66ffcc';
-        }
+        if (f.isExhausted) { stateText = '体力耗尽!'; stateColor = '#ff4444'; }
+        else if (f.parryBoost && f.parryBoost.timer > 0) { stateText = '加速!'; stateColor = '#66ffcc'; }
     }
     if (stateText) {
       ctx.fillStyle = stateColor;
-      ctx.font = 'bold 11px "Segoe UI", sans-serif';
-      ctx.textAlign = isRight ? 'left' : 'right';
-      const stateX = isRight ? edgeX + 4 : edgeX - 4;
-      ctx.fillText(stateText, stateX, stateY);
+      ctx.font = '11px "Segoe UI", sans-serif';
+      ctx.fillText(stateText, x, y + 54);
     }
+
+    ctx.restore();
   }
 
   _drawCombatLog(ctx, cw) {
-    const ch = this.canvas._logicH || this.canvas.height;
     const x = cw / 2;
-    let y = 90; // 下移，不与顶部血条重叠
+    let y = 56;
     ctx.textAlign = 'center';
     ctx.font = '13px "Microsoft YaHei", sans-serif';
     for (const log of this.combatLog) {

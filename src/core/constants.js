@@ -77,7 +77,7 @@ export const DODGE_COST     = 1;
 export const DODGE_DURATION = 0.36;
 export const DODGE_SPEED    = 370;
 export const DODGE_INVULN_END = 0.18;  // 前半段无敌
-export const PERFECT_DODGE_WINDOW = 0.12;
+export const PERFECT_DODGE_WINDOW = 0.08;  // 完美闪避窗口（无敌期前44%）
 
 // ============ 变招 ============
 export const FEINT_COST = 2;
@@ -151,6 +151,12 @@ export const CLASH_TIME_SCALE = {
   light: { scale: 0.30, duration: 0.35 },
   heavy: { scale: 0.20, duration: 0.50 },
 };
+
+// ============ 完美闪避子弹时间 ============
+export const PERFECT_DODGE_TIME_SCALE = { scale: 0.18, duration: 0.50 };
+
+// ============ 重击命中反馈 ============
+export const HEAVY_HIT_FREEZE = 0.12;  // 重击命中冻结帧
 
 // ============ AI 节奏控制 ============
 export const AI_MIN_ATTACK_INTERVAL = 0.6;

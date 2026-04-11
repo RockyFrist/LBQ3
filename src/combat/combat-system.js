@@ -5,7 +5,15 @@ export class CombatSystem {
   constructor(particles, camera) {
     this.particles = particles;
     this.camera = camera;
+    this.playerFighter = null; // 由 Game 设置，用于判断是否触发镜头震动
     this.events = []; // 战斗事件日志（用于 UI 显示）
+  }
+
+  /** 仅在玩家参与战斗时触发镜头震动 */
+  _shakeIfPlayer(a, b, intensity, duration) {
+    const pf = this.playerFighter;
+    if (pf && pf.alive && a !== pf && b !== pf) return;
+    this.camera.shake(intensity, duration);
   }
 
   resolve(fighters, gameTime, dt) {
@@ -81,9 +89,12 @@ export class CombatSystem {
     if (target.isInvulnerable()) {
       // 完美闪避检测
       if (target.state === 'dodging' && target.stateTimer < C.PERFECT_DODGE_WINDOW) {
-        target.perfectDodged = true;
-        this.particles.sparks(midX, midY, ang + Math.PI, 6);
-        this.events.push({ type: 'perfectDodge', target });
+        const pdChance = target.perfectDodgeChance ?? 1.0;
+        if (Math.random() < pdChance) {
+          target.perfectDodged = true;
+          this.particles.sparks(midX, midY, ang + Math.PI, 6);
+          this.events.push({ type: 'perfectDodge', target });
+        }
       }
       return;
     }
@@ -135,7 +146,7 @@ export class CombatSystem {
     const midX = (attacker.x + target.x) / 2;
     const midY = (attacker.y + target.y) / 2;
     this.particles.blood(midX, midY, ang, atkInfo.type === 'heavy' ? 10 : 5);
-    this.camera.shake(
+    this._shakeIfPlayer(attacker, target,
       atkInfo.type === 'heavy' ? C.SHAKE_HEAVY : C.SHAKE_LIGHT,
       C.SHAKE_DURATION
     );
@@ -147,7 +158,7 @@ export class CombatSystem {
     target.blockHitCount++;
     target.drainStamina(C.LIGHT_VS_BLOCK_STAMINA);
     this.particles.blockSpark(mx, my, ang, 5);
-    this.camera.shake(C.SHAKE_LIGHT * 0.5, C.SHAKE_DURATION);
+    this._shakeIfPlayer(attacker, target, C.SHAKE_LIGHT * 0.5, C.SHAKE_DURATION);
 
     if (target.blockHitCount >= C.LIGHT_BREAK_HIT) {
       // 第3下破防
@@ -244,7 +255,7 @@ export class CombatSystem {
     // 特效
     const sparkCount = parryLevel === 'precise' ? 15 : parryLevel === 'semi' ? 10 : 6;
     this.particles.sparks(mx, my, ang + Math.PI, sparkCount);
-    this.camera.shake(C.SHAKE_HEAVY, C.SHAKE_DURATION);
+    this._shakeIfPlayer(attacker, target, C.SHAKE_HEAVY, C.SHAKE_DURATION);
 
     if (parryLevel === 'precise') {
       target.flash('#ffff00', 0.2);
@@ -301,7 +312,7 @@ export class CombatSystem {
       a.applyKnockback(ang + Math.PI, C.HEAVY_CLASH_PUSHBACK);
       b.applyKnockback(ang, C.HEAVY_CLASH_PUSHBACK);
       this.particles.clash(mx, my, 16);
-      this.camera.shake(C.SHAKE_CLASH, C.SHAKE_DURATION * 1.5);
+      this._shakeIfPlayer(a, b, C.SHAKE_CLASH, C.SHAKE_DURATION * 1.5);
       this.events.push({ type: 'heavyClash', a, b });
     } else {
       // 轻击拼刀
@@ -310,7 +321,7 @@ export class CombatSystem {
       a.applyKnockback(ang + Math.PI, C.CLASH_PUSHBACK);
       b.applyKnockback(ang, C.CLASH_PUSHBACK);
       this.particles.clash(mx, my, 10);
-      this.camera.shake(C.SHAKE_CLASH * 0.7, C.SHAKE_DURATION);
+      this._shakeIfPlayer(a, b, C.SHAKE_CLASH * 0.7, C.SHAKE_DURATION);
       this.events.push({ type: 'lightClash', a, b });
     }
   }
@@ -323,7 +334,7 @@ export class CombatSystem {
     attacker.setState('executing', { target });
 
     this.particles.execution(target.x, target.y, 25);
-    this.camera.shake(C.SHAKE_EXECUTION, C.SHAKE_DURATION * 2);
+    this._shakeIfPlayer(attacker, target, C.SHAKE_EXECUTION, C.SHAKE_DURATION * 2);
     this.events.push({ type: 'execution', attacker, target, damage: dmg });
   }
 
