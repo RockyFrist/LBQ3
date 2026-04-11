@@ -2,8 +2,8 @@ import { Fighter } from './fighter.js';
 import { vec2Normalize } from '../core/utils.js';
 
 export class Player {
-  constructor(x, y) {
-    this.fighter = new Fighter(x, y, { color: '#4499ff', team: 0, name: '玩家' });
+  constructor(x, y, { scale = 1, hpMult = 1 } = {}) {
+    this.fighter = new Fighter(x, y, { color: '#4499ff', team: 0, name: '玩家', scale, hpMult });
   }
 
   getCommands(input) {

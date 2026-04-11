@@ -126,8 +126,10 @@ export class CombatSystem {
   _applyHit(attacker, target, atkInfo, ang) {
     target.takeDamage(atkInfo.damage);
     target.setState('staggered', { duration: C.HIT_STAGGER });
-    const kb = atkInfo.type === 'heavy' ? C.HEAVY_HIT_KNOCKBACK : C.HIT_KNOCKBACK;
-    target.applyKnockback(ang, kb);
+    const baseKb = atkInfo.type === 'heavy' ? C.HEAVY_HIT_KNOCKBACK : C.HIT_KNOCKBACK;
+    // 体型缩放: 大体型攻击方击退更远，大体型目标更难被击退
+    const scaleRatio = (attacker.scale || 1) / (target.scale || 1);
+    target.applyKnockback(ang, baseKb * scaleRatio);
     target.flash('#fff', 0.1);
 
     const midX = (attacker.x + target.x) / 2;
@@ -186,7 +188,8 @@ export class CombatSystem {
     attacker.knockbackTimer = 0;
 
     // 格挡后保证最小间距（至少1/3身位），防止贴脸
-    const minGap = C.FIGHTER_RADIUS * 2 + C.FIGHTER_RADIUS * 0.88;
+    const avgRadius = (attacker.radius + target.radius) / 2;
+    const minGap = attacker.radius + target.radius + avgRadius * 0.88;
     const curDist = dist(attacker, target);
     if (curDist < minGap) {
       const pushBack = (minGap - curDist) / 2;
@@ -329,11 +332,12 @@ export class CombatSystem {
     for (const other of allFighters) {
       if (other === fighter || other.team === fighter.team || !other.alive) continue;
       const d = dist(fighter, other);
-      if (d > C.ATTACK_MAGNET_RANGE || d < 5) continue;
+      const magnetRange = C.ATTACK_MAGNET_RANGE * (fighter.scale || 1);
+      if (d > magnetRange || d < 5) continue;
       const ang = angleBetween(fighter, other);
       const diff = Math.abs(normalizeAngle(ang - fighter.facing));
       if (diff < C.ATTACK_MAGNET_ANGLE) {
-        const pull = C.ATTACK_MAGNET_PULL * (1 - d / C.ATTACK_MAGNET_RANGE);
+        const pull = C.ATTACK_MAGNET_PULL * (1 - d / magnetRange);
         fighter.x += Math.cos(ang) * pull * dt;
         fighter.y += Math.sin(ang) * pull * dt;
       }

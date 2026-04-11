@@ -5,7 +5,7 @@ export class Menu {
     this.ctx = canvas.getContext('2d');
     this.input = input;
 
-    this.page = 'main'; // 'main' | 'pvai' | 'spectate' | 'test' | 'wusheng'
+    this.page = 'main'; // 'main' | 'pvai' | 'spectate' | 'test' | 'wusheng' | 'jianghu'
     this.pvaiDiff = 3;
     this.nnWeightsLoaded = false;
     this.nnLoadError = null;
@@ -41,6 +41,7 @@ export class Menu {
       case 'spectate': this._updateSpectate(mx, my); break;
       case 'test': this._updateTest(mx, my); break;
       case 'wusheng': this._updateWusheng(mx, my); break;
+      case 'jianghu': this._updateJianghu(mx, my); break;
     }
   }
 
@@ -182,6 +183,7 @@ export class Menu {
       case 'spectate': this._drawSpectate(); break;
       case 'test': this._drawTest(); break;
       case 'wusheng': this._drawWusheng(); break;
+      case 'jianghu': this._drawJianghu(); break;
     }
   }
 
@@ -239,18 +241,20 @@ export class Menu {
     const btnW = 340;
     const btnH = 64;
     const gap = 18;
-    const startY = ch * 0.30;
+    const startY = ch * 0.22;
 
     return {
       buttons: [
-        { id: 'pvai', label: '⚔ 对战模式', desc: '玩家 vs AI，键鼠操作', accent: '#4499ff',
+        { id: 'jianghu', label: '🏔 江湖行', desc: '十关爬塔，3条命，闯荡江湖', accent: '#ffcc44',
           x: cx - btnW / 2, y: startY, w: btnW, h: btnH },
-        { id: 'spectate', label: '🦗 斗蛐蛐', desc: '选择双方AI难度，观看互斗', accent: '#ffaa33',
+        { id: 'pvai', label: '⚔ 对战模式', desc: '玩家 vs AI，键鼠操作', accent: '#4499ff',
           x: cx - btnW / 2, y: startY + btnH + gap, w: btnW, h: btnH },
-        { id: 'test', label: '📊 自动测试', desc: '批量对战数据统计与分析', accent: '#44ff88',
+        { id: 'spectate', label: '🦗 斗蛐蛐', desc: '选择双方AI难度，观看互斗', accent: '#ffaa33',
           x: cx - btnW / 2, y: startY + (btnH + gap) * 2, w: btnW, h: btnH },
-        { id: 'wusheng', label: '🏆 挑战武圣', desc: '对战神经网络训练的终极AI', accent: '#ff00ff',
+        { id: 'test', label: '📊 自动测试', desc: '批量对战数据统计与分析', accent: '#44ff88',
           x: cx - btnW / 2, y: startY + (btnH + gap) * 3, w: btnW, h: btnH },
+        { id: 'wusheng', label: '🏆 挑战武圣', desc: '对战神经网络训练的终极AI', accent: '#ff00ff',
+          x: cx - btnW / 2, y: startY + (btnH + gap) * 4, w: btnW, h: btnH },
       ],
       helpBtn: { x: cw - 110, y: ch - 44, w: 96, h: 32 },
     };
@@ -463,6 +467,58 @@ export class Menu {
     ctx.font = '12px "Microsoft YaHei", sans-serif';
     ctx.textAlign = 'center';
     ctx.fillText(names[value - 1], x + 5 * 42 / 2 - 3, y + 46);
+  }
+
+  // ---- 江湖行页 ----
+  _updateJianghu(mx, my) {
+    const L = this._layoutJianghu();
+    if (this._hit(mx, my, L.startBtn.x, L.startBtn.y, L.startBtn.w, L.startBtn.h)) {
+      this.result = { mode: 'jianghu' };
+      this._clickCooldown = 0.3;
+      return;
+    }
+    if (this._hit(mx, my, L.backBtn.x, L.backBtn.y, L.backBtn.w, L.backBtn.h)) {
+      this.page = 'main';
+      this._clickCooldown = 0.2;
+    }
+  }
+
+  _drawJianghu() {
+    const ctx = this.ctx;
+    const cw = this.canvas.width;
+    const ch = this.canvas.height;
+    const mx = this.input.mouseX;
+    const my = this.input.mouseY;
+    const L = this._layoutJianghu();
+
+    this._drawSubHeader(ctx, cw, '🏔 江湖行', '十关爬塔 · 3条命 · 闯荡江湖');
+
+    // 描述
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#aaa';
+    ctx.font = '14px "Microsoft YaHei", sans-serif';
+    ctx.fillText('从山贼到武林盟主，敌人体型、血量、智能逐步升级', cw / 2, ch * 0.32);
+    ctx.fillText('每关战胜后恢复40%HP，挑战到底!', cw / 2, ch * 0.37);
+
+    // 关卡预览
+    ctx.fillStyle = '#666';
+    ctx.font = '12px "Microsoft YaHei", sans-serif';
+    ctx.fillText('关卡: 山贼 → 镖师 → 恶霸 → 剑客 → 力士 → 捕快 → 武僧 → 长老 → 剑仙 → 盟主', cw / 2, ch * 0.44);
+
+    this._drawActionBtn(ctx, L.startBtn, '⚔ 踏入江湖', '#ffcc44', mx, my);
+    this._drawActionBtn(ctx, L.backBtn, '← 返回', '#666', mx, my);
+  }
+
+  _layoutJianghu() {
+    const cw = this.canvas.width;
+    const ch = this.canvas.height;
+    const cx = cw / 2;
+    const btnW = 280;
+    const btnH = 48;
+    return {
+      startBtn: { x: cx - btnW / 2, y: ch * 0.54, w: btnW, h: btnH },
+      backBtn: { x: cx - 60, y: ch * 0.54 + btnH + 20, w: 120, h: 34 },
+    };
   }
 
   // ---- 武圣挑战页 ----

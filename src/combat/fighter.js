@@ -9,7 +9,7 @@ import { clamp, normalizeAngle, angleDiff } from '../core/utils.js';
 */
 
 export class Fighter {
-  constructor(x, y, { color = '#4488ff', team = 0, name = '' } = {}) {
+  constructor(x, y, { color = '#4488ff', team = 0, name = '', scale = 1, hpMult = 1 } = {}) {
     this.x = x;
     this.y = y;
     this.facing = 0;
@@ -18,11 +18,12 @@ export class Fighter {
     this.color = color;
     this.team = team;
     this.name = name;
-    this.radius = C.FIGHTER_RADIUS;
+    this.scale = scale;
+    this.radius = C.FIGHTER_RADIUS * scale;
 
     // 生命
-    this.hp = C.MAX_HP;
-    this.maxHp = C.MAX_HP;
+    this.maxHp = Math.round(C.MAX_HP * hpMult);
+    this.hp = this.maxHp;
     this.alive = true;
 
     // 体力
@@ -138,6 +139,7 @@ export class Fighter {
         this.canFeint = params.canFeint !== undefined ? params.canFeint : true;
         const idx = this.comboStep - 1;
         this.attackData = { ...C.LIGHT_ATTACKS[idx] };
+        this.attackData.range *= this.scale;
         // 格挡加速增益
         if (this.parryBoost.timer > 0) {
           this.attackData.startup *= this.parryBoost.mult;
@@ -151,7 +153,7 @@ export class Fighter {
         this.canFeint = params.canFeint !== undefined ? params.canFeint : true;
         this.attackData = {
           startup: C.HEAVY_CHARGE, active: C.HEAVY_ACTIVE,
-          recovery: C.HEAVY_RECOVERY, range: C.HEAVY_RANGE,
+          recovery: C.HEAVY_RECOVERY, range: C.HEAVY_RANGE * this.scale,
           arc: C.HEAVY_ARC, damage: C.HEAVY_DAMAGE,
         };
         // 格挡加速增益
@@ -206,7 +208,7 @@ export class Fighter {
           startup: baseStartup * mult,
           active: C.PARRY_COUNTER_ACTIVE,
           recovery: C.PARRY_COUNTER_RECOVERY,
-          range: C.PARRY_COUNTER_RANGE,
+          range: C.PARRY_COUNTER_RANGE * this.scale,
           arc: C.PARRY_COUNTER_ARC,
           damage: C.PARRY_COUNTER_DAMAGE,
         };
@@ -578,7 +580,9 @@ export class Fighter {
       // 只在可移动状态下处理方向输入
       const movable = this.state === 'idle' || this.state === 'blocking';
       if (movable && cmd && (cmd.moveX || cmd.moveY)) {
-        const spd = C.FIGHTER_SPEED * this.speedMult;
+        // 体型越大移速越慢: scale 1.5 → ×0.88
+        const scaleSpdMult = 1 / Math.pow(this.scale, 0.3);
+        const spd = C.FIGHTER_SPEED * this.speedMult * scaleSpdMult;
         this.vx = (cmd.moveX || 0) * spd;
         this.vy = (cmd.moveY || 0) * spd;
       } else if (this.state !== 'dodging') {

@@ -5,8 +5,8 @@ import { buildAIConfig } from './ai-config.js';
 import { planMethods } from './ai-plans.js';
 
 export class Enemy {
-  constructor(x, y, difficulty = 2) {
-    this.fighter = new Fighter(x, y, { color: '#ff4444', team: 1, name: '敌人' });
+  constructor(x, y, difficulty = 2, { scale = 1, hpMult = 1, color = '#ff4444', name = '敌人' } = {}) {
+    this.fighter = new Fighter(x, y, { color, team: 1, name, scale, hpMult });
     this.difficulty = difficulty;
     this.aiState = 'approach';
     this.aiTimer = 0;
