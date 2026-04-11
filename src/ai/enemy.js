@@ -185,12 +185,11 @@ export class Enemy {
 
       // AI变招：在startup阶段取消攻击
       if (this.aiState === 'feint_wait' && f.phase === 'startup') {
-        const opHeavyRate = this._getPlayerHeavyRate();
-        // 格挡只在对手爱用重击时有格反收益，否则选攻击型变招
-        const blockWorth = opHeavyRate > 0.25 || pf.state === 'heavyAttack';
+        // 变招→格挡只在对手正在蓄力重击时才有格反收益
+        const blockWorth = pf.state === 'heavyAttack' && pf.phase === 'startup';
         if (f.attackType === 'light') {
           if (blockWorth) {
-            // 轻击→防御（骗对手反击后格反）
+            // 轻击→防御（对手正在蓄重击，等格反）
             cmd.blockHeld = true;
             this.aiState = 'defend';
             this.aiTimer = 0.3 + Math.random() * 0.15;
@@ -205,7 +204,7 @@ export class Enemy {
         } else if (f.attackType === 'heavy') {
           // 重击变招：根据对手风格选策略
           const r = Math.random();
-          const blockChance = blockWorth ? 0.35 : 0.08;
+          const blockChance = blockWorth ? 0.40 : 0;
           if (r >= blockChance) {
             // 重击→轻击（最常见，快速打出）
             cmd.lightAttack = true;
@@ -307,12 +306,6 @@ export class Enemy {
               this.aiState = 'recover';
               this.aiTimer = 1.2;
               this._logDecision(this._gameTime, 'stagger_guess', 'heavy', { dist: +d.toFixed(0), opState: pf.state });
-            } else if (guess < 0.55 && opHeavyRateG > 0.25) {
-              // 对手爱出重击时格挡才有格反收益
-              cmd.blockHeld = true;
-              this.aiState = 'defend';
-              this.aiTimer = cfg.blockDurBase + Math.random() * 0.3;
-              this._logDecision(this._gameTime, 'stagger_guess', 'block', { dist: +d.toFixed(0), opState: pf.state });
             } else {
               cmd.lightAttack = true;
               this.comboTarget = Math.min(2, cfg.maxCombo);
@@ -449,13 +442,19 @@ export class Enemy {
           this.aiTimer = 0.4;
         }
       } else if (!isHeavyThreat && Math.random() < identifyChance) {
-        // === 识别轻击 → 反击（拼刀或打后摇，避免无效格挡） ===
+        // === 识别轻击 → 反击/闪避（轻击格挡无收益，不格挡） ===
         if (d < 70 && Math.random() < 0.55) {
           cmd.lightAttack = true;
           this.comboTarget = Math.min(2, cfg.maxCombo);
           this.comboCount = 1;
           this.aiState = 'recover';
           this.aiTimer = 0.6;
+        } else if (f.stamina >= C.DODGE_COST && Math.random() < 0.5) {
+          const dodgeA = ang + (Math.random() < 0.5 ? Math.PI / 2 : -Math.PI / 2);
+          cmd.dodge = true;
+          cmd.dodgeAngle = dodgeA;
+          this.aiState = 'recover';
+          this.aiTimer = 0.4;
         } else {
           cmd.heavyAttack = true;
           this.aiState = 'recover';
@@ -463,11 +462,11 @@ export class Enemy {
         }
       } else {
         // === 基础反应（低难度默认 + 高难度未识别时） ===
+        // 不确定攻击类型时：只在有可能是重击时才格挡
         const r = Math.random();
         const opponentHeavyRate = this._getPlayerHeavyRate();
-        // 对手越少用重击，格挡收益越低（轻击vs格挡=白耗体力）
-        const blockBias = Math.max(0.08, opponentHeavyRate * 1.5) * (1.2 - diffScaleR * 0.5);
-        const adjustedBlockChance = cfg.reactChance * Math.min(1, blockBias);
+        // 只有对手重击率较高时才考虑格挡（否则大概率是轻击，格挡无意义）
+        const adjustedBlockChance = opponentHeavyRate > 0.20 ? cfg.reactChance * opponentHeavyRate : 0;
         const adjustedDodgeChance = cfg.dodgeChance;
 
         if (r < adjustedBlockChance) {
@@ -646,24 +645,30 @@ export class Enemy {
             this.aiState = 'approach';
           }
         } else if (pf.phase === 'active') {
-          // 玩家释放重击！立刻举盾格挡
-          cmd.blockHeld = true;
-          this.aiState = 'defend';
-          this.aiTimer = 0.5;
-        } else {
-          // 蓄力中：根据蓄力进度决定是否提前举盾（预判即将释放）
-          const chargeProgress = pf.phaseTimer / (pf.attackData ? pf.attackData.startup : C.HEAVY_CHARGE);
-          const releaseRate = 1 - this._getPlayerHeavyFeintRate();
-          // 蓄力接近70%+，且玩家很少变招 → 提前举盾以获得精准格挡
-          if (chargeProgress > 0.65 && releaseRate > 0.6) {
+          // 玩家释放重击！根据难度混合应对
+          const rr = Math.random();
+          const diffReadScale = (this.difficulty - 1) / 4; // 0~1
+          const blockRate = 0.30 + diffReadScale * 0.35; // D1=30%, D5=65%
+          if (rr < blockRate) {
             cmd.blockHeld = true;
             this.aiState = 'defend';
-            this.aiTimer = 0.6;
-          } else if (this.aiTimer <= 0) {
-            // 等待超时，默认举盾
-            cmd.blockHeld = true;
-            this.aiState = 'defend';
+            this.aiTimer = 0.5;
+          } else if (rr < blockRate + 0.25 && f.stamina >= C.DODGE_COST) {
+            cmd.dodge = true;
+            cmd.dodgeAngle = ang + (Math.random() < 0.5 ? Math.PI / 2 : -Math.PI / 2);
+            this.aiState = 'recover';
             this.aiTimer = 0.4;
+          } else {
+            // 硬吃/交换 — 用霸体重击交换
+            cmd.heavyAttack = true;
+            this.aiState = 'recover';
+            this.aiTimer = 1.2;
+          }
+        } else {
+          // 蓄力中 → 等待释放，不提前举盾
+          if (this.aiTimer <= 0) {
+            // 等待超时 → 回到接近（对手可能一直蓄力不放）
+            this.aiState = 'approach';
           }
         }
         break;
@@ -765,10 +770,6 @@ export class Enemy {
         // 大概率后撤拉距
         this.aiState = 'retreat';
         this.aiTimer = 0.8 + Math.random() * 0.7;
-      } else if (d < 80) {
-        // 近身被迫格挡（短暂）
-        this.aiState = 'defend';
-        this.aiTimer = 0.2 + Math.random() * 0.15;
       } else {
         // 远距离等回复
         this.aiState = 'retreat';
@@ -777,16 +778,13 @@ export class Enemy {
       return;
     }
 
-    // 反重击spam：对手爱用重击时偏向轻击快攻
+    // 反重击spam：对手爱用重击时偏向轻击快攻（不主动举盾，靠reactToHeavy处理）
     const heavyRate = this._getPlayerHeavyRate();
     if (heavyRate > 0.5 && cfg.heavyReactMult > 0.3) {
-      if (r < 0.55) {
+      if (r < 0.70) {
         this.aiState = 'attack';
         this.comboTarget = Math.min(2, cfg.maxCombo);
         this.comboCount = 0;
-      } else if (r < 0.80) {
-        this.aiState = 'defend';
-        this.aiTimer = cfg.blockDurBase;
       } else {
         this.aiState = 'retreat';
         this.aiTimer = 0.3;
@@ -815,20 +813,8 @@ export class Enemy {
       this.aiState = 'heavy';
       this._logDecision(this._gameTime, 'decide', 'heavy', { dist: +d.toFixed(0) });
     } else {
-      // 根据对手重击倾向和自身难度决定是否主动防御
-      // 低难度AI：本能龟防（不懂防御无意义）；高难度：判断对手风格
-      const opponentHeavyRate = this._getPlayerHeavyRate();
-      const diffScale = (this.difficulty - 1) / 4; // 0(D1) ~ 1(D5)
-      // 低难度有少量防御倾向；高难度只在对手出重击时才防御
-      const baseDefendRate = 0.06 * (1 - diffScale); // D1=0.06, D5=0
-      const smartDefendRate = Math.min(0.20, opponentHeavyRate * 0.4) * diffScale; // D5看对手重击率
-      const defendRate = baseDefendRate + smartDefendRate;
-      
-      if (Math.random() < defendRate) {
-        this.aiState = 'defend';
-        this.blockDuration = cfg.blockDurBase + Math.random() * 0.6;
-        this.aiTimer = this.blockDuration;
-      } else if (Math.random() < 0.65) {
+      // 不主动举盾（格挡由reactToHeavy和heavy_read专门处理）
+      if (Math.random() < 0.65) {
         // 大概率再次进攻（对拼比空防更有价值）
         this.aiState = 'attack';
         this.comboTarget = 1 + Math.floor(Math.random() * cfg.maxCombo);

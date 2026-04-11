@@ -184,13 +184,7 @@ export const planMethods = {
         this._initPlan([{ act: 'light', dur: 1.0 }]);
       }
     } else {
-      const opHeavyRateP = this._getPlayerHeavyRate();
-      if (opHeavyRateP > 0.25 && Math.random() < 0.5) {
-        this._initPlan([
-          { act: 'block', dur: 0.25 },
-          { act: 'light', dur: 1.0 },
-        ]);
-      } else if (Math.random() < 0.5) {
+      if (Math.random() < 0.5) {
         this._initPlan([{ act: 'light', dur: 1.0 }]);
       }
     }
@@ -199,32 +193,21 @@ export const planMethods = {
   // --- 被弹恢复后计划 ---
   _createRecoveryPlan(f, pf, d, cfg) {
     const r = Math.random();
-    const opHeavyRate = this._getPlayerHeavyRate();
-    if (this.difficulty >= 4 && r < 0.3 && opHeavyRate > 0.2) {
-      this._initPlan([
-        { act: 'block', dur: 0.25 },
-        { act: 'light', dur: 1.0 },
-      ]);
-    } else if (r < 0.3) {
+    if (r < 0.35) {
       this._initPlan([{ act: 'light', dur: 1.0 }]);
-    } else if (r < 0.55 && opHeavyRate > 0.2) {
-      this._initPlan([{ act: 'block', dur: 0.4 + Math.random() * 0.3 }]);
-    } else if (r < 0.7) {
+    } else if (r < 0.60) {
       this._initPlan([{ act: 'dodge', dur: 0.5 }]);
+    } else if (r < 0.80 && this.difficulty >= 3) {
+      this._initPlan([{ act: 'heavy', dur: 1.5 }]);
     }
   },
 
   // --- 拼刀后计划 ---
   _createClashFollowupPlan(f, pf, d, cfg) {
     const r = Math.random();
-    const opHeavyRate = this._getPlayerHeavyRate();
-    if (r < 0.45) {
+    if (r < 0.50) {
       this._initPlan([{ act: 'light', dur: 0.8 }]);
-    } else if (r < 0.70 && opHeavyRate > 0.25) {
-      this._initPlan([{ act: 'block', dur: 0.3 + Math.random() * 0.2 }]);
-    } else if (r < 0.70) {
-      this._initPlan([{ act: 'light', dur: 0.8 }]);
-    } else if (r < 0.85 && this.difficulty >= 3) {
+    } else if (r < 0.75 && this.difficulty >= 3) {
       this._initPlan([{ act: 'heavy', dur: 1.5 }]);
     } else {
       this._initPlan([{ act: 'dodge', dur: 0.5, side: Math.PI }]);
@@ -313,27 +296,13 @@ export const planMethods = {
   _createPressurePlan(f, pf, d, cfg) {
     if (f.stamina < 2) return;
 
-    const opHeavyRate = this._getPlayerHeavyRate();
     const plans = [
       [{ act: 'light', dur: 1.0 }, { act: 'heavy', dur: 1.5 }],
       [{ act: 'heavy', dur: 1.5 }],
       [{ act: 'light', dur: 1.0 }, { act: 'light', dur: 1.0 }],
     ];
 
-    if (opHeavyRate > 0.25) {
-      plans.push(
-        [{ act: 'light', dur: 1.0 }, { act: 'light', dur: 1.0 }, { act: 'block', dur: 0.3 }],
-      );
-    }
-
     if (this.difficulty >= 4 && f.stamina >= 3) {
-      if (opHeavyRate > 0.25) {
-        plans.push([
-          { act: 'light', dur: 1.0 },
-          { act: 'block', dur: 0.35 },
-          { act: 'light', dur: 1.0 },
-        ]);
-      }
       plans.push([
         { act: 'approach', dur: 0.3, dist: 50 },
         { act: 'heavy', dur: 1.5 },
@@ -370,29 +339,29 @@ export const planMethods = {
     const staminaLow = this.fighter.stamina <= 2;
     const smartness = cfg.heavyReactMult;
 
-    let wBlock = 0.15;
-    let wRead  = 0.20;
-    let wDodge = 0.10;
-    let wTrade = 0.10;
+    // 权重分配：格挡只是选项之一，不是默认反应
+    let wBlock = 0.10;
+    let wRead  = 0.00;  // 移除heavy_read（其本质就是延迟格挡）
+    let wDodge = 0.25;
+    let wTrade = 0.20;
     let wHeavy = 0.05;
 
+    // 对手经常真释放重击 → 格挡收益高，提高格挡权重
     if (releaseRate > 0.80) {
-      wRead += 0.35;
-      wBlock += 0.15;
+      wBlock += 0.25;
       wDodge -= 0.05;
-      wTrade -= 0.05;
     } else if (releaseRate > 0.55) {
-      wBlock += 0.20;
-      wRead += 0.15;
+      wBlock += 0.15;
     } else {
-      wRead += 0.30;
-      wTrade += 0.10;
-      wBlock -= 0.05;
+      // 对手爱变招 → 格挡风险高（可能被骗），多用交换/闪避
+      wTrade += 0.15;
+      wDodge += 0.05;
     }
 
     if (staminaLow) {
-      wBlock += wDodge * 0.8;
-      wDodge *= 0.2;
+      // 体力低时不能闪避，转为格挡
+      wBlock += wDodge * 0.6;
+      wDodge *= 0.4;
     }
 
     const total = wBlock + wDodge + wRead + wTrade + wHeavy;
