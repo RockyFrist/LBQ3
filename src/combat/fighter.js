@@ -488,6 +488,22 @@ export class Fighter {
     this.staminaRegenPaused = true;
     this.staminaPauseTimer = C.BLOCK_STAMINA_PAUSE;
 
+    // 格挡变招：格挡中按攻击可变招为攻击（消耗体力）
+    if (cmd && this.stamina >= C.FEINT_COST && this.blockHitCount === 0) {
+      if (cmd.lightAttack) {
+        this.stamina -= C.FEINT_COST;
+        this.feinted = true;
+        this.setState('lightAttack', { comboStep: 1, canFeint: false });
+        return;
+      }
+      if (cmd.heavyAttack) {
+        this.stamina -= C.FEINT_COST;
+        this.feinted = true;
+        this.setState('heavyAttack', { canFeint: false });
+        return;
+      }
+    }
+
     if (cmd && !cmd.blockHeld) {
       // 松手后 grace period — 仍然维持招架一小段时间
       this.blockLingerTimer += dt;

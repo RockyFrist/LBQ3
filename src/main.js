@@ -127,7 +127,7 @@ function setupTrainCallbacks(m) {
 
 function startGame(result) {
   appState = 'playing';
-  if (controlsHelp) controlsHelp.style.display = result.mode === 'pvai' || result.mode === 'wusheng' || result.mode === 'jianghu' ? '' : 'none';
+  if (controlsHelp) controlsHelp.style.display = result.mode === 'pvai' || result.mode === 'wusheng' || result.mode === 'jianghu' || result.mode === 'training' ? '' : 'none';
   game = new Game(canvas, input, {
     mode: result.mode,
     diffA: result.diffA,
@@ -137,7 +137,7 @@ function startGame(result) {
     onExit: returnToMenu,
     nnWeights: nnWeights, // 传入武圣权重
   });
-  if (game.mode !== 'test' && game.mode !== 'jianghu') {
+  if (game.mode !== 'test' && game.mode !== 'jianghu' && game.mode !== 'training') {
     game.spawnEnemy();
   }
 }

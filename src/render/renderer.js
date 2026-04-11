@@ -135,9 +135,121 @@ export class Renderer {
 
     ctx.globalAlpha = 1;
 
+    // ---- 脚下体力环 ----
+    this._drawStaminaRing(ctx, f);
+
+    // ---- 脚下体力豆（无间冥庙风格）----
+    this._drawStaminaDots(ctx, f);
+
     // 状态特效
     this._drawStateEffect(ctx, f);
 
+    ctx.restore();
+  }
+
+  /** 角色脚下体力弧环 — 类似异人之下/只狼的近身体力指示 */
+  _drawStaminaRing(ctx, f) {
+    const max = C.STAMINA_MAX;
+    const cur = f.stamina;
+    if (max <= 0) return;
+
+    const ringR = f.radius + 4;       // 环半径（紧贴身体外侧）
+    const startAngle = Math.PI * 0.5;  // 从正下方开始
+    const totalArc = Math.PI * 1.4;    // 总弧长（不满圆，留缺口朝上）
+    const gapArc = 0.08;               // 段间缝隙弧度
+
+    // 每个体力点对应的弧度
+    const segArc = (totalArc - gapArc * (max - 1)) / max;
+
+    ctx.save();
+    ctx.lineWidth = 3;
+    ctx.lineCap = 'round';
+
+    for (let i = 0; i < max; i++) {
+      const a0 = startAngle - totalArc / 2 + i * (segArc + gapArc);
+      const a1 = a0 + segArc;
+
+      if (i < cur) {
+        // 有体力 — 金色（体力耗尽时红色闪烁）
+        if (f.isExhausted) {
+          const flash = Math.sin(f.stateTimer * 10) * 0.3 + 0.7;
+          ctx.strokeStyle = `rgba(255,60,40,${flash * 0.9})`;
+        } else {
+          const alpha = cur >= max ? 0.7 : 0.85;
+          ctx.strokeStyle = `rgba(255,200,50,${alpha})`;
+        }
+      } else {
+        // 已消耗 — 暗色底
+        ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+      }
+
+      ctx.beginPath();
+      ctx.arc(0, 0, ringR, a0, a1);
+      ctx.stroke();
+    }
+
+    // 体力恢复进度指示（下一点恢复中时，对应段显示渐变填充）
+    if (cur < max && f.staminaRegenTimer > 0 && !f.isExhausted) {
+      const progress = 1 - f.staminaRegenTimer / C.STAMINA_REGEN_INTERVAL;
+      const idx = cur; // 正在恢复的那个段下标
+      const a0 = startAngle - totalArc / 2 + idx * (segArc + gapArc);
+      const a1 = a0 + segArc * Math.max(0, progress);
+      ctx.strokeStyle = `rgba(255,200,50,${0.15 + 0.35 * progress})`;
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(0, 0, ringR, a0, a1);
+      ctx.stroke();
+    }
+
+    ctx.restore();
+  }
+
+  /** 角色脚下体力豆 — 无间冥庙风格水平排列小圆点 */
+  _drawStaminaDots(ctx, f) {
+    const max = C.STAMINA_MAX;
+    const cur = f.stamina;
+    if (max <= 0) return;
+
+    const dotR = 2.5;          // 每个豆半径
+    const gap = 7;             // 豆中心间距
+    const y = f.radius + 22;  // 位于体力环下方、状态文字上方
+    const totalW = (max - 1) * gap;
+    const startX = -totalW / 2;
+
+    ctx.save();
+    for (let i = 0; i < max; i++) {
+      const cx = startX + i * gap;
+      if (i < cur) {
+        // 有体力 — 金色实心豆
+        if (f.isExhausted) {
+          const flash = Math.sin(f.stateTimer * 10) * 0.3 + 0.7;
+          ctx.fillStyle = `rgba(255,60,40,${flash * 0.9})`;
+        } else {
+          const alpha = cur >= max ? 0.7 : 0.9;
+          ctx.fillStyle = `rgba(255,200,50,${alpha})`;
+        }
+        ctx.beginPath();
+        ctx.arc(cx, y, dotR, 0, Math.PI * 2);
+        ctx.fill();
+      } else {
+        // 已消耗 — 暗色空心圆
+        ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.arc(cx, y, dotR, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+    }
+
+    // 恢复进度指示（正在恢复的豆显示渐填充）
+    if (cur < max && f.staminaRegenTimer > 0 && !f.isExhausted) {
+      const progress = 1 - f.staminaRegenTimer / C.STAMINA_REGEN_INTERVAL;
+      const cx = startX + cur * gap;
+      ctx.fillStyle = `rgba(255,200,50,${0.1 + 0.4 * progress})`;
+      ctx.beginPath();
+      ctx.arc(cx, y, dotR * progress, 0, Math.PI * 2);
+      ctx.fill();
+    }
     ctx.restore();
   }
 
@@ -486,9 +598,9 @@ export class Renderer {
     ctx.strokeStyle = 'rgba(0,0,0,0.7)';
     ctx.lineWidth = 3;
     ctx.lineJoin = 'round';
-    ctx.strokeText(label, 0, f.radius + 26);
+    ctx.strokeText(label, 0, f.radius + 38);
     ctx.fillStyle = color;
-    ctx.fillText(label, 0, f.radius + 26);
+    ctx.fillText(label, 0, f.radius + 38);
     ctx.restore();
   }
 

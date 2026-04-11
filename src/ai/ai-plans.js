@@ -340,18 +340,18 @@ export const planMethods = {
     const smartness = cfg.heavyReactMult;
 
     // 权重分配：格挡只是选项之一，不是默认反应
-    let wBlock = 0.10;
+    let wBlock = 0.30;
     let wRead  = 0.00;  // 移除heavy_read（其本质就是延迟格挡）
-    let wDodge = 0.25;
-    let wTrade = 0.20;
+    let wDodge = 0.20;
+    let wTrade = 0.15;
     let wHeavy = 0.05;
 
     // 对手经常真释放重击 → 格挡收益高，提高格挡权重
     if (releaseRate > 0.80) {
-      wBlock += 0.25;
-      wDodge -= 0.05;
+      wBlock += 0.30;
+      wDodge -= 0.10;
     } else if (releaseRate > 0.55) {
-      wBlock += 0.15;
+      wBlock += 0.20;
     } else {
       // 对手爱变招 → 格挡风险高（可能被骗），多用交换/闪避
       wTrade += 0.15;
@@ -360,8 +360,8 @@ export const planMethods = {
 
     if (staminaLow) {
       // 体力低时不能闪避，转为格挡
-      wBlock += wDodge * 0.6;
-      wDodge *= 0.4;
+      wBlock += wDodge * 0.8;
+      wDodge *= 0.2;
     }
 
     const total = wBlock + wDodge + wRead + wTrade + wHeavy;

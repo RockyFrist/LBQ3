@@ -37,5 +37,6 @@ export function buildAIConfig(d) {
     heavyReactDist:  [70,   95,   115,  155,  175 ][d - 1],
     punishRate:      [0.10, 0.25, 0.35, 0.72, 0.95][d - 1],
     feintChance:     [0.03, 0.08, 0.18, 0.45, 0.65][d - 1],
+    blockChance:     [0.05, 0.12, 0.20, 0.30, 0.38][d - 1],
   };
 }

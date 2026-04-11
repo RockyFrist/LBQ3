@@ -10,7 +10,16 @@
   <div id="game-container">
     <canvas id="game-canvas"></canvas>
     <div id="controls-help">
-      WASD 移动 | 左键 轻击 | 右键 重击 | 空格 招架 | Shift+方向 闪避 | E 刷敌人 | R 重置 | H 帮助 | 1-5 难度
+      <div>WASD 移动</div>
+      <div>左键 轻击</div>
+      <div>右键 重击</div>
+      <div>空格 招架</div>
+      <div>Shift+方向 闪避</div>
+      <div>U 刷敌人</div>
+      <div>I 刷队友</div>
+      <div>R 重置</div>
+      <div>H 帮助</div>
+      <div>1-5 难度</div>
     </div>
 
     <!-- 帮助弹窗 -->
@@ -32,11 +41,13 @@
               <div class="help-item"><span class="help-key">攻击中按右键</span><span class="help-desc">轻击→重击（消耗2体力）</span></div>
               <div class="help-item"><span class="help-key">攻击中按空格</span><span class="help-desc">攻击→招架（消耗2体力）</span></div>
               <div class="help-item"><span class="help-key">重击中按左键</span><span class="help-desc">重击→轻击（消耗2体力）</span></div>
+              <div class="help-item"><span class="help-key">招架中按攻击</span><span class="help-desc">招架→攻击（消耗2体力）</span></div>
               <div class="help-item"><span class="help-key" style="color:#aaa">闪避取消</span><span class="help-desc">攻击中按Shift闪避，不算变招（仅正常闪避消耗）</span></div>
               <div class="help-item"><span class="help-key" style="color:#aaa">限制</span><span class="help-desc">命中目标后不可变招</span></div>
 
               <div class="section-title">系统按键</div>
-              <div class="help-item"><span class="help-key">E</span><span class="help-desc">刷出敌人</span></div>
+              <div class="help-item"><span class="help-key">U</span><span class="help-desc">刷出敌人</span></div>
+              <div class="help-item"><span class="help-key">I</span><span class="help-desc">刷出队友</span></div>
               <div class="help-item"><span class="help-key">R</span><span class="help-desc">重置战场</span></div>
               <div class="help-item"><span class="help-key">1-5</span><span class="help-desc">切换AI难度</span></div>
               <div class="help-item"><span class="help-key" style="color:#44aaff">6</span><span class="help-desc">拼刀训练（AI只用轻击对攻）</span></div>

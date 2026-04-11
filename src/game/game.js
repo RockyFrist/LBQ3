@@ -87,6 +87,13 @@ export class Game {
     // DOM帮助面板
     this.helpOverlay = document.getElementById('help-overlay');
 
+    // ===== 队友系统 =====
+    this.allies = []; // AI队友列表
+
+    // ===== 设置面板 =====
+    this.settingsOpen = false;
+    this._settingsClickCd = 0;
+
     // ===== 江湖行 =====
     this.jianghuStage = 0;       // 当前关卡索引
     this.jianghuLives = JIANGHU_MAX_LIVES;
@@ -200,14 +207,37 @@ export class Game {
       this._nnLastAction = 0;
     }
     this.enemies = [];
+    this.allies = [];
     this.particles.particles = [];
     this._rebuildFighterList();
-    this.spawnEnemy();
+    if (this.mode !== 'training') this.spawnEnemy();
     this.ui.addLog('--- 重置 ---');
+  }
+
+  spawnAlly() {
+    const angle = Math.random() * Math.PI * 2;
+    const r = 100 + Math.random() * 60;
+    const px = this.player.fighter.x;
+    const py = this.player.fighter.y;
+    let ax = px + Math.cos(angle) * r;
+    let ay = py + Math.sin(angle) * r;
+    ax = Math.max(40, Math.min(C.ARENA_W - 40, ax));
+    ay = Math.max(40, Math.min(C.ARENA_H - 40, ay));
+    const ally = new Enemy(ax, ay, this.difficulty);
+    ally.fighter.name = `队友${this.allies.length + 1}`;
+    ally.fighter.color = '#44ddaa';
+    ally.fighter.team = 0; // 和玩家同队，不互相伤害
+    ally._isAlly = true;
+    this.allies.push(ally);
+    this._rebuildFighterList();
+    this.ui.addLog(`队友${this.allies.length} 加入!`);
   }
 
   _rebuildFighterList() {
     this.allFighters = [this.player.fighter];
+    for (const a of this.allies) {
+      this.allFighters.push(a.fighter);
+    }
     for (const e of this.enemies) {
       this.allFighters.push(e.fighter);
     }
@@ -254,8 +284,8 @@ export class Game {
       return;
     }
 
-    // 帮助/暂停切换（仅对战模式）
-    if (this.mode === 'pvai' && input.pressed('KeyH')) {
+    // 帮助/暂停切换（仅对战/训练模式）
+    if ((this.mode === 'pvai' || this.mode === 'training') && input.pressed('KeyH')) {
       this.showHelp = !this.showHelp;
       this.paused = this.showHelp;
       if (this.helpOverlay) {
@@ -263,8 +293,27 @@ export class Game {
       }
     }
 
-    // 难度切换 (1-7)（仅对战模式）
-    if (this.mode === 'pvai') {
+    // 设置面板（所有非测试模式）
+    this._settingsClickCd -= dt;
+    if (this.mode !== 'test' && input.pressed('KeyP')) {
+      this.settingsOpen = !this.settingsOpen;
+    }
+    // 设置按钮点击检测
+    if (this.mode !== 'test' && input.mouseLeftDown && this._settingsClickCd <= 0) {
+      const r = this._getSettingsBtnRect();
+      if (input.mouseX >= r.x && input.mouseX <= r.x + r.w &&
+          input.mouseY >= r.y && input.mouseY <= r.y + r.h) {
+        this.settingsOpen = !this.settingsOpen;
+        this._settingsClickCd = 0.3;
+      }
+    }
+    if (this.settingsOpen) {
+      this._updateSettings(dt);
+      return; // 暂停游戏逻辑
+    }
+
+    // 难度切换 (1-7)（仅对战/训练模式）
+    if (this.mode === 'pvai' || this.mode === 'training') {
       for (let i = 1; i <= 7; i++) {
         if (input.pressed(`Digit${i}`)) {
           this.difficulty = i;
@@ -315,7 +364,7 @@ export class Game {
       this.hitFreezeTimer -= dt;
 
       // 冻结期间仍然采集玩家输入到缓冲（防止点击被吞）
-      if (this.mode === 'pvai' || this.mode === 'wusheng') {
+      if (this.mode === 'pvai' || this.mode === 'wusheng' || this.mode === 'training') {
         const freezeCmd = this.player.getCommands(this.input);
         const pf = this.player.fighter;
         // 只缓冲攻击/闪避意图，不缓冲持续按住的格挡（避免格挡后误入blocking）
@@ -328,6 +377,7 @@ export class Game {
 
       if (this.mode !== 'test') {
         this.particles.update(dt);
+        this._updateCameraTarget();
         this.camera.update(dt);
       }
       this.ui.update(dt);
@@ -346,8 +396,9 @@ export class Game {
     const input = this.input;
 
     // 对战模式按键
-    if (this.mode === 'pvai' || this.mode === 'wusheng') {
-      if (input.pressed('KeyE') && this._victoryTimer < 0) this.spawnEnemy();
+    if (this.mode === 'pvai' || this.mode === 'wusheng' || this.mode === 'training') {
+      if (input.pressed('KeyU') && this._victoryTimer < 0) this.spawnEnemy();
+      if (input.pressed('KeyI') && this._victoryTimer < 0) this.spawnAlly();
       if (input.pressed('KeyR')) { this._victoryTimer = -1; this.reset(); return; }
     }
     // 观战模式按键
@@ -362,7 +413,7 @@ export class Game {
       const pf = this.player.fighter;
       const enemy0 = this.enemies[0]?.fighter;
       const noop = { moveX: 0, moveY: 0, faceAngle: 0, lightAttack: false, heavyAttack: false, blockHeld: false, dodge: false, dodgeAngle: 0 };
-      const isPlayerMode = this.mode === 'pvai' || this.mode === 'wusheng' || this.mode === 'jianghu';
+      const isPlayerMode = this.mode === 'pvai' || this.mode === 'wusheng' || this.mode === 'jianghu' || this.mode === 'training';
 
       if (pf.alive) {
         if (isPlayerMode) {
@@ -389,6 +440,7 @@ export class Game {
       }
 
       this.particles.update(dt);
+      this._updateCameraTarget();
       this.camera.update(dt);
       this.ui.update(dt);
       return;
@@ -440,6 +492,21 @@ export class Game {
       ef.update(dt, eCmd, this.gameTime);
     }
 
+    // 队友AI更新（以最近敌人为目标）
+    for (const ally of this.allies) {
+      const af = ally.fighter;
+      if (!af.alive) continue;
+      // 找最近活着的敌人
+      let target = null, minD = Infinity;
+      for (const e of this.enemies) {
+        if (!e.fighter.alive) continue;
+        const d = dist(af, e.fighter);
+        if (d < minD) { minD = d; target = e.fighter; }
+      }
+      const aCmd = target ? ally.getCommands(dt, target) : { moveX: 0, moveY: 0, faceAngle: 0, lightAttack: false, heavyAttack: false, blockHeld: false, dodge: false, dodgeAngle: 0 };
+      af.update(dt, aCmd, this.gameTime);
+    }
+
     // 碰撞分离
     this._separateFighters();
 
@@ -468,12 +535,14 @@ export class Game {
     // 粒子等
     if (this.mode !== 'test') {
       this.particles.update(dt);
+      this._updateCameraTarget();
       this.camera.update(dt);
     }
     this.ui.update(dt);
 
-    // 清理死亡敌人
+    // 清理死亡敌人和队友
     this.enemies = this.enemies.filter(e => e.fighter.alive || e.fighter.stateTimer < 2);
+    this.allies = this.allies.filter(a => a.fighter.alive || a.fighter.stateTimer < 2);
     this._rebuildFighterList();
 
     // 胜负检测
@@ -592,9 +661,12 @@ export class Game {
 
     this.renderer.drawGrid();
 
-    // 绘制角色（先画敌人再画玩家，玩家在上层）
+    // 绘制角色（先画敌人再画队友再画玩家，玩家在上层）
     for (const enemy of this.enemies) {
       this.renderer.drawFighter(enemy.fighter);
+    }
+    for (const ally of this.allies) {
+      this.renderer.drawFighter(ally.fighter);
     }
     this.renderer.drawFighter(this.player.fighter);
 
@@ -629,6 +701,8 @@ export class Game {
     } else if (this.mode === 'jianghu') {
       const stage = JIANGHU_STAGES[this.jianghuStage];
       this._drawModeLabel(`🏔 江湖行 · 第${this.jianghuStage + 1}关 ${stage ? stage.name : ''} · ❤×${this.jianghuLives}`);
+    } else if (this.mode === 'training') {
+      this._drawModeLabel(`🎯 自由训练 · U召敌 · I召队友 · R重置 · 1-5难度(当前${this.difficulty})`);
     }
 
     // 江湖行覆盖层（剧情/过关/失败）
@@ -639,6 +713,16 @@ export class Game {
     // 测试结果
     if (this.testDone) {
       this._drawTestResults();
+    }
+
+    // 设置按钮（非测试模式，右上角）
+    if (this.mode !== 'test') {
+      this._drawSettingsBtn();
+    }
+
+    // 设置面板覆盖层
+    if (this.settingsOpen) {
+      this._drawSettings();
     }
   }
 
@@ -652,6 +736,177 @@ export class Game {
     ctx.font = '13px "Microsoft YaHei", sans-serif';
     ctx.textAlign = 'center';
     ctx.fillText(text, lw / 2, lh - 10);
+  }
+
+  // ===================== 镜头跟踪 =====================
+  _updateCameraTarget() {
+    const pf = this.player.fighter;
+    let tx = pf.x, ty = pf.y;
+    // 有敌人时跟踪玩家与最近敌人的中点
+    const target = this._getTarget();
+    if (target && target.alive) {
+      tx = (pf.x + target.x) / 2;
+      ty = (pf.y + target.y) / 2;
+    }
+    this.camera.setTarget(tx, ty);
+  }
+
+  // ===================== 设置面板 =====================
+  _getSettingsBtnRect() {
+    const lw = this.canvas._logicW || this.canvas.width;
+    return { x: lw - 44, y: 6, w: 36, h: 36 };
+  }
+
+  _drawSettingsBtn() {
+    const ctx = this.canvas.getContext('2d');
+    const r = this._getSettingsBtnRect();
+    const mx = this.input.mouseX;
+    const my = this.input.mouseY;
+    const hovered = mx >= r.x && mx <= r.x + r.w && my >= r.y && my <= r.y + r.h;
+
+    ctx.fillStyle = hovered ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.06)';
+    ctx.fillRect(r.x, r.y, r.w, r.h);
+    ctx.strokeStyle = hovered ? 'rgba(255,255,255,0.4)' : 'rgba(255,255,255,0.15)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(r.x, r.y, r.w, r.h);
+    ctx.fillStyle = hovered ? '#fff' : '#999';
+    ctx.font = '18px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('⚙', r.x + r.w / 2, r.y + r.h / 2 + 6);
+  }
+
+  _getSettingsLayout() {
+    const lw = this.canvas._logicW || this.canvas.width;
+    const lh = this.canvas._logicH || this.canvas.height;
+    const panelW = 320;
+    const panelH = 200;
+    const px = (lw - panelW) / 2;
+    const py = (lh - panelH) / 2;
+    const sliderW = 200;
+    const sliderH = 20;
+    const sliderX = px + (panelW - sliderW) / 2;
+    const zoomSliderY = py + 80;
+    return {
+      px, py, panelW, panelH,
+      sliderX, sliderW, sliderH,
+      zoomSliderY,
+      resetBtn: { x: px + panelW / 2 - 50, y: py + 130, w: 100, h: 32 },
+      closeBtn: { x: px + panelW / 2 - 50, y: py + panelH - 40, w: 100, h: 30 },
+    };
+  }
+
+  _updateSettings(dt) {
+    this._settingsClickCd -= dt;
+    const input = this.input;
+    const L = this._getSettingsLayout();
+    const mx = input.mouseX;
+    const my = input.mouseY;
+
+    // Escape 关闭
+    if (input.pressed('Escape')) {
+      this.settingsOpen = false;
+      return;
+    }
+
+    if (!input.mouseLeftDown) return;
+    if (this._settingsClickCd > 0) return;
+
+    // 缩放滑块拖拽
+    if (mx >= L.sliderX && mx <= L.sliderX + L.sliderW &&
+        my >= L.zoomSliderY - 5 && my <= L.zoomSliderY + L.sliderH + 5) {
+      const t = (mx - L.sliderX) / L.sliderW;
+      this.camera.zoomExtra = this.camera.zoomMin + t * (this.camera.zoomMax - this.camera.zoomMin);
+      return;
+    }
+
+    // 恢复默认
+    const rb = L.resetBtn;
+    if (mx >= rb.x && mx <= rb.x + rb.w && my >= rb.y && my <= rb.y + rb.h) {
+      this.camera.zoomExtra = this.camera.zoomExtraDefault;
+      this._settingsClickCd = 0.2;
+      return;
+    }
+
+    // 关闭按钮
+    const cb = L.closeBtn;
+    if (mx >= cb.x && mx <= cb.x + cb.w && my >= cb.y && my <= cb.y + cb.h) {
+      this.settingsOpen = false;
+      this._settingsClickCd = 0.3;
+      return;
+    }
+
+    // 点击面板外关闭
+    if (mx < L.px || mx > L.px + L.panelW || my < L.py || my > L.py + L.panelH) {
+      this.settingsOpen = false;
+      this._settingsClickCd = 0.3;
+    }
+  }
+
+  _drawSettings() {
+    const ctx = this.canvas.getContext('2d');
+    const lw = this.canvas._logicW || this.canvas.width;
+    const lh = this.canvas._logicH || this.canvas.height;
+    const L = this._getSettingsLayout();
+    const mx = this.input.mouseX;
+    const my = this.input.mouseY;
+
+    // 暗化背景
+    ctx.fillStyle = 'rgba(0,0,0,0.6)';
+    ctx.fillRect(0, 0, lw, lh);
+
+    // 面板
+    ctx.fillStyle = 'rgba(20,22,40,0.95)';
+    ctx.fillRect(L.px, L.py, L.panelW, L.panelH);
+    ctx.strokeStyle = 'rgba(100,150,255,0.3)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(L.px, L.py, L.panelW, L.panelH);
+
+    // 标题
+    ctx.fillStyle = '#e8e0d0';
+    ctx.font = 'bold 18px "Microsoft YaHei", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('⚙ 设置', L.px + L.panelW / 2, L.py + 30);
+
+    // 缩放标签
+    ctx.fillStyle = '#aaa';
+    ctx.font = '13px "Microsoft YaHei", sans-serif';
+    const zoomPct = Math.round(this.camera.zoomExtra * 100);
+    ctx.fillText(`视角缩放: ${zoomPct}%`, L.px + L.panelW / 2, L.zoomSliderY - 8);
+
+    // 缩放滑块
+    const sliderBg = L.sliderX;
+    ctx.fillStyle = '#333';
+    ctx.fillRect(sliderBg, L.zoomSliderY, L.sliderW, L.sliderH);
+    const t = (this.camera.zoomExtra - this.camera.zoomMin) / (this.camera.zoomMax - this.camera.zoomMin);
+    ctx.fillStyle = '#4499ff';
+    ctx.fillRect(sliderBg, L.zoomSliderY, L.sliderW * t, L.sliderH);
+    ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+    ctx.strokeRect(sliderBg, L.zoomSliderY, L.sliderW, L.sliderH);
+    // 滑块把手
+    const handleX = sliderBg + L.sliderW * t;
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(handleX - 3, L.zoomSliderY - 2, 6, L.sliderH + 4);
+
+    // 恢复默认按钮
+    const rb = L.resetBtn;
+    const rbHover = mx >= rb.x && mx <= rb.x + rb.w && my >= rb.y && my <= rb.y + rb.h;
+    ctx.fillStyle = rbHover ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.05)';
+    ctx.fillRect(rb.x, rb.y, rb.w, rb.h);
+    ctx.strokeStyle = rbHover ? '#ffcc33' : 'rgba(255,255,255,0.2)';
+    ctx.strokeRect(rb.x, rb.y, rb.w, rb.h);
+    ctx.fillStyle = rbHover ? '#fff' : '#aaa';
+    ctx.font = '13px "Microsoft YaHei", sans-serif';
+    ctx.fillText('恢复默认', rb.x + rb.w / 2, rb.y + rb.h / 2 + 5);
+
+    // 关闭按钮
+    const cb = L.closeBtn;
+    const cbHover = mx >= cb.x && mx <= cb.x + cb.w && my >= cb.y && my <= cb.y + cb.h;
+    ctx.fillStyle = cbHover ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.05)';
+    ctx.fillRect(cb.x, cb.y, cb.w, cb.h);
+    ctx.strokeStyle = cbHover ? '#4499ff' : 'rgba(255,255,255,0.2)';
+    ctx.strokeRect(cb.x, cb.y, cb.w, cb.h);
+    ctx.fillStyle = cbHover ? '#fff' : '#aaa';
+    ctx.fillText('关闭', cb.x + cb.w / 2, cb.y + cb.h / 2 + 5);
   }
 
   // ===================== 江湖行逻辑 =====================

@@ -5,7 +5,7 @@ export class Menu {
     this.ctx = canvas.getContext('2d');
     this.input = input;
 
-    this.page = 'main'; // 'main' | 'pvai' | 'spectate' | 'test' | 'wusheng' | 'jianghu'
+    this.page = 'main'; // 'main' | 'pvai' | 'spectate' | 'test' | 'wusheng' | 'jianghu' | 'training'
     this.pvaiDiff = 3;
     this.nnWeightsLoaded = false;
     this.nnLoadError = null;
@@ -42,6 +42,7 @@ export class Menu {
       case 'test': this._updateTest(mx, my); break;
       case 'wusheng': this._updateWusheng(mx, my); break;
       case 'jianghu': this._updateJianghu(mx, my); break;
+      case 'training': this._updateTraining(mx, my); break;
     }
   }
 
@@ -184,6 +185,7 @@ export class Menu {
       case 'test': this._drawTest(); break;
       case 'wusheng': this._drawWusheng(); break;
       case 'jianghu': this._drawJianghu(); break;
+      case 'training': this._drawTraining(); break;
     }
   }
 
@@ -255,6 +257,8 @@ export class Menu {
           x: cx - btnW / 2, y: startY + (btnH + gap) * 3, w: btnW, h: btnH },
         { id: 'wusheng', label: '🏆 挑战武圣', desc: '对战神经网络训练的终极AI', accent: '#ff00ff',
           x: cx - btnW / 2, y: startY + (btnH + gap) * 4, w: btnW, h: btnH },
+        { id: 'training', label: '🎯 自由训练', desc: '无敌人干扰，自由移动练习操作', accent: '#66ccff',
+          x: cx - btnW / 2, y: startY + (btnH + gap) * 5, w: btnW, h: btnH },
       ],
       helpBtn: { x: cw - 110, y: ch - 44, w: 96, h: 32 },
     };
@@ -467,6 +471,66 @@ export class Menu {
     ctx.font = '12px "Microsoft YaHei", sans-serif';
     ctx.textAlign = 'center';
     ctx.fillText(names[value - 1], x + 5 * 42 / 2 - 3, y + 46);
+  }
+
+  // ---- 自由训练页 ----
+  _updateTraining(mx, my) {
+    const L = this._layoutTraining();
+    // 难度选择
+    for (let i = 0; i < 5; i++) {
+      const bx = L.diffX + i * 42;
+      if (this._hit(mx, my, bx, L.diffY, 36, 30)) {
+        this.pvaiDiff = i + 1;
+        this._clickCooldown = 0.12;
+        return;
+      }
+    }
+    if (this._hit(mx, my, L.startBtn.x, L.startBtn.y, L.startBtn.w, L.startBtn.h)) {
+      this.result = { mode: 'training', diffA: 1, diffB: this.pvaiDiff, rounds: 0, simOnly: false };
+      this._clickCooldown = 0.3;
+      return;
+    }
+    if (this._hit(mx, my, L.backBtn.x, L.backBtn.y, L.backBtn.w, L.backBtn.h)) {
+      this.page = 'main';
+      this._clickCooldown = 0.2;
+    }
+  }
+
+  _drawTraining() {
+    const ctx = this.ctx;
+    const cw = this.canvas._logicW || this.canvas.width;
+    const ch = this.canvas._logicH || this.canvas.height;
+    const mx = this.input.mouseX;
+    const my = this.input.mouseY;
+    const L = this._layoutTraining();
+
+    this._drawSubHeader(ctx, cw, '🎯 自由训练', '场地自由移动 · 按E召唤敌人');
+    this._drawDiffSelector(ctx, L.diffX, L.diffY, '敌人难度', this.pvaiDiff, '#ff4444', mx, my);
+
+    // 说明
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#aaa';
+    ctx.font = '14px "Microsoft YaHei", sans-serif';
+    ctx.fillText('进入后无敌人，按 E 召唤敌人，R 重置，1-5 切换难度', cw / 2, L.diffY + 70);
+
+    this._drawActionBtn(ctx, L.startBtn, '⚔ 进入训练场', '#66ccff', mx, my);
+    this._drawActionBtn(ctx, L.backBtn, '← 返回', '#666', mx, my);
+  }
+
+  _layoutTraining() {
+    const cw = this.canvas._logicW || this.canvas.width;
+    const ch = this.canvas._logicH || this.canvas.height;
+    const cx = cw / 2;
+    const selectorW = 5 * 42;
+    const btnW = 280;
+    const btnH = 44;
+    const diffX = cx - selectorW / 2;
+    const diffY = ch * 0.38;
+    return {
+      diffX, diffY,
+      startBtn: { x: cx - btnW / 2, y: diffY + 120, w: btnW, h: btnH },
+      backBtn:  { x: cx - 60, y: diffY + 180, w: 120, h: 34 },
+    };
   }
 
   // ---- 江湖行页 ----
