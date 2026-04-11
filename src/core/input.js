@@ -23,8 +23,9 @@ export class Input {
     });
     canvas.addEventListener('mousemove', e => {
       const r = canvas.getBoundingClientRect();
-      this.mouseX = (e.clientX - r.left) * (canvas.width / r.width);
-      this.mouseY = (e.clientY - r.top) * (canvas.height / r.height);
+      // 使用逻辑坐标（CSS像素），与 DPI 缩放后的绘图坐标系一致
+      this.mouseX = e.clientX - r.left;
+      this.mouseY = e.clientY - r.top;
     });
     canvas.addEventListener('mousedown', e => {
       e.preventDefault();

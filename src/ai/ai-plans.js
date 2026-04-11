@@ -380,7 +380,7 @@ export const planMethods = {
     }
 
     c += wBlock;
-    if (r < c) {
+    if (r < c && this.blockCooldown <= 0) {
       this.aiState = 'defend';
       this.blockDuration = 0.6 + Math.random() * 0.3;
       this.aiTimer = this.blockDuration;

@@ -177,8 +177,8 @@ export const testModeMethods = {
 
   _drawTestResults() {
     const ctx = this.canvas.getContext('2d');
-    const cw = this.canvas.width;
-    const ch = this.canvas.height;
+    const cw = this.canvas._logicW || this.canvas.width;
+    const ch = this.canvas._logicH || this.canvas.height;
     const stats = this.testStats;
     if (!stats.length) return;
 

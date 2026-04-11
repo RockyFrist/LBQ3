@@ -123,13 +123,13 @@ export class Enemy {
     this.thinkCD -= dt;
     this.aiTimer -= dt;
     this.attackCooldown -= dt;
+    if (this.blockCooldown > 0) this.blockCooldown -= dt;
     this._trackPlayer(pf);
 
     // HTN 计划管理
     if (this._hasPlan() && (f.state === 'staggered' || f.state === 'executed' || !f.alive)) {
       this._clearPlan();
     }
-    this._checkPlanTriggers(f, pf, d, cfg);
 
     // 二次博弈：格挡相关状态转换后重置AI决策，避免旧定时器阻止行动
     const justExitedParryStunned = this._prevFighterState === 'parryStunned' && f.state !== 'parryStunned';
@@ -150,9 +150,12 @@ export class Enemy {
     }
 
     this._prevFighterState = f.state;
-    this._wasParryBoosted = f.parryBoost && f.parryBoost.timer > 0;
 
-    // 攻击承诺：当AI决定攻击或进入startup时，一次性决定是否承诺
+    // _checkPlanTriggers 需要旧的 _wasParryBoosted 值来检测首次获得 parryBoost
+    this._checkPlanTriggers(f, pf, d, cfg);
+
+    // 在 _checkPlanTriggers 之后才更新 _wasParryBoosted（否则计划触发条件永远为 false）
+    this._wasParryBoosted = f.parryBoost && f.parryBoost.timer > 0;
     // 低难度AI完全承诺，高难度AI有机会取消（快速反射）
     const isAttacking = this.aiState === 'attack' || this.aiState === 'heavy' ||
       (f.state === 'lightAttack' && f.phase === 'startup') ||
@@ -271,7 +274,7 @@ export class Enemy {
         const incomingHeavy = pf.state === 'heavyAttack' ||
           (pf.state === 'parryCounter' && pf.phase !== 'recovery');
 
-        if (incomingHeavy && Math.random() < cfg.reactChance) {
+        if (incomingHeavy && Math.random() < cfg.reactChance && this.blockCooldown <= 0) {
           // 重击/格反来袭 → 格挡有收益（格反机会）
           cmd.blockHeld = true;
           this.aiState = 'defend';
@@ -358,15 +361,16 @@ export class Enemy {
 
     // ===== 防御状态维持（所有模式通用，确保训练模式也能格挡） =====
     if (f.state === 'blocking' && this.aiState === 'defend') {
-      // 被轻击命中 → 格挡无格反收益，尽快松手准备反击
-      if (f.blockHitCount > 0 && pf.state === 'lightAttack') {
+      // 被命中后缩短格挡时间（不管对手当前状态，被打就赶紧松手）
+      if (f.blockHitCount > 0) {
         this.aiTimer = Math.min(this.aiTimer, 0.05);
       }
       cmd.blockHeld = true;
       if (this.aiTimer <= 0) {
         this.aiState = 'recover';
-        this.aiTimer = 0.15;
-        this.attackCooldown = 0; // 防御结束后允许立即反击
+        this.aiTimer = 0.10;
+        this.attackCooldown = 0;
+        this.blockCooldown = 0.6; // 格挡结束后短暂不允许再次举盾
       }
       return cmd;
     }
@@ -430,7 +434,7 @@ export class Enemy {
       const identifyChance = diffScaleR * diffScaleR;
       if (isHeavyThreat && Math.random() < identifyChance) {
         // === 识别重击 → 格挡（争取精准格反 → 巨大收益） ===
-        if (Math.random() < cfg.reactChance) {
+        if (Math.random() < cfg.reactChance && this.blockCooldown <= 0) {
           this.aiState = 'defend';
           this.blockDuration = cfg.blockDurBase + Math.random() * 0.4;
           this.aiTimer = this.blockDuration;
@@ -469,7 +473,7 @@ export class Enemy {
         const adjustedBlockChance = opponentHeavyRate > 0.20 ? cfg.reactChance * opponentHeavyRate : 0;
         const adjustedDodgeChance = cfg.dodgeChance;
 
-        if (r < adjustedBlockChance) {
+        if (r < adjustedBlockChance && this.blockCooldown <= 0) {
           this.aiState = 'defend';
           this.blockDuration = cfg.blockDurBase + Math.random() * 0.4;
           this.aiTimer = this.blockDuration;
@@ -589,16 +593,26 @@ export class Enemy {
       case 'defend': {
         cmd.blockHeld = true;
         if (this.aiTimer <= 0) {
-          // 防御结束后有概率直接发起变招（防守反击变招）
-          if (cfg.feintChance > 0.2 && d < 80 &&
-              f.stamina >= C.FEINT_COST + 1 && this.attackCooldown <= 0 &&
-              !this._hasPlan() && Math.random() < cfg.feintChance * 0.2) {
-            this._createFeintPlan(d);
-            this.aiState = 'approach';
-            this._logDecision(this._gameTime, 'feint_defend', 'plan', { dist: +d.toFixed(0) });
+          this.blockCooldown = 0.6; // 格挡结束后短暂不再举盾
+          // 防御结束后：近距离优先反击，远距离回到接近
+          if (d < 80 && this.attackCooldown <= 0) {
+            if (cfg.feintChance > 0.2 && f.stamina >= C.FEINT_COST + 1 &&
+                !this._hasPlan() && Math.random() < cfg.feintChance * 0.3) {
+              this._createFeintPlan(d);
+              this.aiState = 'approach';
+              this._logDecision(this._gameTime, 'feint_defend', 'plan', { dist: +d.toFixed(0) });
+            } else {
+              // 直接反击而非进入recover等待
+              cmd.lightAttack = true;
+              this.comboTarget = Math.min(2, cfg.maxCombo);
+              this.comboCount = 1;
+              this.aiState = 'recover';
+              this.aiTimer = 0.5;
+              this.attackCooldown = C.AI_MIN_ATTACK_INTERVAL;
+            }
           } else {
-            this.aiState = 'recover';
-            this.aiTimer = 0.3;
+            this.aiState = 'approach';
+            this.aiTimer = 0;
           }
         }
         break;
@@ -649,7 +663,7 @@ export class Enemy {
           const rr = Math.random();
           const diffReadScale = (this.difficulty - 1) / 4; // 0~1
           const blockRate = 0.30 + diffReadScale * 0.35; // D1=30%, D5=65%
-          if (rr < blockRate) {
+          if (rr < blockRate && this.blockCooldown <= 0) {
             cmd.blockHeld = true;
             this.aiState = 'defend';
             this.aiTimer = 0.5;

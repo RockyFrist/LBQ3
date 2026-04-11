@@ -189,8 +189,8 @@ export class Menu {
 
   _drawBg() {
     const ctx = this.ctx;
-    const cw = this.canvas.width;
-    const ch = this.canvas.height;
+    const cw = this.canvas._logicW || this.canvas.width;
+    const ch = this.canvas._logicH || this.canvas.height;
     ctx.fillStyle = '#0a0a14';
     ctx.fillRect(0, 0, cw, ch);
     ctx.strokeStyle = 'rgba(255,255,255,0.025)';
@@ -206,8 +206,8 @@ export class Menu {
   // ---- 主页 ----
   _drawMain() {
     const ctx = this.ctx;
-    const cw = this.canvas.width;
-    const ch = this.canvas.height;
+    const cw = this.canvas._logicW || this.canvas.width;
+    const ch = this.canvas._logicH || this.canvas.height;
     const mx = this.input.mouseX;
     const my = this.input.mouseY;
     const L = this._layoutMain();
@@ -235,8 +235,8 @@ export class Menu {
   }
 
   _layoutMain() {
-    const cw = this.canvas.width;
-    const ch = this.canvas.height;
+    const cw = this.canvas._logicW || this.canvas.width;
+    const ch = this.canvas._logicH || this.canvas.height;
     const cx = cw / 2;
     const btnW = 340;
     const btnH = 64;
@@ -263,7 +263,7 @@ export class Menu {
   // ---- 对战模式页 ----
   _drawPvai() {
     const ctx = this.ctx;
-    const cw = this.canvas.width;
+    const cw = this.canvas._logicW || this.canvas.width;
     const mx = this.input.mouseX;
     const my = this.input.mouseY;
     const L = this._layoutSub('pvai');
@@ -276,13 +276,13 @@ export class Menu {
     ctx.fillStyle = '#444';
     ctx.font = '12px "Microsoft YaHei", sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText('游戏中可按 1-5 切换难度 · 6 拼刀训练 · 7 格挡训练 · H 帮助', cw / 2, this.canvas.height - 24);
+    ctx.fillText('游戏中可按 1-5 切换难度 · 6 拼刀训练 · 7 格挡训练 · H 帮助', cw / 2, (this.canvas._logicH || this.canvas.height) - 24);
   }
 
   // ---- 斗蛐蛐页 ----
   _drawSpectate() {
     const ctx = this.ctx;
-    const cw = this.canvas.width;
+    const cw = this.canvas._logicW || this.canvas.width;
     const mx = this.input.mouseX;
     const my = this.input.mouseY;
     const L = this._layoutSub('spectate');
@@ -297,8 +297,8 @@ export class Menu {
   // ---- 测试页 ----
   _drawTest() {
     const ctx = this.ctx;
-    const cw = this.canvas.width;
-    const ch = this.canvas.height;
+    const cw = this.canvas._logicW || this.canvas.width;
+    const ch = this.canvas._logicH || this.canvas.height;
     const mx = this.input.mouseX;
     const my = this.input.mouseY;
     const L = this._layoutSub('test');
@@ -332,8 +332,8 @@ export class Menu {
 
   // ---- 子页布局 ----
   _layoutSub(page) {
-    const cw = this.canvas.width;
-    const ch = this.canvas.height;
+    const cw = this.canvas._logicW || this.canvas.width;
+    const ch = this.canvas._logicH || this.canvas.height;
     const cx = cw / 2;
     const selectorW = 5 * 42;
     const btnW = 280;
@@ -383,7 +383,7 @@ export class Menu {
 
   // ===================== 公共绘制工具 =====================
   _drawSubHeader(ctx, cw, title, subtitle) {
-    const ch = this.canvas.height;
+    const ch = this.canvas._logicH || this.canvas.height;
     ctx.textAlign = 'center';
     ctx.fillStyle = '#e8e0d0';
     ctx.font = 'bold 28px "Microsoft YaHei", sans-serif';
@@ -485,8 +485,8 @@ export class Menu {
 
   _drawJianghu() {
     const ctx = this.ctx;
-    const cw = this.canvas.width;
-    const ch = this.canvas.height;
+    const cw = this.canvas._logicW || this.canvas.width;
+    const ch = this.canvas._logicH || this.canvas.height;
     const mx = this.input.mouseX;
     const my = this.input.mouseY;
     const L = this._layoutJianghu();
@@ -510,8 +510,8 @@ export class Menu {
   }
 
   _layoutJianghu() {
-    const cw = this.canvas.width;
-    const ch = this.canvas.height;
+    const cw = this.canvas._logicW || this.canvas.width;
+    const ch = this.canvas._logicH || this.canvas.height;
     const cx = cw / 2;
     const btnW = 280;
     const btnH = 48;
@@ -584,8 +584,8 @@ export class Menu {
 
   _drawWusheng() {
     const ctx = this.ctx;
-    const cw = this.canvas.width;
-    const ch = this.canvas.height;
+    const cw = this.canvas._logicW || this.canvas.width;
+    const ch = this.canvas._logicH || this.canvas.height;
     const mx = this.input.mouseX;
     const my = this.input.mouseY;
     const L = this._layoutWusheng();
@@ -699,8 +699,8 @@ export class Menu {
   }
 
   _layoutWusheng() {
-    const cw = this.canvas.width;
-    const ch = this.canvas.height;
+    const cw = this.canvas._logicW || this.canvas.width;
+    const ch = this.canvas._logicH || this.canvas.height;
     const cx = cw / 2;
     const btnW = 260;
     const btnH = 38;

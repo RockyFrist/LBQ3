@@ -8,9 +8,12 @@ export class Player {
 
   getCommands(input) {
     const f = this.fighter;
+    // 使用世界坐标的鼠标位置（如果可用）
+    const wmx = input._worldMouseX != null ? input._worldMouseX : input.mouseX;
+    const wmy = input._worldMouseY != null ? input._worldMouseY : input.mouseY;
     const cmd = {
       moveX: 0, moveY: 0,
-      faceAngle: Math.atan2(input.mouseY - f.y, input.mouseX - f.x),
+      faceAngle: Math.atan2(wmy - f.y, wmx - f.x),
       lightAttack: false,
       heavyAttack: false,
       blockHeld: false,

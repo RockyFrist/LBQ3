@@ -36,8 +36,18 @@ window.addEventListener('keydown', (e) => {
 });
 
 function resize() {
-  canvas.width = Math.min(window.innerWidth, C.ARENA_W);
-  canvas.height = Math.min(window.innerHeight, C.ARENA_H);
+  const dpr = window.devicePixelRatio || 1;
+  const w = window.innerWidth;
+  const h = window.innerHeight;
+  canvas.width  = Math.round(w * dpr);
+  canvas.height = Math.round(h * dpr);
+  // CSS 尺寸 = 逻辑像素，确保不拉伸
+  canvas.style.width  = w + 'px';
+  canvas.style.height = h + 'px';
+  // 存储逻辑尺寸+DPR供所有模块使用
+  canvas._dpr    = dpr;
+  canvas._logicW = w;
+  canvas._logicH = h;
 }
 resize();
 window.addEventListener('resize', resize);
@@ -151,6 +161,8 @@ function loop(timestamp) {
   lastTime = timestamp;
 
   if (appState === 'menu') {
+    const dpr = canvas._dpr || 1;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     menu.update(dt);
     menu.draw();
     if (menu.result) {

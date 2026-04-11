@@ -7,16 +7,15 @@ export class Renderer {
     this.camera = camera;
   }
 
-  clear() {
+  clear(w, h) {
     const ctx = this.ctx;
     ctx.fillStyle = '#1a1a2e';
-    ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+    ctx.fillRect(0, 0, w || this.canvas.width, h || this.canvas.height);
   }
 
   drawGrid() {
     const ctx = this.ctx;
     ctx.save();
-    ctx.translate(this.camera.offsetX, this.camera.offsetY);
     ctx.strokeStyle = 'rgba(255,255,255,0.04)';
     ctx.lineWidth = 1;
     const step = 60;
@@ -38,7 +37,7 @@ export class Renderer {
     const ctx = this.ctx;
     const f = fighter;
     ctx.save();
-    ctx.translate(this.camera.offsetX + f.x, this.camera.offsetY + f.y);
+    ctx.translate(f.x, f.y);
 
     // 残影
     ctx.save();
@@ -48,7 +47,7 @@ export class Renderer {
       ctx.globalAlpha = a;
       ctx.fillStyle = f.color;
       ctx.beginPath();
-      ctx.arc(this.camera.offsetX + ai.x, this.camera.offsetY + ai.y, f.radius, 0, Math.PI * 2);
+      ctx.arc(ai.x, ai.y, f.radius, 0, Math.PI * 2);
       ctx.fill();
     }
     ctx.globalAlpha = 1;
@@ -495,16 +494,12 @@ export class Renderer {
 
   drawParticles(particleSystem) {
     const ctx = this.ctx;
-    ctx.save();
-    ctx.translate(this.camera.offsetX, this.camera.offsetY);
     particleSystem.draw(ctx);
-    ctx.restore();
   }
 
   drawFloatingTexts(texts) {
     const ctx = this.ctx;
     ctx.save();
-    ctx.translate(this.camera.offsetX, this.camera.offsetY);
     ctx.textAlign = 'center';
     for (const ft of texts) {
       const lifeRatio = ft.timer / ft.maxTimer;
@@ -544,21 +539,24 @@ export class Renderer {
     ctx.restore();
   }
 
-  drawScreenFlash(flash) {
+  drawScreenFlash(flash, w, h) {
     if (!flash || flash.timer <= 0) return;
     const alpha = flash.timer / flash.maxTimer;
     const ctx = this.ctx;
+    w = w || this.canvas._logicW || this.canvas.width;
+    h = h || this.canvas._logicH || this.canvas.height;
     ctx.save();
     ctx.globalAlpha = alpha;
     ctx.fillStyle = flash.color;
-    ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+    ctx.fillRect(0, 0, w, h);
     ctx.globalAlpha = 1;
     ctx.restore();
   }
 
-  drawSlowMoEffect(scale, timer) {
+  drawSlowMoEffect(scale, timer, w, h) {
     const ctx = this.ctx;
-    const w = this.canvas.width, h = this.canvas.height;
+    w = w || this.canvas._logicW || this.canvas.width;
+    h = h || this.canvas._logicH || this.canvas.height;
     const intensity = (1 - scale) * 0.18 * Math.min(1, timer * 3);
     ctx.save();
     // 暗角 vignette（中央透明，边缘变暗）— 不改变角色颜色

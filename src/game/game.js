@@ -17,6 +17,7 @@ export class Game {
     this.canvas = canvas;
     this.input = input;
     this.camera = new Camera();
+    this.camera.resize(canvas._logicW || canvas.width, canvas._logicH || canvas.height);
     this.particles = new ParticleSystem();
     this.renderer = new Renderer(canvas, this.camera);
     this.combat = new CombatSystem(this.particles, this.camera);
@@ -226,6 +227,14 @@ export class Game {
 
   update(dt) {
     const input = this.input;
+
+    // 同步视口尺寸（窗口可能被拉伸）
+    this.camera.resize(this.canvas._logicW || this.canvas.width, this.canvas._logicH || this.canvas.height);
+
+    // 将屏幕鼠标坐标转换为世界坐标（供 player faceAngle 使用）
+    const wm = this.camera.screenToWorld(input.mouseX, input.mouseY);
+    input._worldMouseX = wm.x;
+    input._worldMouseY = wm.y;
 
     // ESC 返回菜单
     if (input.pressed('Escape') && this.onExit) {
@@ -558,16 +567,29 @@ export class Game {
   }
 
   render() {
+    const dpr = this.canvas._dpr || 1;
+    const lw = this.canvas._logicW || this.canvas.width;
+    const lh = this.canvas._logicH || this.canvas.height;
+    const ctx = this.renderer.ctx;
+
+    // DPI 缩放：所有后续绘制均在逻辑像素坐标系下
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
     // 纯数据模式：只绘制结果
     if (this.testSimOnly && this.testDone) {
-      const ctx = this.canvas.getContext('2d');
       ctx.fillStyle = '#0a0a14';
-      ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+      ctx.fillRect(0, 0, lw, lh);
       this._drawTestResults();
       return;
     }
 
-    this.renderer.clear();
+    // 清屏（全屏逻辑尺寸）
+    this.renderer.clear(lw, lh);
+
+    // ===== 世界空间绘制（竞技场 + 角色 + 粒子 + 浮动文字） =====
+    ctx.save();
+    this.camera.applyWorldTransform(ctx);
+
     this.renderer.drawGrid();
 
     // 绘制角色（先画敌人再画玩家，玩家在上层）
@@ -582,12 +604,17 @@ export class Game {
     // 浮动战斗文字
     this.renderer.drawFloatingTexts(this.floatingTexts);
 
+    ctx.restore();
+    // ===== 世界空间结束 =====
+
+    // ===== 屏幕空间绘制（HUD、覆盖层等） =====
+
     // 屏幕闪光
-    this.renderer.drawScreenFlash(this.screenFlash);
+    this.renderer.drawScreenFlash(this.screenFlash, lw, lh);
 
     // 慢动作视觉
     if (this.timeScaleTimer > 0) {
-      this.renderer.drawSlowMoEffect(this.timeScale, this.timeScaleTimer);
+      this.renderer.drawSlowMoEffect(this.timeScale, this.timeScaleTimer, lw, lh);
     }
 
     // HUD
@@ -617,12 +644,14 @@ export class Game {
 
   _drawModeLabel(text) {
     const ctx = this.canvas.getContext('2d');
+    const lw = this.canvas._logicW || this.canvas.width;
+    const lh = this.canvas._logicH || this.canvas.height;
     ctx.fillStyle = 'rgba(0,0,0,0.5)';
-    ctx.fillRect(0, this.canvas.height - 30, this.canvas.width, 30);
+    ctx.fillRect(0, lh - 30, lw, 30);
     ctx.fillStyle = '#aaa';
     ctx.font = '13px "Microsoft YaHei", sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText(text, this.canvas.width / 2, this.canvas.height - 10);
+    ctx.fillText(text, lw / 2, lh - 10);
   }
 
   // ===================== 江湖行逻辑 =====================
@@ -737,8 +766,8 @@ export class Game {
 
   _drawJianghuOverlay() {
     const ctx = this.canvas.getContext('2d');
-    const cw = this.canvas.width;
-    const ch = this.canvas.height;
+    const cw = this.canvas._logicW || this.canvas.width;
+    const ch = this.canvas._logicH || this.canvas.height;
     const stage = JIANGHU_STAGES[this.jianghuStage];
 
     if (this.jianghuPhase === 'story' && stage) {

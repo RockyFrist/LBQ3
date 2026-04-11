@@ -20,7 +20,7 @@ export class UI {
 
   draw(player, targetEnemy, enemies, difficulty) {
     const ctx = this.ctx;
-    const cw = this.canvas.width;
+    const cw = this.canvas._logicW || this.canvas.width;
 
     // 玩家状态（左上）
     this._drawFighterHUD(ctx, player, 20, 20, false);
