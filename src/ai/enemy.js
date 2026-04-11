@@ -137,10 +137,12 @@ export class Enemy {
     const hasParryBoost = f.parryBoost && f.parryBoost.timer > 0;
     if (justExitedParryStunned) {
       // AI攻击被格挡后恢复：清除recover定时器，允许立即行动
+      // 设置blockCooldown防止立刻再举盾
       this.aiState = 'approach';
       this.aiTimer = 0;
       this.attackCooldown = 0;
       this.thinkCD = 0;
+      this.blockCooldown = 1.0;
     }
     if (hasParryBoost && !this._wasParryBoosted && f.state === 'idle') {
       // AI成功格挡获得parryBoost → 立即切换到进攻模式利用增益
@@ -282,16 +284,9 @@ export class Enemy {
           this.aiTimer = 0.25 + Math.random() * 0.15;
           this._logDecision(this._gameTime, 'stagger_react', 'block', { dist: +d.toFixed(0), opState: pf.state, opPhase: pf.phase });
         } else if (incomingLight) {
-          // 轻击来袭 → 格挡/闪避/霸体交换
+          // 轻击来袭 → 闪避或霸体交换
           const diffScaleD = (this.difficulty - 1) / 4;
-          const stmLowS = f.stamina <= 2;
-          if (stmLowS && this.blockCooldown <= 0 && Math.random() < 0.55) {
-            // 体力低时用格挡替代闪避
-            cmd.blockHeld = true;
-            this.aiState = 'defend';
-            this.aiTimer = 0.2 + Math.random() * 0.15;
-            this._logDecision(this._gameTime, 'stagger_react', 'block_low_stam', { dist: +d.toFixed(0), opState: pf.state });
-          } else if (Math.random() < cfg.dodgeChance * 1.5 && f.stamina >= C.DODGE_COST) {
+          if (Math.random() < cfg.dodgeChance * 1.5 && f.stamina >= C.DODGE_COST) {
             cmd.dodge = true;
             cmd.dodgeAngle = ang + (Math.random() < 0.5 ? Math.PI / 2 : -Math.PI / 2);
             this.aiState = 'recover';
@@ -353,17 +348,8 @@ export class Enemy {
       return cmd;
     }
 
-    // 格挡被弹状态：AI根据难度决定是否按防御（乒乓）
+    // 格挡被弹状态：不举盾（被弹后应优先反击，格挡由恢复后决策处理）
     if (f.state === 'parryStunned') {
-      // 只在对手正在攻击时才防御（避免对手不动时莫名招架）
-      const opAttacking = pf.state === 'lightAttack' || pf.state === 'heavyAttack' ||
-                           pf.state === 'parryCounter';
-      if (opAttacking) {
-        const pingPongChance = cfg.reactChance * 0.8;
-        if (Math.random() < pingPongChance) {
-          cmd.blockHeld = true;
-        }
-      }
       return cmd;
     }
 
@@ -378,7 +364,7 @@ export class Enemy {
         this.aiState = 'recover';
         this.aiTimer = 0.10;
         this.attackCooldown = 0;
-        this.blockCooldown = 0.35; // 格挡结束后短暂不允许再次举盾
+        this.blockCooldown = 5.0; // 格挡结束后冷却防止频繁举盾
       }
       return cmd;
     }
@@ -454,30 +440,25 @@ export class Enemy {
           this.aiTimer = 0.4;
         }
       } else if (!isHeavyThreat && Math.random() < identifyChance) {
-        // === 识别轻击 → 多样化反应（格挡/反击/闪避）===
+        // === 识别轻击 → 反击/闪避（体力低时少量格挡） ===
         const stmLowL = f.stamina <= 2;
-        if (stmLowL && this.blockCooldown <= 0 && Math.random() < 0.6) {
-          // 体力低时优先格挡（闪避太贵）
+        if (stmLowL && this.blockCooldown <= 0 && Math.random() < 0.20) {
+          // 体力低时少量格挡（闪避太贵）
           this.aiState = 'defend';
-          this.blockDuration = cfg.blockDurBase * 0.6 + Math.random() * 0.2;
+          this.blockDuration = cfg.blockDurBase * 0.5 + Math.random() * 0.2;
           this.aiTimer = this.blockDuration;
-        } else if (d < 70 && Math.random() < 0.45) {
+        } else if (d < 70 && Math.random() < 0.55) {
           cmd.lightAttack = true;
           this.comboTarget = Math.min(2, cfg.maxCombo);
           this.comboCount = 1;
           this.aiState = 'recover';
           this.aiTimer = 0.6;
-        } else if (f.stamina >= C.DODGE_COST && Math.random() < 0.35) {
+        } else if (f.stamina >= C.DODGE_COST && Math.random() < 0.5) {
           const dodgeA = ang + (Math.random() < 0.5 ? Math.PI / 2 : -Math.PI / 2);
           cmd.dodge = true;
           cmd.dodgeAngle = dodgeA;
           this.aiState = 'recover';
           this.aiTimer = 0.4;
-        } else if (this.blockCooldown <= 0 && Math.random() < 0.30) {
-          // 随机格挡（应对连招中重击混入）
-          this.aiState = 'defend';
-          this.blockDuration = cfg.blockDurBase * 0.5 + Math.random() * 0.2;
-          this.aiTimer = this.blockDuration;
         } else {
           cmd.heavyAttack = true;
           this.aiState = 'recover';
@@ -489,8 +470,8 @@ export class Enemy {
         const r = Math.random();
         const opponentHeavyRate = this._getPlayerHeavyRate();
         // 只有对手重击率较高时才考虑格挡（否则大概率是轻击，格挡无意义）
-        const adjustedBlockChance = cfg.blockChance + (opponentHeavyRate > 0.15 ? opponentHeavyRate * 0.35 : 0);
-        const adjustedDodgeChance = cfg.dodgeChance * (f.stamina <= 2 ? 0.3 : 1.0);
+        const adjustedBlockChance = cfg.blockChance + (opponentHeavyRate > 0.20 ? cfg.reactChance * opponentHeavyRate * 0.5 : 0);
+        const adjustedDodgeChance = cfg.dodgeChance;
 
         if (r < adjustedBlockChance && this.blockCooldown <= 0) {
           this.aiState = 'defend';
@@ -612,7 +593,7 @@ export class Enemy {
       case 'defend': {
         cmd.blockHeld = true;
         if (this.aiTimer <= 0) {
-          this.blockCooldown = 0.35; // 格挡结束后短暂不再举盾
+          this.blockCooldown = 5.0; // 格挡结束后冷却防止频繁举盾
           // 防御结束后：近距离优先反击，远距离回到接近
           if (d < 80 && this.attackCooldown <= 0) {
             if (cfg.feintChance > 0.2 && f.stamina >= C.FEINT_COST + 1 &&
@@ -825,19 +806,6 @@ export class Enemy {
       return;
     }
 
-    // 主动防守：低体力时积极格挡（闪避太贵），近距时偶尔防御
-    if (d < cfg.approachDist + 20 && this.blockCooldown <= 0) {
-      const staminaLow = f.stamina <= 2;
-      const blockProb = staminaLow ? cfg.blockChance * 2.5 : cfg.blockChance * 0.4;
-      if (Math.random() < blockProb) {
-        this.aiState = 'defend';
-        this.blockDuration = cfg.blockDurBase + Math.random() * 0.3;
-        this.aiTimer = this.blockDuration;
-        this._logDecision(this._gameTime, 'decide', 'proactive_block', { dist: +d.toFixed(0), stamina: f.stamina });
-        return;
-      }
-    }
-
     if (r < cfg.attackRate) {
       // 主动变招：有概率不直接攻击，而是发起变招计划
       if (cfg.feintChance > 0.1 && f.stamina >= C.FEINT_COST + 1 &&
@@ -859,18 +827,12 @@ export class Enemy {
       this.aiState = 'heavy';
       this._logDecision(this._gameTime, 'decide', 'heavy', { dist: +d.toFixed(0) });
     } else {
-      // 格挡已在上方 proactive_block 处理，此处偏向进攻或后撤
-      const rr = Math.random();
-      if (rr < 0.50) {
+      // 不主动举盾（格挡由reactToHeavy和重击识别处理）
+      if (Math.random() < 0.65) {
+        // 大概率再次进攻
         this.aiState = 'attack';
         this.comboTarget = 1 + Math.floor(Math.random() * cfg.maxCombo);
         this.comboCount = 0;
-      } else if (rr < 0.70 && this.blockCooldown <= 0) {
-        // 防御姿态
-        this.aiState = 'defend';
-        this.blockDuration = cfg.blockDurBase + Math.random() * 0.3;
-        this.aiTimer = this.blockDuration;
-        this._logDecision(this._gameTime, 'decide', 'defensive_block', { dist: +d.toFixed(0) });
       } else {
         this.aiState = 'retreat';
         this.aiTimer = 0.3 + Math.random() * 0.5;

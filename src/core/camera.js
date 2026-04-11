@@ -16,7 +16,7 @@ export class Camera {
 
     // 缩放控制（用户可调）
     this.zoomExtra = 1.5;        // 默认拉近 25%
-    this.zoomExtraDefault = 1.25;
+    this.zoomExtraDefault = 1.5;
     this.zoomMin = 0.8;
     this.zoomMax = 2.0;
 

@@ -110,7 +110,7 @@ export const planMethods = {
       }
     }
 
-    // === 被弹恢复 → 规划防守反击 ===
+    // === 被弹恢复 → 规划反击 ===
     if (prev === 'parryStunned' && cur === 'idle') {
       if (Math.random() < smartness * 0.7) {
         this._createRecoveryPlan(f, pf, d, cfg);
@@ -190,15 +190,27 @@ export const planMethods = {
     }
   },
 
-  // --- 被弹恢复后计划 ---
+  // --- 被弹恢复后计划（反击+回避混合，避免自动拼刀循环） ---
   _createRecoveryPlan(f, pf, d, cfg) {
     const r = Math.random();
-    if (r < 0.35) {
+    if (r < 0.30) {
+      // 直接轻击反击（可能拼刀）
       this._initPlan([{ act: 'light', dur: 1.0 }]);
-    } else if (r < 0.60) {
-      this._initPlan([{ act: 'dodge', dur: 0.5 }]);
-    } else if (r < 0.80 && this.difficulty >= 3) {
+    } else if (r < 0.45 && this.difficulty >= 3) {
+      // 重击反击
       this._initPlan([{ act: 'heavy', dur: 1.5 }]);
+    } else if (r < 0.65) {
+      // 等一拍再轻击（错开对手攻击时机，避免自动拼刀）
+      this._initPlan([
+        { act: 'wait', dur: 0.15 + Math.random() * 0.15 },
+        { act: 'light', dur: 1.0 },
+      ]);
+    } else if (r < 0.80 && f.stamina >= C.DODGE_COST) {
+      // 闪避打断循环
+      this._initPlan([{ act: 'dodge', dur: 0.5 }]);
+    } else {
+      // 什么都不做（让对手的攻击打过来，正常被命中或被格挡）
+      // 不创建plan，走正常决策流程
     }
   },
 
@@ -340,18 +352,18 @@ export const planMethods = {
     const smartness = cfg.heavyReactMult;
 
     // 权重分配：格挡只是选项之一，不是默认反应
-    let wBlock = 0.30;
+    let wBlock = 0.18;
     let wRead  = 0.00;  // 移除heavy_read（其本质就是延迟格挡）
-    let wDodge = 0.20;
-    let wTrade = 0.15;
+    let wDodge = 0.22;
+    let wTrade = 0.18;
     let wHeavy = 0.05;
 
     // 对手经常真释放重击 → 格挡收益高，提高格挡权重
     if (releaseRate > 0.80) {
-      wBlock += 0.30;
-      wDodge -= 0.10;
-    } else if (releaseRate > 0.55) {
       wBlock += 0.20;
+      wDodge -= 0.05;
+    } else if (releaseRate > 0.55) {
+      wBlock += 0.10;
     } else {
       // 对手爱变招 → 格挡风险高（可能被骗），多用交换/闪避
       wTrade += 0.15;
@@ -360,8 +372,8 @@ export const planMethods = {
 
     if (staminaLow) {
       // 体力低时不能闪避，转为格挡
-      wBlock += wDodge * 0.8;
-      wDodge *= 0.2;
+      wBlock += wDodge * 0.6;
+      wDodge *= 0.4;
     }
 
     const total = wBlock + wDodge + wRead + wTrade + wHeavy;

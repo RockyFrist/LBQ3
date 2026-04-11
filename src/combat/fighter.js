@@ -562,8 +562,13 @@ export class Fighter {
 
   // 格挡被弹后：短暂硬直→回到idle→二次博弈决策
   update_parryStunned(dt, cmd, gameTime) {
-    // 预输入缓冲（在被弹期间记录操作意图，回到idle后立即执行）
-    this._bufferFromCmd(cmd);
+    // 预输入缓冲：只缓冲攻击/闪避，不缓冲格挡
+    // （被弹后应优先反击创造拼刀，而非再次举盾）
+    if (cmd) {
+      if (cmd.lightAttack) this.bufferInput('lightAttack');
+      else if (cmd.heavyAttack) this.bufferInput('heavyAttack');
+      else if (cmd.dodge) this.bufferInput('dodge', { angle: cmd.dodgeAngle });
+    }
     if (this.stateTimer >= this.staggerDuration) {
       this.setState('idle');
     }
