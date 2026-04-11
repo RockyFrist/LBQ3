@@ -101,6 +101,12 @@ export class Fighter {
 
     // 打空追踪（供外部读取）
     this.lastWhiff = null;
+
+    // 格挡成功后防止持续按住Space误入blocking
+    this.blockSuppressed = false;
+
+    // 格挡成功后短暂停顿（格挡方也无法立即行动，与攻击方同步解锁形成二次博弈）
+    this.parryActionDelay = 0;
   }
 
   // ===================== 状态切换 =====================
@@ -108,6 +114,10 @@ export class Fighter {
     // 退出旧状态
     if (this.state === 'blocking') {
       this.staminaRegenPaused = false;
+    }
+    // 任何非idle状态转换都清除格挡抑制（已完成首次决策后恢复正常格挡能力）
+    if (this.blockSuppressed && s !== 'idle') {
+      this.blockSuppressed = false;
     }
     this.state = s;
     this.stateTimer = 0;
@@ -249,6 +259,9 @@ export class Fighter {
       }
     }
 
+    // 格挡成功后行动延迟计时
+    if (this.parryActionDelay > 0) this.parryActionDelay -= dt;
+
     this.updateStamina(dt);
     this.updateExhaustion(dt);
     this.updateAfterimages(dt);
@@ -271,7 +284,7 @@ export class Fighter {
     if (!cmd) return;
     if (cmd.lightAttack) this.bufferInput('lightAttack');
     else if (cmd.heavyAttack) this.bufferInput('heavyAttack');
-    else if (cmd.blockHeld) this.bufferInput('block');
+    else if (cmd.blockHeld && !this.blockSuppressed) this.bufferInput('block');
     else if (cmd.dodge) this.bufferInput('dodge', { angle: cmd.dodgeAngle });
   }
 
@@ -288,6 +301,7 @@ export class Fighter {
         this.setState('heavyAttack');
         return true;
       case 'block':
+        if (this.blockSuppressed) return false;
         this.setState('blocking', { time: gameTime });
         return true;
       case 'dodge':
@@ -302,6 +316,13 @@ export class Fighter {
 
   // ===================== 各状态更新 =====================
   update_idle(dt, cmd, gameTime) {
+    // 格挡成功后短暂停顿：只允许移动/转向，缓冲意图等延迟结束后执行
+    if (this.parryActionDelay > 0) {
+      if (cmd && cmd.faceAngle !== undefined) this.facing = cmd.faceAngle;
+      this._bufferFromCmd(cmd);
+      return;
+    }
+
     // 先尝试消费缓冲输入
     if (this._consumeBuffer(gameTime)) return;
 
@@ -312,10 +333,7 @@ export class Fighter {
       this.setState('dodging', { angle: cmd.dodgeAngle });
       return;
     }
-    if (cmd.blockHeld) {
-      this.setState('blocking', { time: gameTime });
-      return;
-    }
+    // 攻击优先于格挡：玩家格挡后可能仍按着Space，此时点击攻击应优先出招
     if (cmd.lightAttack) {
       this.setState('lightAttack', { comboStep: 1 });
       return;
@@ -323,6 +341,15 @@ export class Fighter {
     if (cmd.heavyAttack) {
       this.setState('heavyAttack');
       return;
+    }
+    if (cmd.blockHeld) {
+      if (!this.blockSuppressed) {
+        this.setState('blocking', { time: gameTime });
+        return;
+      }
+    } else {
+      // Space松开后解除抑制，下次按Space可正常格挡
+      this.blockSuppressed = false;
     }
   }
 
@@ -401,9 +428,14 @@ export class Fighter {
       if (cmd && this.canFeint && this.hasHit.size === 0 && this.stamina >= C.FEINT_COST) {
         if (this._tryFeint(cmd, gameTime)) return;
       }
-      // 轻击连击衔接
+      // 轻击连击衔接（支持buffer输入：玩家在active阶段点击的攻击也能触发连击）
+      const wantsLight = (cmd && cmd.lightAttack) ||
+        (this.inputBuffer && this.inputBuffer.action === 'lightAttack');
       if (this.attackType === 'light' && this.comboStep < 3 &&
-          cmd && cmd.lightAttack && this.phaseTimer < C.LIGHT_COMBO_WINDOW) {
+          wantsLight && this.phaseTimer < C.LIGHT_COMBO_WINDOW) {
+        if (this.inputBuffer && this.inputBuffer.action === 'lightAttack') {
+          this.inputBuffer = null; // 消费buffer
+        }
         this.setState('lightAttack', { comboStep: this.comboStep + 1, canFeint: this.canFeint });
         return;
       }
@@ -510,14 +542,9 @@ export class Fighter {
     }
   }
 
-  // 格挡被弹后：可以按防御进入blocking（乒乓），或者硬吃反击
+  // 格挡被弹后：短暂硬直→回到idle→二次博弈决策
   update_parryStunned(dt, cmd, gameTime) {
-    if (cmd && cmd.blockHeld && this.stateTimer >= 0.18) {
-      // 0.18s延迟：保证格挡方增益轻击能可靠命中
-      this.setState('blocking', { time: gameTime });
-      return;
-    }
-    // 预输入缓冲（在被弹期间记录操作意图）
+    // 预输入缓冲（在被弹期间记录操作意图，回到idle后立即执行）
     this._bufferFromCmd(cmd);
     if (this.stateTimer >= this.staggerDuration) {
       this.setState('idle');

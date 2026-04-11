@@ -232,6 +232,12 @@ export class CombatSystem {
     const boost = C.PARRY_BOOST[parryLevel];
     target.parryBoost = { mult: boost.mult, timer: boost.duration };
 
+    // 防止格挡成功后因Space仍然按住而误入blocking
+    target.blockSuppressed = true;
+
+    // 格挡方也有短暂停顿，与攻击方stagger同步解锁，形成真正二次博弈
+    target.parryActionDelay = result.parryStagger * 0.4;
+
     // 特效
     const sparkCount = parryLevel === 'precise' ? 15 : parryLevel === 'semi' ? 10 : 6;
     this.particles.sparks(mx, my, ang + Math.PI, sparkCount);

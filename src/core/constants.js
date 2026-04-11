@@ -45,9 +45,9 @@ export const SEMI_PARRY_WINDOW    = 0.55;
 // parryKnockback: 格挡后攻击方被推开距离（< 反击射程65px）
 // hitFreeze: 格挡瞬间双方冻结时间（只狼式识破定格）
 export const PARRY_RESULTS = {
-  precise:    { selfCost: 0, enemyDrain: 2, counterStartup: 0.12, parryStagger: 0.40, parryKnockback: 10, hitFreeze: 0.18 },
-  semi:       { selfCost: 0, enemyDrain: 1, counterStartup: 0.22, parryStagger: 0.45, parryKnockback: 12, hitFreeze: 0.12 },
-  nonPrecise: { selfCost: 2, enemyDrain: 1, counterStartup: 0.38, parryStagger: 0.50, parryKnockback: 15, hitFreeze: 0.06 },
+  precise:    { selfCost: 0, enemyDrain: 2, counterStartup: 0.12, parryStagger: 0.10, parryKnockback: 10, hitFreeze: 0.18 },
+  semi:       { selfCost: 0, enemyDrain: 1, counterStartup: 0.22, parryStagger: 0.10, parryKnockback: 12, hitFreeze: 0.12 },
+  nonPrecise: { selfCost: 2, enemyDrain: 1, counterStartup: 0.38, parryStagger: 0.10, parryKnockback: 15, hitFreeze: 0.06 },
 };
 // 格挡加速增益（格挡成功后下次攻击前摇压缩）
 // 设计目标：二次博弈——格挡方略有先手但不保证命中，双方同时出手
@@ -60,7 +60,7 @@ export const PARRY_COUNTER_ACTIVE   = 0.12;
 export const PARRY_COUNTER_RECOVERY = 0.30;
 
 // ============ 预输入缓冲 ============
-export const INPUT_BUFFER_DURATION  = 0.25; // 预输入缓冲窗口（动作游戏标准约0.2-0.3s）
+export const INPUT_BUFFER_DURATION  = 0.25; // 预输入缓冲窗口（动作游戏标准0.2-0.3s，略宽确保慢动作下不过期）
 export const PARRY_COUNTER_RANGE    = 65;
 export const PARRY_COUNTER_ARC      = Math.PI * 0.35;
 export const PARRY_COUNTER_DAMAGE   = 15;

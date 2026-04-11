@@ -134,7 +134,7 @@ export class UI {
         stateColor = '#ff8800';
         break;
       case 'parryStunned':
-        stateText = '被弹!按空格招架';
+        stateText = '武器被弹!';
         stateColor = '#ffcc33';
         break;
       case 'parryCounter':

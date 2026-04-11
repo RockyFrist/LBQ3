@@ -260,6 +260,19 @@ export class Game {
     // 冻结帧（hitstop）
     if (this.hitFreezeTimer > 0) {
       this.hitFreezeTimer -= dt;
+
+      // 冻结期间仍然采集玩家输入到缓冲（防止点击被吞）
+      if (this.mode === 'pvai' || this.mode === 'wusheng') {
+        const freezeCmd = this.player.getCommands(this.input);
+        const pf = this.player.fighter;
+        // 只缓冲攻击/闪避意图，不缓冲持续按住的格挡（避免格挡后误入blocking）
+        if (freezeCmd.lightAttack) pf.bufferInput('lightAttack');
+        else if (freezeCmd.heavyAttack) pf.bufferInput('heavyAttack');
+        else if (freezeCmd.dodge) pf.bufferInput('dodge', { angle: freezeCmd.dodgeAngle });
+        // Freeze期间松开Space则解除blockSuppressed，后续可正常格挡
+        if (!freezeCmd.blockHeld) pf.blockSuppressed = false;
+      }
+
       if (this.mode !== 'test') {
         this.particles.update(dt);
         this.camera.update(dt);
