@@ -113,6 +113,50 @@ export class Enemy {
     const cfg = this._cfg;
     this._gameTime += dt;
 
+    // ---- 教学模式特殊行为 ----
+    if (this._tutForcePassive) {
+      // 被动模式：面朝玩家站立不动
+      return { moveX: 0, moveY: 0, faceAngle: ang, lightAttack: false, heavyAttack: false, blockHeld: false, dodge: false, dodgeAngle: 0 };
+    }
+    if (this._tutForceAttack) {
+      // 攻击模式：缓慢靠近并定期轻击
+      this._tutAtkCD = (this._tutAtkCD || 0) - dt;
+      const cmd = { moveX: 0, moveY: 0, faceAngle: ang, lightAttack: false, heavyAttack: false, blockHeld: false, dodge: false, dodgeAngle: 0 };
+      if (d > 60) {
+        cmd.moveX = Math.cos(ang) * 0.5;
+        cmd.moveY = Math.sin(ang) * 0.5;
+      }
+      if (d < 70 && this._tutAtkCD <= 0 && f.state === 'idle') {
+        cmd.lightAttack = true;
+        this._tutAtkCD = 1.8; // 每1.8秒攻击一次，给玩家充足反应时间
+      }
+      return cmd;
+    }
+    if (this._tutForceHeavy) {
+      // 重击模式：缓慢靠近并定期重击
+      this._tutAtkCD = (this._tutAtkCD || 0) - dt;
+      const interval = this._tutAtkInterval || 2.2;
+      const cmd = { moveX: 0, moveY: 0, faceAngle: ang, lightAttack: false, heavyAttack: false, blockHeld: false, dodge: false, dodgeAngle: 0 };
+      if (d > 60) {
+        cmd.moveX = Math.cos(ang) * 0.5;
+        cmd.moveY = Math.sin(ang) * 0.5;
+      }
+      if (d < 70 && this._tutAtkCD <= 0 && f.state === 'idle') {
+        cmd.heavyAttack = true;
+        this._tutAtkCD = interval;
+      }
+      return cmd;
+    }
+    if (this._tutForceBlock) {
+      // 格挡模式：靠近并持续格挡
+      const cmd = { moveX: 0, moveY: 0, faceAngle: ang, lightAttack: false, heavyAttack: false, blockHeld: true, dodge: false, dodgeAngle: 0 };
+      if (d > 55) {
+        cmd.moveX = Math.cos(ang) * 0.5;
+        cmd.moveY = Math.sin(ang) * 0.5;
+      }
+      return cmd;
+    }
+
     // 懒初始化：确保 fighter 上有完美闪避概率（test-runner 可能替换 fighter）
     if (f.perfectDodgeChance === undefined) {
       f.perfectDodgeChance = cfg.perfectDodgeChance ?? 1.0;

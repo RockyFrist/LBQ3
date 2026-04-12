@@ -4,8 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>冷兵器战斗系统 Demo</title>
-  <script type="module" crossorigin src="./assets/index-MbSaY_tv.js"></script>
-  <link rel="stylesheet" crossorigin href="./assets/index-MaSTv8De.css">
+  <script type="module" crossorigin src="./assets/index-B_t2qlsP.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-wjDhdQOo.css">
 </head>
 <body>
   <div id="game-container">
@@ -107,6 +107,32 @@
           按 <span class="key-badge">H</span> 关闭帮助并继续游戏
           <button id="help-close-btn" style="margin-left:16px;padding:4px 18px;font-size:15px;border-radius:6px;border:1px solid rgba(100,150,255,0.3);background:rgba(40,50,80,0.8);color:#cce;cursor:pointer;">✕ 关闭</button>
         </div>
+      </div>
+    </div>
+
+    <!-- 联机房间面板 -->
+    <div id="room-overlay" class="hidden">
+      <div class="room-panel">
+        <div class="room-header">🌐 联机对战</div>
+        <div class="room-body">
+          <div class="room-row">
+            <label>服务器地址</label>
+            <input id="room-server" type="text" value="localhost:3000" spellcheck="false" autocomplete="off" />
+          </div>
+          <div class="room-actions" id="room-actions-init">
+            <button id="btn-create-room" class="room-btn">创建房间</button>
+          </div>
+          <div class="room-join-row">
+            <input id="room-code-input" type="text" maxlength="4" placeholder="输入4位房间号" spellcheck="false" autocomplete="off" />
+            <button id="btn-confirm-join" class="room-btn">加入房间</button>
+          </div>
+          <div id="room-status" class="room-status"></div>
+          <div id="room-code-display" class="room-code hidden">
+            房间号: <span id="room-code-text"></span>
+            <button id="btn-copy-code" class="room-btn room-copy-btn" title="复制房间号">📋 复制</button>
+          </div>
+        </div>
+        <button id="btn-room-back" class="room-btn room-back">返回菜单</button>
       </div>
     </div>
   </div>

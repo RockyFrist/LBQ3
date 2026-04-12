@@ -58,7 +58,15 @@ export class Menu {
     const L = this._layoutMain();
     for (const btn of L.buttons) {
       if (this._hit(mx, my, btn.x, btn.y, btn.w, btn.h)) {
-        this.page = btn.id;
+        if (btn.id === 'online' && this._onOpenOnline) {
+          this._onOpenOnline();
+        } else if (btn.id === 'tutorial') {
+          // 教学模式直接开始
+          this.result = { mode: 'tutorial' };
+          this._clickCooldown = 0.3;
+        } else {
+          this.page = btn.id;
+        }
         this._clickCooldown = 0.2;
         return;
       }
@@ -262,18 +270,22 @@ export class Menu {
     const ch = this.canvas._logicH || this.canvas.height;
     const cx = cw / 2;
     const btnW = 340;
-    const btnH = 64;
-    const gap = 18;
-    const startY = ch * 0.25;
+    const btnH = 58;
+    const gap = 14;
+    const startY = ch * 0.22;
 
     return {
       buttons: [
-        { id: 'pvai', label: '⚔ 对战模式', desc: '玩家 vs AI，键鼠操作', accent: '#4499ff',
+        { id: 'tutorial', label: '📖 教学模式', desc: '分步教学所有操作与博弈技巧', accent: '#44ff88',
           x: cx - btnW / 2, y: startY, w: btnW, h: btnH },
-        { id: 'entertainment', label: '🎮 娱乐模式', desc: '江湖行 · 武圣挑战 · 连战 · 自由训练', accent: '#ff00ff',
+        { id: 'pvai', label: '⚔ 对战模式', desc: '玩家 vs AI，键鼠操作', accent: '#4499ff',
           x: cx - btnW / 2, y: startY + btnH + gap, w: btnW, h: btnH },
-        { id: 'spectate', label: '🦗 斗蛐蛐', desc: '选择双方AI难度，观看互斗', accent: '#ffaa33',
+        { id: 'online', label: '🌐 联机对战', desc: '局域网双人对战', accent: '#44ffaa',
           x: cx - btnW / 2, y: startY + (btnH + gap) * 2, w: btnW, h: btnH },
+        { id: 'entertainment', label: '🎮 娱乐模式', desc: '江湖行 · 武圣挑战 · 连战 · 自由训练', accent: '#ff00ff',
+          x: cx - btnW / 2, y: startY + (btnH + gap) * 3, w: btnW, h: btnH },
+        { id: 'spectate', label: '🦗 斗蛐蛐', desc: '选择双方AI难度，观看互斗', accent: '#ffaa33',
+          x: cx - btnW / 2, y: startY + (btnH + gap) * 4, w: btnW, h: btnH },
       ],
       helpBtn: { x: cw - 110, y: ch - 44, w: 96, h: 32 },
       testBtn: { x: 12, y: ch - 44, w: 106, h: 32 },
