@@ -1,5 +1,5 @@
 // ===================== 开始菜单（多页设计） =====================
-const GAME_VERSION = 'v0.8.0';
+const GAME_VERSION = 'v0.8.6';
 
 export class Menu {
   constructor(canvas, input) {
@@ -853,8 +853,8 @@ export class Menu {
       return;
     }
     if (this._hit(mx, my, L.trainingBtn.x, L.trainingBtn.y, L.trainingBtn.w, L.trainingBtn.h)) {
-      this.page = 'training';
-      this._clickCooldown = 0.2;
+      this.result = { mode: 'training', diffA: 1, diffB: 3, rounds: 0, simOnly: false };
+      this._clickCooldown = 0.3;
       return;
     }
     if (this._hit(mx, my, L.backBtn.x, L.backBtn.y, L.backBtn.w, L.backBtn.h)) {

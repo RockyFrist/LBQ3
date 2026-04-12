@@ -129,7 +129,12 @@ function setupTrainCallbacks(m) {
 
 function startGame(result) {
   appState = 'playing';
-  if (controlsHelp) controlsHelp.style.display = result.mode === 'pvai' || result.mode === 'wusheng' || result.mode === 'jianghu' || result.mode === 'training' || result.mode === 'chainKill' || result.mode === 'online_host' || result.mode === 'online_guest' || result.mode === 'tutorial' ? '' : 'none';
+  // 根据模式显示/隐藏右侧快捷键提示，并更新内容
+  const showControls = result.mode === 'pvai' || result.mode === 'wusheng' || result.mode === 'chainKill';
+  if (controlsHelp) {
+    controlsHelp.style.display = showControls ? '' : 'none';
+    if (showControls) _updateControlsHelp(result.mode);
+  }
   game = new Game(canvas, input, {
     mode: result.mode,
     diffA: result.diffA,
@@ -158,6 +163,28 @@ function returnToMenu() {
   setupOnlineCallback(menu);
   if (controlsHelp) controlsHelp.style.display = 'none';
   if (helpOverlay) helpOverlay.classList.add('hidden');
+}
+
+/** 根据游戏模式更新右侧快捷键提示内容 */
+function _updateControlsHelp(mode) {
+  if (!controlsHelp) return;
+  const lines = [
+    'WASD 移动',
+    '左键 轻击',
+    '右键 重击',
+    '空格 招架',
+    'Shift+方向 闪避',
+    'F 绝技(炁满)',
+  ];
+  if (mode === 'training') {
+    lines.push('E 召唤敌人', 'I 召唤队友', 'O 充满炁', 'P 暂停/恢复AI', 'R 重置', '1-5 难度', 'H 帮助');
+  } else if (mode === 'chainKill') {
+    lines.push('R 重置', 'H 帮助');
+  } else {
+    // pvai, wusheng
+    lines.push('E 刷出敌人', 'I 召唤队友', 'R 重置', '1-5 难度', 'H 帮助');
+  }
+  controlsHelp.innerHTML = lines.map(l => `<div>${l}</div>`).join('');
 }
 
 // ===================== 联机房间控制器 =====================

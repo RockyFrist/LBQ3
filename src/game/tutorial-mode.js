@@ -58,6 +58,14 @@ export const TUTORIAL_STEPS = [
     setup(g) { g._tutSOParry = false; g._tutSOClash = false; },
   },
   {
+    id: 'ultimate', title: '炁与拔刀', dummyMode: 'passive',
+    subs: [
+      { id: 'fillQi', desc: '攻击敌人积攒炁至满', hint: '攻击命中可获得炁能量 — 炁条在血量条下方', check(g) { return g._tutQiFull; } },
+      { id: 'useUlt', desc: '按 F 释放拔刀', hint: '炁满后按 F 释放绝技「拔刀」— 面前乱刀连斩！', check(g) { return g._tutUltimateUsed; } },
+    ],
+    setup(g) { g._tutQiFull = false; g._tutUltimateUsed = false; },
+  },
+  {
     id: 'freePlay', title: '综合训练', dummyMode: 'ai',
     subs: [
       { id: 'kill', desc: '击败AI敌人', hint: '运用所有技能自由对战 — 击败敌人即可完成！', check(g) { return g._tutKillCount >= 1; } },
@@ -95,6 +103,7 @@ export const tutorialModeMethods = {
     this._tutBlockBreakSeen = false; this._tutExecutionSeen = false;
     this._tutSOParry = false; this._tutSOClash = false;
     this._tutKillCount = 0;
+    this._tutQiFull = false; this._tutUltimateUsed = false;
   },
 
   /** 跳转到指定教学步骤 */
@@ -146,6 +155,12 @@ export const tutorialModeMethods = {
     // ESC退出
     if (input.pressed('Escape')) {
       if (this.onExit) { this.onExit(); return; }
+    }
+
+    // R键重置当前步骤
+    if (input.pressed('KeyR') && !this._tutAllDone) {
+      this._tutJumpToStep(this._tutStep);
+      return;
     }
 
     // 左侧清单点击跳转
@@ -228,6 +243,15 @@ export const tutorialModeMethods = {
       if (evt.type === 'lightClash' || evt.type === 'heavyClash') {
         if (step.id === 'secondOrder') this._tutSOClash = true;
       }
+      // 绝技
+      if (evt.type === 'ultimate' && evt.attacker === pf) {
+        this._tutUltimateUsed = true;
+      }
+    }
+
+    // 炁满检测
+    if (pf.qi >= (pf.qiMax || C.QI_MAX)) {
+      this._tutQiFull = true;
     }
 
     // 闪避检测（每次进入dodge状态只计一次，修复多帧重复计数）
@@ -303,6 +327,10 @@ export const tutorialModeMethods = {
     // 木桩死亡后自动复活（综合训练和处决教学除外）
     if (step.id !== 'freePlay' && step.id !== 'staminaExec' && this.enemies[0] && !this.enemies[0].fighter.alive) {
       this._tutResetDummy();
+      // 绝技教学：保持玩家炁值
+      if (step.id === 'ultimate') {
+        pf.qi = Math.min(pf.qi, pf.qiMax || C.QI_MAX);
+      }
     }
     // 处决教学：死亡后复活以备重试
     if (step.id === 'staminaExec' && this.enemies[0]) {

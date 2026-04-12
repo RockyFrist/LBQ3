@@ -102,6 +102,7 @@ export class UI {
       case 'parryCounter': stateText = '反击!'; stateColor = '#00ddff'; break;
       case 'executing': stateText = '处决!'; stateColor = '#ff0000'; break;
       case 'executed': stateText = '被处决'; stateColor = '#ff0000'; break;
+      case 'ultimate': stateText = '乱刀斩!'; stateColor = '#aaddff'; break;
       default:
         if (f.isExhausted) { stateText = '体力耗尽!'; stateColor = '#ff4444'; }
         else if (f.parryBoost && f.parryBoost.timer > 0) { stateText = '加速!'; stateColor = '#66ffcc'; }
@@ -111,6 +112,44 @@ export class UI {
       ctx.font = '11px "Segoe UI", sans-serif';
       ctx.fillText(stateText, x, y + 54);
     }
+
+    // 炁条（能量条）— 与HP同宽，醒目显示
+    const qiBarW = 56;
+    const qiBarH = 7;
+    const qiX = alignRight ? x - qiBarW : x;
+    const qiY = y + 60;
+    const qiRatio = Math.min(1, (f.qi || 0) / (f.qiMax || C.QI_MAX));
+    // 底色边框
+    ctx.fillStyle = 'rgba(30,40,60,0.6)';
+    ctx.fillRect(qiX - 1, qiY - 1, qiBarW + 2, qiBarH + 2);
+    ctx.fillStyle = 'rgba(255,255,255,0.08)';
+    ctx.fillRect(qiX, qiY, qiBarW, qiBarH);
+    // 填充色
+    if (qiRatio > 0) {
+      const full = qiRatio >= 1;
+      if (full) {
+        // 满炁闪烁发光
+        const pulse = 0.7 + 0.3 * Math.sin(Date.now() * 0.008);
+        ctx.fillStyle = `rgba(120,200,255,${pulse})`;
+        ctx.fillRect(qiX, qiY, qiBarW, qiBarH);
+        // 高光描边
+        ctx.strokeStyle = `rgba(200,240,255,${0.5 + 0.3 * Math.sin(Date.now() * 0.006)})`;
+        ctx.lineWidth = 1;
+        ctx.strokeRect(qiX, qiY, qiBarW, qiBarH);
+      } else {
+        // 渐变：深蓝→浅蓝
+        const grad = ctx.createLinearGradient(qiX, 0, qiX + qiBarW * qiRatio, 0);
+        grad.addColorStop(0, '#3366aa');
+        grad.addColorStop(1, '#66aaee');
+        ctx.fillStyle = grad;
+        ctx.fillRect(qiX, qiY, qiBarW * qiRatio, qiBarH);
+      }
+    }
+    // 炁文字标签
+    ctx.fillStyle = qiRatio >= 1 ? '#88ddff' : 'rgba(180,210,240,0.7)';
+    ctx.font = '10px "Segoe UI", sans-serif';
+    const qiLabel = qiRatio >= 1 ? '炁 MAX [F]' : `炁 ${Math.floor((f.qi || 0))}/${f.qiMax || C.QI_MAX}`;
+    ctx.fillText(qiLabel, alignRight ? qiX + qiBarW : qiX, qiY + qiBarH + 12);
 
     ctx.restore();
   }

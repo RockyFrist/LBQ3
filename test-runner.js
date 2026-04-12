@@ -34,6 +34,7 @@ const LOG_ROUND  = getArg('--log-round', -1);
 // ---- Mock 视觉系统 (no-op) ----
 const mockParticles = {
   sparks() {}, blockSpark() {}, blood() {}, clash() {}, execution() {},
+  ultimateSlash() {},
   update() {}, particles: [],
 };
 const mockCamera = { shake() {}, update() {} };
@@ -91,6 +92,12 @@ function runRound(diffA, diffB, collectLog) {
     whiffB: { light: 0, heavy: 0, parryCounter: 0 },
     dodgeA: 0, dodgeB: 0,
     perfectDodgeA: 0, perfectDodgeB: 0,
+    ultUsedA: 0, ultUsedB: 0,
+    ultHitsA: 0, ultHitsB: 0,
+    ultDmgA: 0, ultDmgB: 0,
+    ultCompA: 0, ultCompB: 0,
+    ultInterruptA: 0, ultInterruptB: 0,
+    ultClash: 0,
     winner: 'draw', hpA: 0, hpB: 0,
   };
 
@@ -234,6 +241,10 @@ function runRound(diffA, diffB, collectLog) {
     if (fighterA.state === 'dodging' && prevStateA !== 'dodging') stats.dodgeA++;
     if (fighterB.state === 'dodging' && prevStateB !== 'dodging') stats.dodgeB++;
 
+    // 绝技使用统计
+    if (fighterA.state === 'ultimate' && prevStateA !== 'ultimate') stats.ultUsedA++;
+    if (fighterB.state === 'ultimate' && prevStateB !== 'ultimate') stats.ultUsedB++;
+
     // 变招统计（实际执行的变招：fighter.feinted 标记）
     if (fighterA.feinted) { stats.feintA++; fighterA.feinted = false; }
     if (fighterB.feinted) { stats.feintB++; fighterB.feinted = false; }
@@ -261,6 +272,11 @@ function runRound(diffA, diffB, collectLog) {
           const side = isA ? stats.hitsA : stats.hitsB;
           if (evt.atkType === 'heavy') side.heavy++; else side.light++;
           if (isA) stats.damageA += evt.damage; else stats.damageB += evt.damage;
+          // 炁获取
+          const qiGain = evt.atkType === 'parryCounter' ? C.QI_GAIN_COUNTER_HIT
+            : evt.atkType === 'heavy' ? C.QI_GAIN_HEAVY_HIT : C.QI_GAIN_LIGHT_HIT;
+          evt.attacker.gainQi(qiGain);
+          evt.target.gainQi(evt.atkType === 'heavy' ? C.QI_GAIN_TAKEN_HEAVY : C.QI_GAIN_TAKEN_LIGHT);
           logEvent(gameTime, 'hit', {
             who: isA ? 'A' : 'B', target: isA ? 'B' : 'A',
             attackType: evt.atkType, damage: evt.damage,
@@ -275,6 +291,9 @@ function runRound(diffA, diffB, collectLog) {
           if (ts && (timeScaleTimer <= 0 || ts.scale < timeScale)) {
             timeScale = ts.scale; timeScaleTimer = ts.duration;
           }
+          // 格挡方炁获取
+          const parryQi = evt.level === 'precise' ? C.QI_GAIN_PRECISE : evt.level === 'semi' ? C.QI_GAIN_SEMI : 0;
+          if (parryQi > 0) evt.target.gainQi(parryQi);
           logEvent(gameTime, 'parry', {
             blocker: isA ? 'A' : 'B', attacker: isA ? 'B' : 'A', level: evt.level,
           });
@@ -297,6 +316,7 @@ function runRound(diffA, diffB, collectLog) {
         case 'execution': {
           if (evt.attacker === fighterA) stats.executionA++;
           else stats.executionB++;
+          evt.attacker.gainQi(C.QI_GAIN_EXECUTION);
           logEvent(gameTime, 'execution', {
             who: evt.attacker === fighterA ? 'A' : 'B',
             target: evt.target === fighterA ? 'A' : 'B',
@@ -308,6 +328,29 @@ function runRound(diffA, diffB, collectLog) {
           if (evt.target === fighterA) stats.perfectDodgeA++;
           else stats.perfectDodgeB++;
           logEvent(gameTime, 'perfectDodge', { who: evt.target === fighterA ? 'A' : 'B' });
+          break;
+        }
+        case 'ultimateHit': {
+          const isA = evt.attacker === fighterA;
+          if (isA) { stats.ultHitsA += evt.hitCount; stats.ultDmgA += evt.damage * evt.hitCount; }
+          else { stats.ultHitsB += evt.hitCount; stats.ultDmgB += evt.damage * evt.hitCount; }
+          break;
+        }
+        case 'ultimate': {
+          if (evt.attacker === fighterA) stats.ultCompA++;
+          else stats.ultCompB++;
+          break;
+        }
+        case 'ultimateInterrupt': {
+          if (evt.target === fighterA) stats.ultInterruptA++;
+          else stats.ultInterruptB++;
+          break;
+        }
+        case 'ultimateClash': {
+          stats.ultClash++;
+          // 双方都算“被中断”
+          stats.ultInterruptA++;
+          stats.ultInterruptB++;
           break;
         }
       }
@@ -383,6 +426,16 @@ const totalPDodgeA = sum(s => s.perfectDodgeA);
 const totalPDodgeB = sum(s => s.perfectDodgeB);
 const totalFeintA = sum(s => s.feintA);
 const totalFeintB = sum(s => s.feintB);
+const ultUsedA = sum(s => s.ultUsedA);
+const ultUsedB = sum(s => s.ultUsedB);
+const ultHitsA = sum(s => s.ultHitsA);
+const ultHitsB = sum(s => s.ultHitsB);
+const ultDmgA = sum(s => s.ultDmgA);
+const ultDmgB = sum(s => s.ultDmgB);
+const ultCompA = sum(s => s.ultCompA);
+const ultCompB = sum(s => s.ultCompB);
+const ultInterruptA = sum(s => s.ultInterruptA);
+const ultInterruptB = sum(s => s.ultInterruptB);
 
 const summary = {
   config: { rounds: ROUNDS, diffA: DIFF_A, diffB: DIFF_B, elapsed: `${elapsed}s` },
@@ -414,6 +467,14 @@ const summary = {
     perAI: +((totalFeintA + totalFeintB) / ROUNDS / 2).toFixed(2),
   },
   avgWinnerHp: { A: +avgHpA.toFixed(1), B: +avgHpB.toFixed(1) },
+  ultimate: {
+    A: { used: ultUsedA, hits: ultHitsA, damage: ultDmgA, completed: ultCompA, interrupted: ultInterruptA,
+         dodged: ultUsedA - ultCompA - ultInterruptA,
+         hitRate: ultUsedA ? +((ultCompA / ultUsedA) * 100).toFixed(1) : 0 },
+    B: { used: ultUsedB, hits: ultHitsB, damage: ultDmgB, completed: ultCompB, interrupted: ultInterruptB,
+         dodged: ultUsedB - ultCompB - ultInterruptB,
+         hitRate: ultUsedB ? +((ultCompB / ultUsedB) * 100).toFixed(1) : 0 },
+  },
 };
 
 // ---- 事件回放日志模式 ----
@@ -563,6 +624,18 @@ if (JSON_ONLY) {
   console.log(`  闪避  蓝方: ${totalDodgeA}(完美${totalPDodgeA})  红方: ${totalDodgeB}(完美${totalPDodgeB})`);
   console.log(`  破防  蓝方被破: ${totalBrkA}  红方被破: ${totalBrkB}`);
   console.log(`  处决  蓝方: ${totalExeA}  红方: ${totalExeB}`);
+  console.log(`${'─'.repeat(60)}`);
+  const ultDodgedA = ultUsedA - ultCompA - ultInterruptA;
+  const ultDodgedB = ultUsedB - ultCompB - ultInterruptB;
+  console.log(`  绝技  蓝方: ${ultUsedA}次(命中${ultCompA} 闪避${ultDodgedA} 打断${ultInterruptA}) 伤害${ultDmgA}`);
+  console.log(`  绝技  红方: ${ultUsedB}次(命中${ultCompB} 闪避${ultDodgedB} 打断${ultInterruptB}) 伤害${ultDmgB}`);
+  if (ultUsedA + ultUsedB > 0) {
+    const totalUlt = ultUsedA + ultUsedB;
+    const totalComp = ultCompA + ultCompB;
+    const totalDodged = ultDodgedA + ultDodgedB;
+    const totalInt = ultInterruptA + ultInterruptB;
+    console.log(`  绝技总计: ${totalUlt}次 命中率${(totalComp/totalUlt*100).toFixed(1)}% 闪避率${(totalDodged/totalUlt*100).toFixed(1)}% 打断率${(totalInt/totalUlt*100).toFixed(1)}%`);
+  }
   console.log(`${'='.repeat(60)}`);
 
   if (DETAIL) {

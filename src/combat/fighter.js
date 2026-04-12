@@ -67,6 +67,9 @@ export class Fighter {
     this.dodgeAngle = 0;
     this.perfectDodged = false;
 
+    // 绝技锁定（被连斩命中后无法闪避脱离）
+    this.ultimateLocked = null;
+
     // 硬直时长（动态设置）
     this.staggerDuration = 0;
 
@@ -108,6 +111,11 @@ export class Fighter {
 
     // 格挡成功后短暂停顿（格挡方也无法立即行动，与攻击方同步解锁形成二次博弈）
     this.parryActionDelay = 0;
+
+    // 炁（绝技能量）
+    this.qi = 0;
+    this.qiMax = C.QI_MAX;
+    this.ultimateJustActivated = false;
   }
 
   // ===================== 状态切换 =====================
@@ -224,6 +232,25 @@ export class Fighter {
 
       case 'executed':
         break;
+
+      case 'ultimate': {
+        // 拔刀绝技：startup → active（多段连斩）→ recovery
+        this.attackType = 'ultimate';
+        this.phase = 'startup';
+        this.ultimateStartupBegin = true; // 蓄势开始瞬间，用于触发预警特效
+        this.attackData = {
+          startup: C.ULTIMATE_STARTUP,
+          active: C.ULTIMATE_ACTIVE,
+          recovery: C.ULTIMATE_RECOVERY,
+          range: C.ULTIMATE_RANGE * this.scale,
+          arc: C.ULTIMATE_ARC,
+          hitDamage: C.ULTIMATE_HIT_DAMAGE,
+          hitCount: C.ULTIMATE_HIT_COUNT,
+        };
+        this.ultimateHitsDone = 0;  // 已命中段数
+        this.canFeint = false;
+        break;
+      }
     }
   }
 
@@ -284,7 +311,9 @@ export class Fighter {
   // 通用预输入采集：在任何锁定状态中持续检测玩家/AI输入
   _bufferFromCmd(cmd) {
     if (!cmd) return;
-    if (cmd.lightAttack) this.bufferInput('lightAttack');
+    // 绝技最高优先：稀有资源（攒满炁），不应被其他操作吞掉
+    if (cmd.ultimate && this.isUltimateReady()) this.bufferInput('ultimate');
+    else if (cmd.lightAttack) this.bufferInput('lightAttack');
     else if (cmd.heavyAttack) this.bufferInput('heavyAttack');
     else if (cmd.blockHeld && !this.blockSuppressed) this.bufferInput('block');
     else if (cmd.dodge) this.bufferInput('dodge', { angle: cmd.dodgeAngle });
@@ -312,6 +341,12 @@ export class Fighter {
           return true;
         }
         break;
+      case 'ultimate':
+        if (this.isUltimateReady()) {
+          this.setState('ultimate');
+          return true;
+        }
+        break;
     }
     return false;
   }
@@ -333,6 +368,11 @@ export class Fighter {
 
     if (cmd.dodge && this.stamina >= C.DODGE_COST && !this.isExhausted) {
       this.setState('dodging', { angle: cmd.dodgeAngle });
+      return;
+    }
+    // 绝技优先于普通攻击
+    if (cmd.ultimate && this.isUltimateReady()) {
+      this.setState('ultimate');
       return;
     }
     // 攻击优先于格挡：玩家格挡后可能仍按着Space，此时点击攻击应优先出招
@@ -580,6 +620,38 @@ export class Fighter {
     }
   }
 
+  update_ultimate(dt, cmd, gameTime) {
+    const d = this.attackData;
+    if (!d) { this.setState('idle'); return; }
+
+    if (this.phase === 'startup') {
+      // 蓄势阶段可被打断（由combat-system处理）
+      if (this.phaseTimer >= d.startup) {
+        // 消耗全部炁
+        this.qi = 0;
+        this.phase = 'active';
+        this.phaseTimer = 0;
+        this.ultimateHitsDone = 0;
+        this.hasHit = new Set(); // 每段独立判定
+        this.ultimateJustActivated = true; // 触发电影效果
+      }
+    } else if (this.phase === 'active') {
+      // 连斩阶段：前冲漂移
+      this.x += Math.cos(this.facing) * C.ULTIMATE_DRIFT * dt;
+      this.y += Math.sin(this.facing) * C.ULTIMATE_DRIFT * dt;
+      // 多段命中由 combat-system 处理
+      if (this.phaseTimer >= d.active) {
+        this.phase = 'recovery';
+        this.phaseTimer = 0;
+      }
+    } else if (this.phase === 'recovery') {
+      this._bufferFromCmd(cmd);
+      if (this.phaseTimer >= d.recovery) {
+        this.setState('idle');
+      }
+    }
+  }
+
   update_executed(dt) {
     if (this.stateTimer >= C.EXECUTION_DURATION) {
       // 被处决后回满体力
@@ -689,10 +761,14 @@ export class Fighter {
 
   // ===================== 查询 =====================
   isInvulnerable() {
+    // 被绝技锁定时无法获得无敌帧
+    if (this.ultimateLocked) return false;
     return this.state === 'dodging' && this.stateTimer < C.DODGE_INVULN_END;
   }
 
   hasHyperArmor() {
+    // 绝技连斩阶段强制霸体（不受体力影响，已消耗100炁）
+    if (this.state === 'ultimate') return this.phase !== 'startup';
     // 体力耗尽时重击失去霸体，使处决更容易触发
     if (this.isExhausted) return false;
     return this.state === 'heavyAttack' && (this.phase === 'startup' || this.phase === 'active');
@@ -703,6 +779,7 @@ export class Fighter {
   }
 
   isAttackActive() {
+    if (this.state === 'ultimate') return false; // 绝技由专用逻辑处理
     return this.phase === 'active' &&
       (this.state === 'lightAttack' || this.state === 'heavyAttack' || this.state === 'parryCounter');
   }
@@ -724,7 +801,15 @@ export class Fighter {
   }
 
   canBeExecuted() {
-    return this.isExhausted && this.state !== 'executed' && this.state !== 'executing';
+    return this.isExhausted && this.state !== 'executed' && this.state !== 'executing' && this.state !== 'ultimate';
+  }
+
+  gainQi(amount) {
+    this.qi = Math.min(this.qiMax, this.qi + amount);
+  }
+
+  isUltimateReady() {
+    return this.qi >= this.qiMax;
   }
 
   getAttackInfo() {

@@ -23,6 +23,13 @@ export const eventLogMethods = {
       case 'hit': {
         const heavy = evt.atkType === 'heavy';
         this.ui.addLog(`${evt.attacker.name} ${heavy ? '重击' : '轻击'}命中 ${evt.target.name} (-${evt.damage}HP)`);
+        // 炁获取: 攻击者+被击者
+        if (evt.attacker.gainQi) {
+          const qiGain = evt.atkType === 'parryCounter' ? C.QI_GAIN_COUNTER_HIT
+            : heavy ? C.QI_GAIN_HEAVY_HIT : C.QI_GAIN_LIGHT_HIT;
+          evt.attacker.gainQi(qiGain);
+        }
+        if (evt.target.gainQi) evt.target.gainQi(heavy ? C.QI_GAIN_TAKEN_HEAVY : C.QI_GAIN_TAKEN_LIGHT);
         if (!isTest) {
           if (heavy) {
             this.addFloatingText(evt.target.x, evt.target.y - 40, `重击! -${evt.damage}`, '#ff6633', 24, 1.2, -40);
@@ -43,6 +50,11 @@ export const eventLogMethods = {
         const durs = { precise: 1.5, semi: 0.9, nonPrecise: 0.6 };
         const vys = { precise: -30, semi: -45, nonPrecise: -55 };
         this.ui.addLog(`${evt.target.name} ${labels[evt.level]} → ${evt.attacker.name}`);
+        // 炁获取: 格挡方
+        if (evt.target.gainQi) {
+          const qiGain = evt.level === 'precise' ? C.QI_GAIN_PRECISE : evt.level === 'semi' ? C.QI_GAIN_SEMI : 0;
+          if (qiGain > 0) evt.target.gainQi(qiGain);
+        }
         if (!isTest) {
           this.addFloatingText(evt.target.x, evt.target.y - 40, labels[evt.level], colors[evt.level], sizes[evt.level], durs[evt.level], vys[evt.level]);
           if (playerInvolved) {
@@ -100,6 +112,8 @@ export const eventLogMethods = {
       }
       case 'execution':
         this.ui.addLog(`${evt.attacker.name} 处决了 ${evt.target.name}! (-${evt.damage}HP)`);
+        // 炁获取: 处决方
+        if (evt.attacker.gainQi) evt.attacker.gainQi(C.QI_GAIN_EXECUTION);
         if (!isTest) {
           this.addFloatingText(evt.target.x, evt.target.y - 45, `处决! -${evt.damage}`, '#ff0000', 34, 2.0, -25);
           if (playerInvolved) this.flashScreen('rgba(255,0,0,0.3)', 0.25);
@@ -115,6 +129,54 @@ export const eventLogMethods = {
           }
         }
         break;
+      case 'ultimateHit':
+        // 每段连斩命中的逐段特效
+        if (!isTest && playerInvolved) {
+          if (evt.isLastHit) {
+            // 末段大冲击：强冻帧 + 强震动 + 闪屏 + 慢动作
+            this.applyHitFreeze(0.18);
+            this.camera.shake(18, 0.35);
+            this.flashScreen('rgba(255,40,20,0.35)', 0.25);
+            this.applyTimeScale(0.12, 0.6);
+          } else {
+            // 前几段微冻帧 + 微震动
+            this.applyHitFreeze(0.05);
+            this.camera.shake(6, 0.1);
+          }
+        }
+        break;
+      case 'ultimate':
+        this.ui.addLog(`${evt.attacker.name} 乱刀斩! 命中${evt.hitCount}人 (${evt.totalHits}段×${evt.damage})`);
+        if (!isTest) {
+          if (evt.hitCount > 0) {
+            const totalDmg = evt.damage * evt.totalHits;
+            for (const t of evt.targets) {
+              this.addFloatingText(t.x, t.y - 30, `-${totalDmg}`, '#ff6644', 22, 1.0, -50);
+            }
+          }
+        }
+        break;
+      case 'ultimateInterrupt':
+        this.ui.addLog(`${evt.target.name} 拔刀被打断!`);
+        if (!isTest) {
+          this.addFloatingText(evt.target.x, evt.target.y - 40, '打断!', '#ff8844', 24, 1.0, -35);
+          if (playerInvolved) this.flashScreen('rgba(255,136,68,0.2)', 0.12);
+        }
+        break;
+      case 'ultimateClash': {
+        const mx = (evt.a.x + evt.b.x) / 2;
+        const my = (evt.a.y + evt.b.y) / 2;
+        this.ui.addLog('绝刀相撞! 双方弹开!');
+        if (!isTest) {
+          this.addFloatingText(mx, my - 35, '绝刀相撞!', '#ff3300', 32, 1.8, -25);
+          if (playerInvolved) {
+            this.flashScreen('rgba(255,80,30,0.35)', 0.2);
+            this.applyHitFreeze(C.ULTIMATE_CLASH_FREEZE);
+            this.applyTimeScale(0.10, 1.0);
+          }
+        }
+        break;
+      }
       case 'hyperAbsorb':
         this.ui.addLog(`${evt.a.name} 霸体吸收了 ${evt.b.name} 的轻击`);
         if (!isTest) this.addFloatingText(evt.a.x, evt.a.y - 25, '霸体!', '#ff8844', 14, 0.5, -55);

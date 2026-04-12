@@ -18,6 +18,66 @@ export class CombatSystem {
 
   resolve(fighters, gameTime, dt) {
     this.events = [];
+
+    // 清理绝技锁定：攻击者不再处于active阶段时解锁所有被锁目标
+    for (const f of fighters) {
+      if (f.ultimateLocked && (!f.ultimateLocked.alive ||
+          f.ultimateLocked.state !== 'ultimate' || f.ultimateLocked.phase !== 'active')) {
+        f.ultimateLocked = null;
+      }
+    }
+
+    // 绝刀相撞：双方都在绝技active且面向对方时触发特殊弹刀
+    for (let i = 0; i < fighters.length; i++) {
+      for (let j = i + 1; j < fighters.length; j++) {
+        const a = fighters[i], b = fighters[j];
+        if (a.team === b.team) continue;
+        if (a.state !== 'ultimate' || a.phase !== 'active') continue;
+        if (b.state !== 'ultimate' || b.phase !== 'active') continue;
+        // 双方必须面向对方
+        const angAB = angleBetween(a, b);
+        const angBA = angleBetween(b, a);
+        if (Math.abs(normalizeAngle(angAB - a.facing)) > Math.PI / 2) continue;
+        if (Math.abs(normalizeAngle(angBA - b.facing)) > Math.PI / 2) continue;
+        const d = dist(a, b);
+        if (d > C.ULTIMATE_RANGE * 1.2) continue;
+        // 触发绝刀相撞
+        a.setState('staggered', { duration: C.ULTIMATE_CLASH_STAGGER });
+        b.setState('staggered', { duration: C.ULTIMATE_CLASH_STAGGER });
+        a.applyKnockback(angAB + Math.PI, C.ULTIMATE_CLASH_PUSHBACK);
+        b.applyKnockback(angBA + Math.PI, C.ULTIMATE_CLASH_PUSHBACK);
+        // 双方返还50%炁（与被打断同等惩罚）
+        a.qi = Math.floor(a.qiMax * (1 - C.QI_INTERRUPT_COST));
+        b.qi = Math.floor(b.qiMax * (1 - C.QI_INTERRUPT_COST));
+        a.ultimateLocked = null;
+        b.ultimateLocked = null;
+        const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
+        this.particles.clash(mx, my, 25);
+        this._shakeIfPlayer(a, b, C.SHAKE_EXECUTION, C.SHAKE_DURATION * 2);
+        this.events.push({ type: 'ultimateClash', a, b });
+        // 清除被这两人锁定的目标
+        for (const f of fighters) {
+          if (f.ultimateLocked === a || f.ultimateLocked === b) f.ultimateLocked = null;
+        }
+      }
+    }
+
+    // 拔刀绝技多段判定（前方扇形连斩）
+    for (const f of fighters) {
+      if (f.state === 'ultimate' && f.attackData &&
+          (f.phase === 'active' || (f.phase === 'recovery' && f.ultimateHitsDone < f.attackData.hitCount))) {
+        const d = f.attackData;
+        const hitInterval = d.active / d.hitCount;
+        // recovery阶段补发剩余段：update先转了phase，这里兜底最后一段
+        const expectedHits = f.phase === 'recovery' ? d.hitCount : Math.floor(f.phaseTimer / hitInterval);
+        if (expectedHits > f.ultimateHitsDone) {
+          const isLastHit = expectedHits >= d.hitCount;
+          this._resolveUltimateHit(f, fighters, isLastHit);
+          f.ultimateHitsDone = expectedHits;
+        }
+      }
+    }
+
     // 处理所有两两配对
     for (let i = 0; i < fighters.length; i++) {
       for (let j = i + 1; j < fighters.length; j++) {
@@ -124,9 +184,26 @@ export class CombatSystem {
       return;
     }
 
+    // 目标在绝技active阶段被重击——受伤但不打断
+    if (target.hasHyperArmor() && target.state === 'ultimate' && target.phase === 'active') {
+      target.takeDamage(atkInfo.damage);
+      target.flash('#fff', 0.1);
+      this.particles.blood(midX, midY, ang, 6);
+      this._shakeIfPlayer(attacker, target, C.SHAKE_HEAVY, C.SHAKE_DURATION);
+      this.events.push({ type: 'hit', attacker, target, damage: atkInfo.damage, atkType: atkInfo.type });
+      return;
+    }
+
     // 目标可被处决
     if (target.canBeExecuted()) {
       this._resolveExecution(attacker, target);
+      return;
+    }
+
+    // 目标在拔刀startup——打断绝技
+    if (target.state === 'ultimate' && target.phase === 'startup') {
+      this._interruptUltimate(target);
+      this._applyHit(attacker, target, atkInfo, ang);
       return;
     }
 
@@ -336,6 +413,74 @@ export class CombatSystem {
     this.particles.execution(target.x, target.y, 25);
     this._shakeIfPlayer(attacker, target, C.SHAKE_EXECUTION, C.SHAKE_DURATION * 2);
     this.events.push({ type: 'execution', attacker, target, damage: dmg });
+  }
+
+  // ===================== 拔刀绝技（前方多段连斩）=====================
+  _resolveUltimateHit(attacker, allFighters, isLastHit) {
+    const d = attacker.attackData;
+    const range = d.range;
+    const arc = d.arc;
+    const baseDmg = d.hitDamage;
+
+    // 收集前方扇形内目标
+    const targets = [];
+    for (const t of allFighters) {
+      if (t === attacker || t.team === attacker.team || !t.alive) continue;
+      const dd = dist(attacker, t);
+      if (dd > range) continue;
+      // 绝技穿透格挡，但闪避i-frame仍然有效
+      if (t.isInvulnerable()) continue;
+      // 扇形判定
+      if (!isInArc(attacker.x, attacker.y, attacker.facing, t.x, t.y, t.radius, range, arc)) continue;
+      targets.push(t);
+    }
+
+    // 多目标伤害衰减
+    let dmgMult = 1;
+    if (targets.length === 2) dmgMult = C.ULTIMATE_MULTI_2;
+    else if (targets.length >= 3) dmgMult = C.ULTIMATE_MULTI_3;
+    const baseFinalDmg = Math.floor(baseDmg * dmgMult);
+
+    for (const t of targets) {
+      const ang = angleBetween(attacker, t);
+      // 格挡减伤：绝技穿透格挡但伤害减半
+      const blocked = t.isBlocking();
+      const dmg = blocked ? Math.floor(baseFinalDmg * C.ULTIMATE_BLOCK_REDUCTION) : baseFinalDmg;
+      t.takeDamage(dmg);
+      t.flash(blocked ? '#89f' : '#fff', 0.1);
+      // 命中即锁定：标记目标被绝技锁住，无法闪避脱离
+      t.ultimateLocked = attacker;
+      if (isLastHit) {
+        t.setState('staggered', { duration: 0.4 });
+        t.applyKnockback(ang, C.ULTIMATE_KNOCKBACK);
+        t.ultimateLocked = null; // 末段击飞后解锁
+      } else {
+        // 硬直覆盖段间隔(0.15s)，确保无法脱离
+        t.setState('staggered', { duration: 0.18 });
+        t.applyKnockback(ang, 15);
+      }
+      this.particles.blood(t.x, t.y, ang, isLastHit ? 10 : 4);
+    }
+
+    if (targets.length > 0) {
+      this._shakeIfPlayer(attacker, attacker, isLastHit ? C.SHAKE_HEAVY : C.SHAKE_LIGHT, C.SHAKE_DURATION);
+      // 每段连斩刀光粒子
+      this.particles.ultimateSlash(attacker.x, attacker.y, attacker.facing, range, arc, isLastHit);
+      // 每段命中事件（用于逐段特效）
+      this.events.push({ type: 'ultimateHit', attacker, targets, damage: baseFinalDmg, isLastHit, hitCount: targets.length });
+    }
+
+    if (isLastHit) {
+      this.events.push({ type: 'ultimate', attacker, targets, damage: baseFinalDmg, hitCount: targets.length, totalHits: d.hitCount });
+    }
+  }
+
+  // 绝技被打断
+  _interruptUltimate(fighter) {
+    fighter.qi = Math.floor(fighter.qi + fighter.qiMax * (1 - C.QI_INTERRUPT_COST));
+    fighter.qi = Math.min(fighter.qi, fighter.qiMax);
+    // fighter会被后续的applyHit设为staggered
+    this.events.push({ type: 'ultimateInterrupt', target: fighter });
   }
 
   // ===================== 攻击吸附 =====================

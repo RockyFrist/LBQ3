@@ -170,6 +170,7 @@ export class Enemy {
       blockHeld: false,
       dodge: false,
       dodgeAngle: 0,
+      ultimate: false,
     };
 
     this.thinkCD -= dt;
@@ -190,6 +191,53 @@ export class Enemy {
     // 二次博弈：格挡相关状态转换后重置AI决策，避免旧定时器阻止行动
     const justExitedParryStunned = this._prevFighterState === 'parryStunned' && f.state !== 'parryStunned';
     const hasParryBoost = f.parryBoost && f.parryBoost.timer > 0;
+
+    // === AI绝技使用：炁满时有概率释放 ===
+    if (f.isUltimateReady() && f.state === 'idle' && d < C.ULTIMATE_RANGE + 30) {
+      // 难度越高越会用绝技：D1=5% D3=15% D5=30%/思考周期
+      const ultChance = 0.05 + (this.difficulty - 1) / 4 * 0.25;
+      // 机会窗口：对手处于无法闪避/格挡的状态时大幅提高释放概率
+      const vulnStates = ['staggered', 'blockRecovery', 'parryStunned', 'executed'];
+      const vulnRecovery = pf.phase === 'recovery' && (pf.state === 'lightAttack' || pf.state === 'heavyAttack');
+      const oppVulnerable = vulnStates.includes(pf.state) || vulnRecovery;
+      // D3+才会读状态抓机会：D3~70%概率利用 D5~95%
+      const smartChance = oppVulnerable && this.difficulty >= 3
+        ? 0.5 + (this.difficulty - 3) / 2 * 0.25 : 0;
+      if (Math.random() < Math.max(ultChance, smartChance)) {
+        cmd.ultimate = true;
+        this.aiState = 'recover';
+        this.aiTimer = 1.0;
+        return cmd;
+      }
+    }
+
+    // === 反应对手绝技：startup或active阶段侧向闪避脱离 ===
+    if (pf.state === 'ultimate' && (pf.phase === 'startup' || pf.phase === 'active') && (f.state === 'idle' || f.state === 'staggered')) {
+      // startup阶段反应率更高（有预判时间），active阶段靠纯反应
+      const isStartup = pf.phase === 'startup';
+      const baseChance = isStartup ? 0.2 : 0.10;
+      const diffScale = isStartup ? 0.6 : 0.45;
+      const reactChance = baseChance + (this.difficulty - 1) / 4 * diffScale;
+      // D1: startup=20%/active=10%  D5: startup=80%/active=55%
+      if (f.state === 'idle' && f.stamina >= C.DODGE_COST && Math.random() < reactChance) {
+        cmd.dodge = true;
+        // 远离方向闪避（背向+随机偏移，比纯侧向更有效）
+        const away = ang + Math.PI;
+        const jitter = (Math.random() - 0.5) * Math.PI * 0.6;
+        cmd.dodgeAngle = away + jitter;
+        this.aiState = 'recover';
+        this.aiTimer = isStartup ? 0.5 : 0.3;
+        return cmd;
+      }
+      // stagger中也尝试脱离（出硬直瞬间闪避）
+      if (f.state === 'staggered' && !this._staggerReacted) {
+        this._staggerReacted = true;
+        // 出硬直后立即闪避脱离的意图（stagger结束后buffer一个dodge）
+        if (f.stamina >= C.DODGE_COST && Math.random() < reactChance * 0.6) {
+          f.bufferInput?.('dodge', { angle: ang + Math.PI + (Math.random() - 0.5) * 1.0 });
+        }
+      }
+    }
     if (justExitedParryStunned) {
       // AI攻击被格挡后恢复：清除recover定时器，允许立即行动
       // 设置blockCooldown防止立刻再举盾

@@ -101,6 +101,9 @@ export class Game {
     // ===== 队友系统 =====
     this.allies = []; // AI队友列表
 
+    // ===== AI暂停（训练模式）=====
+    this.aiPaused = false;
+
     // ===== 设置面板 =====
     this.settingsOpen = false;
     this._settingsClickCd = 0;
@@ -332,7 +335,14 @@ export class Game {
     // 设置面板（所有非测试模式）
     this._settingsClickCd -= dt;
     if (this.mode !== 'test' && input.pressed('KeyP')) {
-      this.settingsOpen = !this.settingsOpen;
+      if (this.mode === 'training') {
+        this.aiPaused = !this.aiPaused;
+        this.ui.addLog(this.aiPaused ? 'AI已暂停' : 'AI已恢复');
+        this.addFloatingText(this.player.fighter.x, this.player.fighter.y - 30,
+          this.aiPaused ? 'AI暂停' : 'AI恢复', '#ffcc44', 16, 0.8, -40);
+      } else {
+        this.settingsOpen = !this.settingsOpen;
+      }
     }
     // 设置按钮点击检测
     if (this.mode !== 'test' && input.mouseLeftDown && this._settingsClickCd <= 0) {
@@ -419,6 +429,7 @@ export class Game {
         if (freezeCmd.lightAttack) pf.bufferInput('lightAttack');
         else if (freezeCmd.heavyAttack) pf.bufferInput('heavyAttack');
         else if (freezeCmd.dodge) pf.bufferInput('dodge', { angle: freezeCmd.dodgeAngle });
+        else if (freezeCmd.ultimate) pf.bufferInput('ultimate');
         // Freeze期间松开Space则解除blockSuppressed，后续可正常格挡
         if (!freezeCmd.blockHeld) pf.blockSuppressed = false;
       }
@@ -448,6 +459,12 @@ export class Game {
       if (input.pressed('KeyE') && this._victoryTimer < 0) this.spawnEnemy();
       if (input.pressed('KeyI') && this._victoryTimer < 0) this.spawnAlly();
       if (input.pressed('KeyR')) { this._victoryTimer = -1; this.chainKills = 0; this.reset(); return; }
+      // 训练模式：O键恢复满炁
+      if (this.mode === 'training' && input.pressed('KeyO')) {
+        const pf2 = this.player.fighter;
+        pf2.qi = pf2.qiMax || C.QI_MAX;
+        this.addFloatingText(pf2.x, pf2.y - 30, '炁已充满', '#88ddff', 16, 0.8, -40);
+      }
     }
     // 观战模式按键
     if (this.mode === 'spectate' || this.mode === 'wusheng_spectate') {
@@ -564,11 +581,14 @@ export class Game {
     }
 
     // 敌人更新（选择最近的对手为目标，不一定是玩家）
+    const noop = { moveX: 0, moveY: 0, faceAngle: 0, lightAttack: false, heavyAttack: false, blockHeld: false, dodge: false, dodgeAngle: 0 };
     for (const enemy of this.enemies) {
       const ef = enemy.fighter;
       if (!ef.alive) continue;
       let eCmd;
-      if (enemy._isNN && this.nnWeights) {
+      if (this.aiPaused && this.mode === 'training') {
+        eCmd = { ...noop, faceAngle: ef.facing };
+      } else if (enemy._isNN && this.nnWeights) {
         eCmd = this._getNNCommand(dt, ef, pf);
       } else {
         // 找最近的敌对目标（玩家 + 队友）
@@ -587,19 +607,52 @@ export class Game {
     for (const ally of this.allies) {
       const af = ally.fighter;
       if (!af.alive) continue;
-      // 找最近活着的敌人
-      let target = null, minD = Infinity;
-      for (const e of this.enemies) {
-        if (!e.fighter.alive) continue;
-        const d = dist(af, e.fighter);
-        if (d < minD) { minD = d; target = e.fighter; }
+      let aCmd;
+      if (this.aiPaused && this.mode === 'training') {
+        aCmd = { ...noop, faceAngle: af.facing };
+      } else {
+        // 找最近活着的敌人
+        let target = null, minD = Infinity;
+        for (const e of this.enemies) {
+          if (!e.fighter.alive) continue;
+          const d = dist(af, e.fighter);
+          if (d < minD) { minD = d; target = e.fighter; }
+        }
+        aCmd = target ? ally.getCommands(dt, target) : { moveX: 0, moveY: 0, faceAngle: 0, lightAttack: false, heavyAttack: false, blockHeld: false, dodge: false, dodgeAngle: 0 };
       }
-      const aCmd = target ? ally.getCommands(dt, target) : { moveX: 0, moveY: 0, faceAngle: 0, lightAttack: false, heavyAttack: false, blockHeld: false, dodge: false, dodgeAngle: 0 };
       af.update(dt, aCmd, this.gameTime);
     }
 
     // 碰撞分离
     this._separateFighters();
+
+    // 绝技蓄势预警（startup开始瞬间：红光闪烁 + 微震 + 浮字提示）
+    for (const f of this.allFighters) {
+      if (f.ultimateStartupBegin) {
+        f.ultimateStartupBegin = false;
+        if (this.mode !== 'test') {
+          this.flashScreen('rgba(255,60,30,0.18)', 0.12);
+          this.camera.shake(6, 0.15);
+          f.flash('#ff4422', 0.15);
+          this.addFloatingText(f.x, f.y - 45, '⚡蓄势!', '#ff6633', 22, 0.8, -35);
+        }
+      }
+    }
+
+    // 绝技触发电影表现（时停 + 红光 + 震动）
+    for (const f of this.allFighters) {
+      if (f.ultimateJustActivated) {
+        f.ultimateJustActivated = false;
+        if (this.mode !== 'test') {
+          this.applyHitFreeze(0.18);
+          this.flashScreen('rgba(255,30,20,0.35)', 0.25);
+          this.camera.shake(16, 0.3);
+          this.applyTimeScale(0.15, 0.8);
+          f.flash('#ff3020', 0.25);
+          this.addFloatingText(f.x, f.y - 55, '拔刀!', '#ff4422', 32, 1.5, -25);
+        }
+      }
+    }
 
     // 战斗判定
     this.combat.resolve(this.allFighters, this.gameTime, dt);
@@ -634,6 +687,12 @@ export class Game {
 
     // 粒子等
     if (this.mode !== 'test') {
+      // 满炁气流粒子
+      for (const f of this.allFighters) {
+        if (f.alive && f.qi >= (f.qiMax || C.QI_MAX) && f.state !== 'ultimate') {
+          this.particles.qiAura(f.x, f.y, f.radius + 8);
+        }
+      }
       this.particles.update(dt);
       this._updateCameraTarget();
       this.camera.update(dt);
@@ -825,11 +884,12 @@ export class Game {
       const stage = JIANGHU_STAGES[this.jianghuStage];
       this._drawModeLabel(`🏔 江湖行 · 第${this.jianghuStage + 1}关 ${stage ? stage.name : ''} · ❤×${this.jianghuLives}`);
     } else if (this.mode === 'training') {
-      this._drawModeLabel(`🎯 自由训练 · U召敌 · I召队友 · R重置 · 1-5难度(当前${this.difficulty})`);
+      const aiTag = this.aiPaused ? ' · AI暂停🔴' : '';
+      this._drawModeLabel(`🎯 自由训练 · 难度${this.difficulty}${aiTag} · ESC返回菜单`);
     } else if (this.mode === 'chainKill') {
       this._drawModeLabel(`⚔ 连战模式 · 连斩 ×${this.chainKills} · R重置 · ESC返回`);
     } else if (this.mode === 'tutorial') {
-      this._drawModeLabel('📖 教学模式 · ESC返回菜单');
+      this._drawModeLabel('📖 教学模式 · R重置当前步骤 · ESC返回菜单');
     }
 
     // 江湖行覆盖层（剧情/过关/失败）
@@ -840,6 +900,11 @@ export class Game {
     // 教学模式覆盖层
     if (this.mode === 'tutorial') {
       this._drawTutorialOverlay();
+    }
+
+    // 训练模式控制面板
+    if (this.mode === 'training') {
+      this._drawTrainingPanel();
     }
 
     // 测试结果
@@ -868,6 +933,56 @@ export class Game {
     ctx.font = '13px "Microsoft YaHei", sans-serif';
     ctx.textAlign = 'center';
     ctx.fillText(text, lw / 2, lh - 10);
+  }
+
+  /** 训练模式左下角控制面板 */
+  _drawTrainingPanel() {
+    const ctx = this.canvas.getContext('2d');
+    const lh = this.canvas._logicH || this.canvas.height;
+    const diffNames = ['新手', '普通', '熟练', '困难', '大师'];
+    const diffColors = ['#66cc66', '#cccc66', '#ff9933', '#ff5555', '#ff2222'];
+
+    const px = 8, panelW = 150, itemH = 26;
+    const items = [
+      { key: 'E', label: '召唤敌人' },
+      { key: 'I', label: '召唤队友' },
+      { key: 'O', label: '充满炁' },
+      { key: 'P', label: this.aiPaused ? '恢复AI ▶' : '暂停AI ⏸', highlight: this.aiPaused },
+      { key: 'R', label: '重置战场' },
+      { key: '1-5', label: `难度: ${diffNames[this.difficulty - 1] || this.difficulty}`, color: diffColors[this.difficulty - 1] },
+      { key: 'H', label: '帮助' },
+    ];
+    const panelH = items.length * itemH + 32;
+    const py = lh - 30 - panelH - 8;
+
+    // 背景
+    ctx.fillStyle = 'rgba(0,0,0,0.55)';
+    ctx.beginPath();
+    ctx.roundRect(px, py, panelW, panelH, 6);
+    ctx.fill();
+
+    // 标题
+    ctx.fillStyle = '#ffcc44';
+    ctx.font = 'bold 13px "Microsoft YaHei", sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText('🎯 训练控制', px + 10, py + 18);
+
+    // 按键列表
+    ctx.font = '12px "Microsoft YaHei", sans-serif';
+    for (let i = 0; i < items.length; i++) {
+      const it = items[i];
+      const iy = py + 28 + i * itemH;
+
+      // 按键标签
+      ctx.fillStyle = it.highlight ? '#ff6644' : '#88aacc';
+      ctx.font = 'bold 12px "Consolas", monospace';
+      ctx.fillText(it.key, px + 10, iy + 16);
+
+      // 描述
+      ctx.fillStyle = it.color || (it.highlight ? '#ff8866' : '#ccc');
+      ctx.font = '12px "Microsoft YaHei", sans-serif';
+      ctx.fillText(it.label, px + 42, iy + 16);
+    }
   }
 
   /** 联机模式: 顶部比分 + 底部模式标签 */
@@ -1352,6 +1467,21 @@ export class Game {
           const mx = (evt.a.x + evt.b.x) / 2;
           const my = (evt.a.y + evt.b.y) / 2;
           this.particles.blockSpark(mx, my, 0, 3);
+        }
+        break;
+      }
+      case 'ultimate': {
+        if (evt.attacker) {
+          const range = evt.attacker.attackData ? evt.attacker.attackData.range : C.ULTIMATE_RANGE;
+          const arc = evt.attacker.attackData ? evt.attacker.attackData.arc : C.ULTIMATE_ARC;
+          this.particles.ultimateSlash(evt.attacker.x, evt.attacker.y, evt.attacker.facing, range, arc, true);
+          this.camera.shake(C.SHAKE_EXECUTION, C.SHAKE_DURATION * 2);
+        }
+        break;
+      }
+      case 'ultimateInterrupt': {
+        if (evt.target) {
+          this.particles.sparks(evt.target.x, evt.target.y, 0, 8);
         }
         break;
       }

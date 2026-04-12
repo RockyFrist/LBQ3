@@ -61,6 +61,32 @@ export class ParticleSystem {
     this._emit(x, y, Math.floor(count * 0.3), 0, Math.PI * 2, 80, 0.8, '#fff', 3);
   }
 
+  /** 拔刀绝技刀光粒子（前方扇形连斩） */
+  ultimateSlash(x, y, facing, range, arc, isLastHit) {
+    const count = isLastHit ? 20 : 8;
+    const speed = isLastHit ? 300 : 200;
+    // 前方扇形刀光
+    this._emit(x, y, count, facing, arc, speed, 0.35, '#aaddff', isLastHit ? 5 : 3);
+    this._emit(x, y, Math.floor(count * 0.5), facing, arc * 0.6, speed * 0.7, 0.4, '#ffffff', isLastHit ? 4 : 2.5);
+    if (isLastHit) {
+      // 末段大爆发
+      this._emit(x, y, 12, facing, arc, 350, 0.5, '#6699ff', 4);
+    }
+  }
+
+  /** 满炁粒子（角色身上的炁气流） */
+  qiAura(x, y, radius) {
+    const a = Math.random() * Math.PI * 2;
+    const r = radius + Math.random() * 8;
+    const px = x + Math.cos(a) * r;
+    const py = y + Math.sin(a) * r;
+    // 向内旋转的粒子
+    const inward = a + Math.PI + (Math.random() - 0.5) * 1.5;
+    const s = 30 + Math.random() * 40;
+    const color = Math.random() < 0.4 ? '#aaccff' : '#ddeeff';
+    this.particles.push(new Particle(px, py, Math.cos(inward) * s, Math.sin(inward) * s - 20, 0.4 + Math.random() * 0.3, color, 2));
+  }
+
   draw(ctx) {
     for (const p of this.particles) {
       const alpha = Math.max(0, p.life / p.maxLife);

@@ -248,6 +248,122 @@ export const stateEffectsMethods = {
       ctx.stroke();
     }
 
+    // 满炁气流特效（角色周围白蓝旋涡）
+    if (f.qi >= (f.qiMax || C.QI_MAX) && f.state !== 'ultimate') {
+      const pulse = 0.4 + 0.3 * Math.sin(Date.now() * 0.006);
+      ctx.strokeStyle = `rgba(170,220,255,${pulse})`;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(0, 0, f.radius + 10 + Math.sin(Date.now() * 0.004) * 3, 0, Math.PI * 2);
+      ctx.stroke();
+      // 炁字提示
+      ctx.save();
+      ctx.textAlign = 'center';
+      ctx.font = 'bold 10px "Microsoft YaHei", sans-serif';
+      ctx.fillStyle = `rgba(170,220,255,${0.5 + 0.3 * Math.sin(Date.now() * 0.005)})`;
+      ctx.fillText('炁', 0, -(f.radius + 16));
+      ctx.restore();
+    }
+
+    // 拔刀绝技特效
+    if (f.state === 'ultimate') {
+      // 角色红光外环（全阶段可见，强化存在感）
+      const pulseAll = 0.3 + 0.3 * Math.sin(Date.now() * 0.008);
+      ctx.strokeStyle = `rgba(255,50,20,${f.phase === 'active' ? 0.6 + pulseAll : 0.4 + 0.3 * pulseAll})`;
+      ctx.lineWidth = f.phase === 'active' ? 5 : f.phase === 'startup' ? 4 : 3;
+      ctx.beginPath();
+      ctx.arc(0, 0, f.radius + 8, 0, Math.PI * 2);
+      ctx.stroke();
+      if (f.phase === 'active' || f.phase === 'startup') {
+        ctx.fillStyle = `rgba(255,40,20,${f.phase === 'active' ? 0.08 + 0.06 * pulseAll : 0.04 + 0.04 * pulseAll})`;
+        ctx.beginPath();
+        ctx.arc(0, 0, f.radius + 8, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      ctx.save();
+      ctx.rotate(f.facing); // 所有效果朝角色面向方向
+      if (f.phase === 'startup') {
+        // 蓄势：红光聚拢至前方，越来越亮
+        const progress = Math.min(1, f.phaseTimer / C.ULTIMATE_STARTUP);
+        const r = f.radius + 15 * (1 - progress);
+        const pulse = 0.5 + 0.5 * Math.sin(f.phaseTimer * 25);
+        // 开始瞬间爆亮（前20%进度额外强化，确保第一时间引起注意）
+        const burstAlpha = progress < 0.2 ? 1.0 - progress * 4 : 0; // 瞬间高亮衰减
+        // 红色脉冲圈
+        ctx.strokeStyle = `rgba(255,60,30,${Math.min(1, (0.5 + 0.5 * progress) * pulse + burstAlpha * 0.5)})`;
+        ctx.lineWidth = 2 + 4 * progress + burstAlpha * 3;
+        ctx.beginPath();
+        ctx.arc(0, 0, r, -C.ULTIMATE_ARC / 2, C.ULTIMATE_ARC / 2);
+        ctx.stroke();
+        // 红色扇形填充
+        ctx.fillStyle = `rgba(255,40,20,${Math.min(0.5, (0.08 + 0.16 * progress) * pulse + burstAlpha * 0.2)})`;
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.arc(0, 0, r, -C.ULTIMATE_ARC / 2, C.ULTIMATE_ARC / 2);
+        ctx.closePath();
+        ctx.fill();
+        // 危险扇形范围预警线（半透明红色虚线外框）
+        ctx.strokeStyle = `rgba(255,80,40,${0.25 + 0.25 * progress})`;
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([6, 4]);
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.arc(0, 0, C.ULTIMATE_RANGE, -C.ULTIMATE_ARC / 2, C.ULTIMATE_ARC / 2);
+        ctx.closePath();
+        ctx.stroke();
+        ctx.setLineDash([]);
+        // 内圈白光聚拢
+        ctx.strokeStyle = `rgba(255,200,180,${0.3 + 0.3 * progress})`;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(0, 0, f.radius + 3, -C.ULTIMATE_ARC / 3, C.ULTIMATE_ARC / 3);
+        ctx.stroke();
+      } else if (f.phase === 'active') {
+        // 连斩：前方扇形快速挥刀弧线
+        const range = f.attackData ? f.attackData.range : C.ULTIMATE_RANGE;
+        const arc = f.attackData ? f.attackData.arc : C.ULTIMATE_ARC;
+        const hitCount = f.attackData ? f.attackData.hitCount : C.ULTIMATE_HIT_COUNT;
+        const hitInterval = (f.attackData ? f.attackData.active : C.ULTIMATE_ACTIVE) / hitCount;
+        const hitPhase = (f.phaseTimer % hitInterval) / hitInterval;
+        // 左右交替挥刀弧
+        const hitIdx = Math.floor(f.phaseTimer / hitInterval);
+        const swingDir = hitIdx % 2 === 0 ? 1 : -1;
+        const swingAngle = (hitPhase - 0.5) * arc * swingDir;
+        // 红白刀光弧
+        ctx.strokeStyle = `rgba(255,220,200,${0.7 + 0.3 * (1 - hitPhase)})`;
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        const startA = swingAngle - arc * 0.3;
+        const endA = swingAngle + arc * 0.3;
+        ctx.arc(0, 0, range * (0.5 + 0.5 * hitPhase), startA, endA);
+        ctx.stroke();
+        // 扇形范围指示（红色半透明）
+        ctx.fillStyle = `rgba(255,60,30,${0.05})`;
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.arc(0, 0, range, -arc / 2, arc / 2);
+        ctx.closePath();
+        ctx.fill();
+        // 内圈发光
+        ctx.strokeStyle = `rgba(255,200,150,${0.4})`;
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.arc(0, 0, f.radius + 5, -arc / 2, arc / 2);
+        ctx.stroke();
+      } else if (f.phase === 'recovery') {
+        // 收刀：残余刀痕淡出
+        const progress = Math.min(1, f.phaseTimer / C.ULTIMATE_RECOVERY);
+        const range = f.attackData ? f.attackData.range : C.ULTIMATE_RANGE;
+        ctx.strokeStyle = `rgba(255,180,140,${0.3 * (1 - progress)})`;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(0, 0, range * 0.6, -0.4, 0.4);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+
     // ——— 状态标签（角色下方） ———
     this._drawStateLabel(ctx, f);
   },
@@ -269,6 +385,11 @@ export const stateEffectsMethods = {
       case 'executed': label = '💀被处决'; color = '#ff0000'; break;
       case 'dodging':
         if (f.perfectDodged) { label = '✨完美闪避!'; color = '#ffff00'; }
+        break;
+      case 'ultimate':
+        if (f.phase === 'startup') { label = '⚡蓄势'; color = '#ff4422'; }
+        else if (f.phase === 'active') { label = '⚔乱刀斩!'; color = '#ff4422'; }
+        else if (f.phase === 'recovery') { label = '收刀'; color = '#88aacc'; }
         break;
     }
     if (f.isExhausted && !label) {

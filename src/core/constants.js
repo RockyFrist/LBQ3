@@ -158,6 +158,33 @@ export const PERFECT_DODGE_TIME_SCALE = { scale: 0.18, duration: 0.50 };
 // ============ 重击命中反馈 ============
 export const HEAVY_HIT_FREEZE = 0.12;  // 重击命中冻结帧
 
+// ============ 绝技「拔刀」============
+export const QI_MAX               = 100;  // 炁上限
+export const QI_GAIN_LIGHT_HIT    = 10;   // 轻击命中
+export const QI_GAIN_HEAVY_HIT    = 18;   // 重击命中
+export const QI_GAIN_COUNTER_HIT  = 15;   // 弹反反击命中
+export const QI_GAIN_PRECISE      = 12;   // 精准格挡
+export const QI_GAIN_SEMI         = 6;    // 半精准格挡
+export const QI_GAIN_EXECUTION    = 20;   // 处决
+export const QI_GAIN_TAKEN_LIGHT  = 5;    // 被轻击（约命中50%）
+export const QI_GAIN_TAKEN_HEAVY  = 9;    // 被重击
+export const QI_INTERRUPT_COST    = 0.50;  // 被打断消耗比例
+export const ULTIMATE_STARTUP     = 0.40;  // 蓄势（可被打断，足够反应）
+export const ULTIMATE_ACTIVE      = 0.60;  // 乱刀连斩持续时间
+export const ULTIMATE_RECOVERY    = 0.35;  // 收刀
+export const ULTIMATE_RANGE       = 90;    // 前方攻击距离
+export const ULTIMATE_ARC         = Math.PI * 2 / 3; // 前方扇形120°
+export const ULTIMATE_HIT_COUNT   = 4;     // 连斩段数
+export const ULTIMATE_HIT_DAMAGE  = 7;     // 每段伤害（总计4×7=28）
+export const ULTIMATE_KNOCKBACK   = 60;    // 末段击退距离
+export const ULTIMATE_DRIFT       = 120;   // 前冲速度
+export const ULTIMATE_MULTI_2     = 0.80;  // 2人衰减
+export const ULTIMATE_MULTI_3     = 0.66;  // 3+人衰减
+export const ULTIMATE_BLOCK_REDUCTION = 0.50; // 格挡减伤50%
+export const ULTIMATE_CLASH_PUSHBACK = 70;  // 绝刀相撞弹开距离
+export const ULTIMATE_CLASH_STAGGER  = 0.50;// 绝刀相撞硬直
+export const ULTIMATE_CLASH_FREEZE   = 0.25;// 绝刀相撞冻结帧
+
 // ============ AI 节奏控制 ============
 export const AI_MIN_ATTACK_INTERVAL = 0.6;
 export const AI_MAX_IDLE_TIME = 2.5;

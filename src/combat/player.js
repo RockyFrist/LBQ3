@@ -19,6 +19,7 @@ export class Player {
       blockHeld: false,
       dodge: false,
       dodgeAngle: 0,
+      ultimate: false,
     };
 
     // 移动
@@ -45,6 +46,9 @@ export class Player {
 
     // 防御
     cmd.blockHeld = input.held('Space');
+
+    // 绝技
+    if (input.pressed('KeyF')) cmd.ultimate = true;
 
     return cmd;
   }

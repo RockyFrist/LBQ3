@@ -18,6 +18,7 @@ const SNAP_KEYS = [
   'blockSuppressed', 'parryActionDelay',
   'knockbackTimer', 'knockbackDuration', 'knockbackVx', 'knockbackVy',
   'staminaRegenTimer',
+  'qi', 'qiMax',
 ];
 
 /** 序列化单个 Fighter 的渲染状态 */
@@ -59,6 +60,8 @@ export function serializeEvent(evt, fighters) {
   for (const [k, v] of Object.entries(evt)) {
     if (FIGHTER_REF_KEYS.has(k) && v && typeof v === 'object') {
       out[k] = fighters.indexOf(v);
+    } else if (k === 'targets' && Array.isArray(v)) {
+      out[k] = v.map(t => fighters.indexOf(t));
     } else {
       out[k] = v;
     }
@@ -72,6 +75,8 @@ export function deserializeEvent(evt, fighters) {
   for (const [k, v] of Object.entries(evt)) {
     if (FIGHTER_REF_KEYS.has(k) && typeof v === 'number') {
       out[k] = fighters[v] || null;
+    } else if (k === 'targets' && Array.isArray(v)) {
+      out[k] = v.map(i => fighters[i] || null).filter(Boolean);
     } else {
       out[k] = v;
     }
