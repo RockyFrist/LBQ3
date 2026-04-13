@@ -22,109 +22,376 @@
       <div>1-5 难度</div>
     </div>
 
-    <!-- 帮助弹窗 -->
+    <!-- 帮助弹窗（分页标签式） -->
     <div id="help-overlay" class="hidden">
       <div class="help-panel">
         <div class="help-header">⚔ 战斗系统指南</div>
+
+        <!-- 一级标签栏 -->
+        <div class="help-tabs">
+          <button class="help-tab active" data-tab="controls">🎮 操作指南</button>
+          <button class="help-tab" data-tab="mechanics">⚙ 战斗机制</button>
+          <button class="help-tab" data-tab="weapons">🗡 武器图鉴</button>
+        </div>
+
         <div class="help-body">
-          <div class="help-columns">
-            <div class="help-col">
-              <div class="section-title">基础操作</div>
-              <div class="help-item"><span class="help-key">WASD</span><span class="help-desc">移动</span></div>
-              <div class="help-item"><span class="help-key">鼠标</span><span class="help-desc">控制朝向</span></div>
-              <div class="help-item"><span class="help-key">左键单击 / J</span><span class="help-desc">轻击（可连按3下组成连招）</span></div>
-              <div class="help-item"><span class="help-key">右键单击 / K</span><span class="help-desc">重击（蓄力0.7秒，有霸体，<b style="color:#ff6666">0体力时无霸体</b>）</span></div>
-              <div class="help-item"><span class="help-key">空格按住</span><span class="help-desc">招架（精准时机格挡重击）</span></div>
-              <div class="help-item"><span class="help-key">Shift+方向</span><span class="help-desc">闪避（消耗1体力）</span></div>
 
-              <div class="section-title">变招（取消当前动作）</div>
-              <div class="help-item"><span class="help-key">攻击中按右键</span><span class="help-desc">轻击→重击（消耗2体力）</span></div>
-              <div class="help-item"><span class="help-key">攻击中按空格</span><span class="help-desc">攻击→招架（消耗2体力）</span></div>
-              <div class="help-item"><span class="help-key">重击中按左键</span><span class="help-desc">重击→轻击（消耗2体力）</span></div>
-              <div class="help-item"><span class="help-key">招架中按攻击</span><span class="help-desc">招架→攻击（消耗2体力）</span></div>
-              <div class="help-item"><span class="help-key" style="color:#aaa">闪避取消</span><span class="help-desc">攻击中按Shift闪避，不算变招（仅正常闪避消耗）</span></div>
-              <div class="help-item"><span class="help-key" style="color:#aaa">限制</span><span class="help-desc">命中目标后不可变招</span></div>
+          <!-- ========== 操作指南 ========== -->
+          <div class="help-tab-content active" id="tab-controls">
+            <div class="help-columns">
+              <div class="help-col">
+                <div class="section-title">基础操作</div>
+                <div class="help-item"><span class="help-key">WASD</span><span class="help-desc">移动</span></div>
+                <div class="help-item"><span class="help-key">鼠标</span><span class="help-desc">控制朝向</span></div>
+                <div class="help-item"><span class="help-key">左键 / J</span><span class="help-desc">轻击（可连按组成连招）</span></div>
+                <div class="help-item"><span class="help-key">右键 / K</span><span class="help-desc">重击（蓄力，有霸体，<b style="color:#ff6666">0体力无霸体</b>）</span></div>
+                <div class="help-item"><span class="help-key">空格按住</span><span class="help-desc">招架（精准时机格挡重击）</span></div>
+                <div class="help-item"><span class="help-key">Shift+方向</span><span class="help-desc">闪避（消耗1体力）</span></div>
+                <div class="help-item"><span class="help-key hl-gold">F / L</span><span class="help-desc">炁满时释放绝技</span></div>
 
-              <div class="section-title">系统按键</div>
-              <div class="help-item"><span class="help-key">E</span><span class="help-desc">刷出敌人</span></div>
-              <div class="help-item"><span class="help-key">R</span><span class="help-desc">重置战场</span></div>
-              <div class="help-item"><span class="help-key">1-5</span><span class="help-desc">切换AI难度</span></div>
-              <div class="help-item"><span class="help-key" style="color:#44aaff">6</span><span class="help-desc">拼刀训练（AI只用轻击对攻）</span></div>
-              <div class="help-item"><span class="help-key" style="color:#ff88ff">7</span><span class="help-desc">格挡训练（AI用重击+招架，练二次博弈）</span></div>
-              <div class="help-item"><span class="help-key">H</span><span class="help-desc">打开/关闭帮助</span></div>
+                <div class="section-title">变招（取消当前动作）</div>
+                <div class="help-item"><span class="help-key">攻击中按右键</span><span class="help-desc">轻击→重击（消耗2体力）</span></div>
+                <div class="help-item"><span class="help-key">攻击中按空格</span><span class="help-desc">攻击→招架（消耗2体力）</span></div>
+                <div class="help-item"><span class="help-key">重击中按左键</span><span class="help-desc">重击→轻击（消耗2体力）</span></div>
+                <div class="help-item"><span class="help-key">招架中按攻击</span><span class="help-desc">招架→攻击（消耗2体力）</span></div>
+                <div class="help-item"><span class="help-key" style="color:#aaa">限制</span><span class="help-desc">命中目标后不可变招；闪避取消不消耗额外体力</span></div>
+              </div>
+              <div class="help-col">
+                <div class="section-title">系统按键</div>
+                <div class="help-item"><span class="help-key">E</span><span class="help-desc">刷出敌人</span></div>
+                <div class="help-item"><span class="help-key">R</span><span class="help-desc">重置战场</span></div>
+                <div class="help-item"><span class="help-key">1-5</span><span class="help-desc">切换AI难度</span></div>
+                <div class="help-item"><span class="help-key" style="color:#44aaff">6</span><span class="help-desc">拼刀训练</span></div>
+                <div class="help-item"><span class="help-key" style="color:#ff88ff">7</span><span class="help-desc">格挡训练</span></div>
+                <div class="help-item"><span class="help-key">H</span><span class="help-desc">打开/关闭帮助</span></div>
+
+                <div class="section-title">🎮 本地双人 P2 操作</div>
+                <div class="help-item"><span class="help-key">方向键</span><span class="help-desc">移动+朝向（手柄左摇杆）</span></div>
+                <div class="help-item"><span class="help-key">小键盘1</span><span class="help-desc">轻击（手柄X）</span></div>
+                <div class="help-item"><span class="help-key">小键盘2</span><span class="help-desc">闪避（手柄RB/A/LB）</span></div>
+                <div class="help-item"><span class="help-key">小键盘3</span><span class="help-desc">重击（手柄Y）</span></div>
+                <div class="help-item"><span class="help-key">小键盘4</span><span class="help-desc">绝技（手柄RT）</span></div>
+                <div class="help-item"><span class="help-key">小键盘5</span><span class="help-desc">招架（手柄B）</span></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- ========== 战斗机制 ========== -->
+          <div class="help-tab-content" id="tab-mechanics">
+            <div class="help-columns">
+              <div class="help-col">
+                <div class="section-title">克制关系（猜拳三角）</div>
+                <div class="help-relation">
+                  <span style="color:#ff8844;font-weight:bold">重击(霸体)</span>
+                  <span class="arrow">▶</span> 克制 <span class="arrow">▶</span>
+                  <span style="color:#fff;font-weight:bold">轻击</span>
+                </div>
+                <div class="help-relation">
+                  <span style="color:#fff;font-weight:bold">轻击(连击)</span>
+                  <span class="arrow">▶</span> 克制 <span class="arrow">▶</span>
+                  <span style="color:#88ccff;font-weight:bold">招架</span>
+                </div>
+                <div class="help-relation">
+                  <span style="color:#88ccff;font-weight:bold">招架(格挡)</span>
+                  <span class="arrow">▶</span> 克制 <span class="arrow">▶</span>
+                  <span style="color:#ff8844;font-weight:bold">重击</span>
+                </div>
+
+                <div class="section-title">格挡等级（招架时机）</div>
+                <div class="help-item"><span class="help-key hl-gold">精准格挡</span><span class="help-desc">命中前0.12秒招架，对方-2体力，慢动作+加速反击</span></div>
+                <div class="help-item"><span class="help-key hl-blue">半精准格挡</span><span class="help-desc">提前招架，对方-1体力，慢动作+加速反击</span></div>
+                <div class="help-item"><span class="help-key hl-orange">非精准格挡</span><span class="help-desc">时机差，自身-2体力，对方-1体力</span></div>
+                <div class="help-item"><span class="help-key" style="color:#66ffcc">二次博弈</span><span class="help-desc">格挡后双方慢动作，格挡方先解锁+加速，被弹方可格挡/闪避</span></div>
+
+                <div class="section-title">轻击打招架（渐进破招）</div>
+                <div class="help-item"><span class="help-key" style="color:#aaa">第1/2下</span><span class="help-desc">不破防，扣对方1体力/下</span></div>
+                <div class="help-item"><span class="help-key hl-gold">第3下横扫</span><span class="help-desc">破防！对方进入硬直</span></div>
+              </div>
+              <div class="help-col">
+                <div class="section-title">特殊机制</div>
+                <div class="help-item"><span class="help-key hl-yellow">拼刀</span><span class="help-desc">双方轻击同时挥刀→弹开</span></div>
+                <div class="help-item"><span class="help-key hl-yellow">弹刀</span><span class="help-desc">双方重击碰撞→弹远+各-1体力</span></div>
+                <div class="help-item"><span class="help-key" style="color:#ff8844">霸体</span><span class="help-desc">重击蓄力中吸收轻击（<b style="color:#ff6666">0体力时失去霸体</b>）</span></div>
+                <div class="help-item"><span class="help-key hl-gold">完美闪避</span><span class="help-desc">闪避瞬间躲过攻击→退还消耗+额外回1体力</span></div>
+                <div class="help-item"><span class="help-key" style="color:#ff88ff">变招</span><span class="help-desc">攻击前摇中切换动作，消耗2体力</span></div>
+                <div class="help-item"><span class="help-key hl-red">处决</span><span class="help-desc">体力=0时被打→扣25%最大血量，处决后恢复满体力</span></div>
+
+                <div class="section-title">🔥 绝技（炁系统）</div>
+                <div class="help-item"><span class="help-key" style="color:#aaa">充能</span><span class="help-desc">命中/格挡/受击/处决积攒炁（HP条下方炁槽）</span></div>
+                <div class="help-item"><span class="help-key hl-yellow">命中锁定</span><span class="help-desc">首段命中后目标被锁定，无法闪避后续段</span></div>
+                <div class="help-item"><span class="help-key" style="color:#ff6666">可被打断</span><span class="help-desc">蓄势阶段可被攻击打断，返还部分炁</span></div>
+                <div class="help-item"><span class="help-key" style="color:#88ccff">可被闪避</span><span class="help-desc">首段未命中可全程闪避（穿透格挡但减伤，不穿透无敌帧）</span></div>
+                <div class="help-item"><span class="help-key" style="color:#ff3300">绝技相撞</span><span class="help-desc">双方同时释放绝技且面对面→弹开+返还50%炁</span></div>
+
+                <div class="section-title">体力系统（共5点）</div>
+                <div class="help-item"><span class="help-key" style="color:#aaa">恢复</span><span class="help-desc">每2.0秒回1点</span></div>
+                <div class="help-item"><span class="help-key" style="color:#aaa">招架中</span><span class="help-desc">暂停恢复2.5秒</span></div>
+                <div class="help-item"><span class="help-key hl-red">体力=0</span><span class="help-desc">速度减半，重击无霸体，可被处决</span></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- ========== 武器图鉴 ========== -->
+          <div class="help-tab-content" id="tab-weapons">
+            <!-- 武器子标签栏 -->
+            <div class="weapon-tabs">
+              <button class="weapon-tab active" data-weapon="dao"><span style="color:#4488ff">🗡️</span> 刀</button>
+              <button class="weapon-tab" data-weapon="daggers"><span style="color:#cc66ff">🗡🗡</span> 匕首</button>
+              <button class="weapon-tab" data-weapon="hammer"><span style="color:#ff8844">🔨</span> 大锤</button>
+              <button class="weapon-tab" data-weapon="spear"><span style="color:#44ccbb">🔱</span> 长枪</button>
+              <button class="weapon-tab" data-weapon="shield"><span style="color:#ffcc44">🛡️</span> 剑盾</button>
             </div>
 
-            <div class="help-col">
-              <div class="section-title">克制关系（猜拳三角）</div>
-              <div class="help-relation">
-                <span style="color:#ff8844;font-weight:bold">重击(霸体)</span>
-                <span class="arrow">▶</span>
-                <span>克制</span>
-                <span class="arrow">▶</span>
-                <span style="color:#fff;font-weight:bold">轻击</span>
+            <!-- 刀 -->
+            <div class="weapon-tab-content active" id="weapon-dao">
+              <div class="weapon-profile">
+                <div class="weapon-profile-header" style="border-left-color:#4488ff">
+                  <span class="weapon-icon-lg">🗡️</span>
+                  <div>
+                    <div class="weapon-name" style="color:#4488ff">刀</div>
+                    <div class="weapon-role">均衡型 · 攻守兼备</div>
+                  </div>
+                </div>
+                <div class="weapon-desc">各项能力均衡的标准武器，适合初学者。攻击距离中等，前摇/后摇适中，拥有精准格挡和标准霸体机制。刀是理解战斗系统核心的最佳选择。</div>
               </div>
-              <div class="help-relation">
-                <span style="color:#fff;font-weight:bold">轻击(连击)</span>
-                <span class="arrow">▶</span>
-                <span>克制</span>
-                <span class="arrow">▶</span>
-                <span style="color:#88ccff;font-weight:bold">招架</span>
+              <div class="help-columns">
+                <div class="help-col">
+                  <div class="section-title">⚔ 轻击连招 (3段)</div>
+                  <div class="help-item"><span class="help-key" style="color:#4488ff">前刺</span><span class="help-desc">伤害8 · 距离55 · 前摇0.15秒</span></div>
+                  <div class="help-item"><span class="help-key" style="color:#4488ff">斜砍</span><span class="help-desc">伤害9 · 距离58 · 前摇0.15秒</span></div>
+                  <div class="help-item"><span class="help-key hl-gold">横扫</span><span class="help-desc">伤害13 · 距离62 · 前摇0.22秒 · 大弧度收尾</span></div>
+                  <div class="section-title">💥 重击</div>
+                  <div class="help-item"><span class="help-key" style="color:#ff8844">蓄力斩</span><span class="help-desc">伤害28 · 距离78 · 蓄力0.70秒 · 霸体 · 击退80</span></div>
+                  <div class="section-title">🔥 绝技 · 拔刀</div>
+                  <div class="help-item"><span class="help-key hl-gold">拔刀</span><span class="help-desc">前方扇形4段连斩 · 每段伤害7 · 距离90</span></div>
+                </div>
+                <div class="help-col">
+                  <div class="section-title">📊 基础属性</div>
+                  <div class="weapon-stats">
+                    <div class="stat-row"><span class="stat-label">攻速倍率</span><span class="stat-value">×1.0</span></div>
+                    <div class="stat-row"><span class="stat-label">精准格挡窗口</span><span class="stat-value">0.12秒</span></div>
+                    <div class="stat-row"><span class="stat-label">破防所需</span><span class="stat-value">3下</span></div>
+                    <div class="stat-row"><span class="stat-label">格挡消耗</span><span class="stat-value">标准</span></div>
+                    <div class="stat-row"><span class="stat-label">闪避速度</span><span class="stat-value">370</span></div>
+                    <div class="stat-row"><span class="stat-label">无敌帧</span><span class="stat-value">0.18秒</span></div>
+                  </div>
+                  <div class="section-title">💡 战术建议</div>
+                  <div class="weapon-tip">利用3段连招的渐进破招机制压制对手体力；重击配合变招建立心理优势；精准格挡后迅速反击获取最大收益。适合正面対决的稳扎稳打风格。</div>
+                </div>
               </div>
-              <div class="help-relation">
-                <span style="color:#88ccff;font-weight:bold">招架(格挡)</span>
-                <span class="arrow">▶</span>
-                <span>克制</span>
-                <span class="arrow">▶</span>
-                <span style="color:#ff8844;font-weight:bold">重击</span>
-              </div>
-
-              <div class="section-title">格挡等级（招架时机）</div>
-              <div class="help-item"><span class="help-key hl-gold">精准格挡</span><span class="help-desc">命中前0.12秒招架，对方-2体力，慢动作x0.12+加速反击</span></div>
-              <div class="help-item"><span class="help-key hl-blue">半精准格挡</span><span class="help-desc">提前招架，对方-1体力，慢动作x0.15+加速反击</span></div>
-              <div class="help-item"><span class="help-key hl-orange">非精准格挡</span><span class="help-desc">时机差，自身-2体力，对方-1体力</span></div>
-              <div class="help-item"><span class="help-key" style="color:#66ffcc">二次博弈</span><span class="help-desc">格挡后双方进入慢动作，格挡方先解锁+加速，但被弹方也可格挡/闪避</span></div>
-
-              <div class="section-title">轻击打招架（渐进破招）</div>
-              <div class="help-item"><span class="help-key" style="color:#aaa">第1/2下</span><span class="help-desc">不破防，扣对方1体力/下</span></div>
-              <div class="help-item"><span class="help-key hl-gold">第3下横扫</span><span class="help-desc">破防！对方进入硬直</span></div>
-
-              <div class="section-title">特殊机制</div>
-              <div class="help-item"><span class="help-key hl-yellow">拼刀</span><span class="help-desc">双方轻击同时挥刀→弹开</span></div>
-              <div class="help-item"><span class="help-key hl-yellow">弹刀</span><span class="help-desc">双方重击碰撞→弹远+各-1体力</span></div>
-              <div class="help-item"><span class="help-key" style="color:#ff8844">霸体</span><span class="help-desc">重击蓄力中吸收轻击（<b style="color:#ff6666">0体力时失去霸体</b>）</span></div>
-              <div class="help-item"><span class="help-key hl-gold">完美闪避</span><span class="help-desc">闪避瞬间躲过攻击→退还消耗+额外回1体力</span></div>
-              <div class="help-item"><span class="help-key" style="color:#ff88ff">变招</span><span class="help-desc">攻击前摇中切换动作，消耗2体力（出刀时看到虚线弧预告）</span></div>
-              <div class="help-item"><span class="help-key hl-red">处决</span><span class="help-desc">体力=0时被打→扣25%最大血量，处决后恢复满体力</span></div>
-
-              <div class="section-title">🔥 绝技 · 拔刀（炁系统）</div>
-              <div class="help-item"><span class="help-key hl-gold">F / L</span><span class="help-desc">炁满时按F或L释放「拔刀」— 前方扇形4段连斩</span></div>
-              <div class="help-item"><span class="help-key" style="color:#aaa">充能</span><span class="help-desc">命中/格挡/受击/处决均可积攒炁（HP条下方炁槽）</span></div>
-              <div class="help-item"><span class="help-key hl-yellow">命中锁定</span><span class="help-desc">首段命中后目标被锁定，无法闪避脱离后续3段</span></div>
-              <div class="help-item"><span class="help-key" style="color:#ff6666">可被打断</span><span class="help-desc">蓄势阶段(startup)可被攻击打断，返还部分炁</span></div>
-              <div class="help-item"><span class="help-key" style="color:#88ccff">可被闪避</span><span class="help-desc">首段未命中即可全程闪避（穿透格挡但伤害减半，不穿透无敌帧）</span></div>
-              <div class="help-item"><span class="help-key" style="color:#ff3300">绝刀相撞</span><span class="help-desc">双方同时连斩且面对面 → 弹开+返还50%炁</span></div>
-
-              <div class="section-title">体力系统（共5点）</div>
-              <div class="help-item"><span class="help-key" style="color:#aaa">恢复</span><span class="help-desc">每2.0秒回1点</span></div>
-              <div class="help-item"><span class="help-key" style="color:#aaa">招架中</span><span class="help-desc">暂停恢复2.5秒</span></div>
-              <div class="help-item"><span class="help-key hl-red">体力=0</span><span class="help-desc">速度减半，重击无霸体，可被处决</span></div>
-
-              <div class="section-title">🎮 本地双人 P2 操作</div>
-              <div class="help-item"><span class="help-key">方向键</span><span class="help-desc">移动+朝向（手柄左摇杆同理）</span></div>
-              <div class="help-item"><span class="help-key">小键盘1</span><span class="help-desc">轻击（手柄X）</span></div>
-              <div class="help-item"><span class="help-key">小键盘2</span><span class="help-desc">闪避（手柄RB/A/LB）</span></div>
-              <div class="help-item"><span class="help-key">小键盘3</span><span class="help-desc">重击（手柄Y）</span></div>
-              <div class="help-item"><span class="help-key">小键盘4</span><span class="help-desc">绝技（手柄RT）</span></div>
-              <div class="help-item"><span class="help-key">小键盘5</span><span class="help-desc">招架（手柄B）</span></div>
             </div>
+
+            <!-- 匕首 -->
+            <div class="weapon-tab-content" id="weapon-daggers">
+              <div class="weapon-profile">
+                <div class="weapon-profile-header" style="border-left-color:#cc66ff">
+                  <span class="weapon-icon-lg">🗡🗡</span>
+                  <div>
+                    <div class="weapon-name" style="color:#cc66ff">匕首</div>
+                    <div class="weapon-role">速度型 · 闪避/背刺</div>
+                  </div>
+                </div>
+                <div class="weapon-desc">极快的攻击速度和超长的5段连招，配合影步绕背和背刺加成，是高机动性的刺客型武器。代价是距离短、防御弱（无精准格挡、2下即破防、格挡消耗2体力）。</div>
+              </div>
+              <div class="help-columns">
+                <div class="help-col">
+                  <div class="section-title">⚔ 轻击连招 (5段)</div>
+                  <div class="help-item"><span class="help-key" style="color:#cc66ff">左刺</span><span class="help-desc">伤害7 · 距离42 · 前摇0.08秒</span></div>
+                  <div class="help-item"><span class="help-key" style="color:#cc66ff">右刺</span><span class="help-desc">伤害7 · 距离44 · 前摇0.08秒</span></div>
+                  <div class="help-item"><span class="help-key" style="color:#cc66ff">双刺</span><span class="help-desc">伤害8 · 距离46 · 前摇0.10秒</span></div>
+                  <div class="help-item"><span class="help-key" style="color:#cc66ff">旋刺</span><span class="help-desc">伤害9 · 距离46 · 前摇0.10秒</span></div>
+                  <div class="help-item"><span class="help-key hl-gold">交叉斩</span><span class="help-desc">伤害12 · 距离50 · 前摇0.12秒</span></div>
+                  <div class="section-title">💥 重击 · 影突</div>
+                  <div class="help-item"><span class="help-key" style="color:#cc66ff">影突</span><span class="help-desc">伤害25 · 突进距离大 · <b style="color:#ff6666">无霸体</b> · 速度快</span></div>
+                </div>
+                <div class="help-col">
+                  <div class="section-title">📊 基础属性</div>
+                  <div class="weapon-stats">
+                    <div class="stat-row"><span class="stat-label">攻速倍率</span><span class="stat-value" style="color:#44ff88">×1.20</span></div>
+                    <div class="stat-row"><span class="stat-label">精准格挡窗口</span><span class="stat-value" style="color:#ff6666">无</span></div>
+                    <div class="stat-row"><span class="stat-label">破防所需</span><span class="stat-value" style="color:#ff6666">2下</span></div>
+                    <div class="stat-row"><span class="stat-label">格挡消耗</span><span class="stat-value" style="color:#ff6666">2体力</span></div>
+                    <div class="stat-row"><span class="stat-label">闪避速度</span><span class="stat-value" style="color:#44ff88">420</span></div>
+                    <div class="stat-row"><span class="stat-label">无敌帧</span><span class="stat-value" style="color:#44ff88">0.24秒</span></div>
+                    <div class="stat-row"><span class="stat-label">完美闪避回体力</span><span class="stat-value" style="color:#44ff88">+2</span></div>
+                    <div class="stat-row"><span class="stat-label">霸体穿透</span><span class="stat-value" style="color:#ffcc44">80%</span></div>
+                  </div>
+                  <div class="section-title">🌟 特殊能力</div>
+                  <div class="help-item"><span class="help-key" style="color:#cc66ff">影步</span><span class="help-desc">闪避时锁定目标朝向0.3秒，方便绕背</span></div>
+                  <div class="help-item"><span class="help-key hl-gold">背刺</span><span class="help-desc">从背后60°内攻击伤害×1.3</span></div>
+                  <div class="section-title">🔥 绝技 · 影杀</div>
+                  <div class="help-item"><span class="help-key hl-gold">影杀</span><span class="help-desc">短距突进+6段连斩 · 背刺加成×1.3 · 不减伤</span></div>
+                  <div class="section-title">💡 战术建议</div>
+                  <div class="weapon-tip">利用高速连招消耗对手体力，完美闪避绕背后背刺追击。避免正面硬拼，以走位和闪避为核心。霸体穿透可在对手蓄重击时见缝插针造成伤害。</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 大锤 -->
+            <div class="weapon-tab-content" id="weapon-hammer">
+              <div class="weapon-profile">
+                <div class="weapon-profile-header" style="border-left-color:#ff8844">
+                  <span class="weapon-icon-lg">🔨</span>
+                  <div>
+                    <div class="weapon-name" style="color:#ff8844">大锤</div>
+                    <div class="weapon-role">力量型 · 全程霸体</div>
+                  </div>
+                </div>
+                <div class="weapon-desc">所有轻击自带霸体，重击360°全范围AOE。攻击慢但伤害高，命中格挡额外消耗1体力。代价是无精准格挡、闪避慢、灵活性差。适合以交换为核心的暴力打法。</div>
+              </div>
+              <div class="help-columns">
+                <div class="help-col">
+                  <div class="section-title">⚔ 轻击连招 (3段·全霸体)</div>
+                  <div class="help-item"><span class="help-key" style="color:#ff8844">横扫</span><span class="help-desc">伤害14 · 距离62 · 前摇0.20秒 · 霸体</span></div>
+                  <div class="help-item"><span class="help-key" style="color:#ff8844">上挑</span><span class="help-desc">伤害16 · 距离66 · 前摇0.22秒 · 霸体</span></div>
+                  <div class="help-item"><span class="help-key hl-gold">砸地</span><span class="help-desc">伤害18 · 距离72 · 前摇0.30秒 · 霸体 · 长硬直</span></div>
+                  <div class="section-title">💥 重击 · 360°旋风</div>
+                  <div class="help-item"><span class="help-key" style="color:#ff8844">旋风</span><span class="help-desc">伤害32 · 360°全范围 · 蓄力1.05秒 · 霸体 · 击退85</span></div>
+                </div>
+                <div class="help-col">
+                  <div class="section-title">📊 基础属性</div>
+                  <div class="weapon-stats">
+                    <div class="stat-row"><span class="stat-label">攻速倍率</span><span class="stat-value" style="color:#ff6666">×0.85</span></div>
+                    <div class="stat-row"><span class="stat-label">精准格挡窗口</span><span class="stat-value" style="color:#ff6666">无</span></div>
+                    <div class="stat-row"><span class="stat-label">破防所需</span><span class="stat-value">3下</span></div>
+                    <div class="stat-row"><span class="stat-label">命中格挡额外消耗</span><span class="stat-value" style="color:#44ff88">+1体力</span></div>
+                    <div class="stat-row"><span class="stat-label">闪避速度</span><span class="stat-value" style="color:#ff6666">300</span></div>
+                    <div class="stat-row"><span class="stat-label">无敌帧</span><span class="stat-value" style="color:#ff6666">0.15秒</span></div>
+                    <div class="stat-row"><span class="stat-label">炁上限</span><span class="stat-value" style="color:#44ff88">75 (蓄炁快)</span></div>
+                  </div>
+                  <div class="section-title">🔥 绝技 · 开山</div>
+                  <div class="help-item"><span class="help-key hl-gold">开山</span><span class="help-desc">跳跃突进+360°砸地 · 伤害35 · <b style="color:#ff6666">直接破防</b></span></div>
+                  <div class="section-title">🌟 特殊能力</div>
+                  <div class="help-item"><span class="help-key" style="color:#ff8844">震地盾</span><span class="help-desc">重击命中地面产生震波效果</span></div>
+                  <div class="section-title">💡 战术建议</div>
+                  <div class="weapon-tip">利用全程霸体强行交换，轻击连招DPS高于对手单次重击。重击360°范围让对手无法绕背。缺乏精准格挡意味着要靠硬抗和走位控制节奏。</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 长枪 -->
+            <div class="weapon-tab-content" id="weapon-spear">
+              <div class="weapon-profile">
+                <div class="weapon-profile-header" style="border-left-color:#44ccbb">
+                  <span class="weapon-icon-lg">🔱</span>
+                  <div>
+                    <div class="weapon-name" style="color:#44ccbb">长枪</div>
+                    <div class="weapon-role">距离型 · 空间控制</div>
+                  </div>
+                </div>
+                <div class="weapon-desc">全武器最长的攻击距离，在甜区(65-110)内伤害加成15%。拥有精准格挡自动反刺和后撤刺被动能力。攻击弧度窄，近身劣势明显（近距离伤害-25%）。适合控制距离的精确打法。</div>
+              </div>
+              <div class="help-columns">
+                <div class="help-col">
+                  <div class="section-title">⚔ 轻击连招 (3段)</div>
+                  <div class="help-item"><span class="help-key" style="color:#44ccbb">前刺</span><span class="help-desc">伤害8 · 距离75 · 前摇0.13秒 · 窄弧度</span></div>
+                  <div class="help-item"><span class="help-key" style="color:#44ccbb">横扫</span><span class="help-desc">伤害8 · 距离80 · 前摇0.13秒</span></div>
+                  <div class="help-item"><span class="help-key hl-gold">突刺</span><span class="help-desc">伤害14 · 距离88 · 前摇0.18秒 · 最远</span></div>
+                  <div class="section-title">💥 重击 · 长刺</div>
+                  <div class="help-item"><span class="help-key" style="color:#44ccbb">长刺</span><span class="help-desc">伤害25 · 距离110 · 蓄力0.65秒 · 霸体 · 极窄弧度</span></div>
+                </div>
+                <div class="help-col">
+                  <div class="section-title">📊 基础属性</div>
+                  <div class="weapon-stats">
+                    <div class="stat-row"><span class="stat-label">攻速倍率</span><span class="stat-value">×1.0</span></div>
+                    <div class="stat-row"><span class="stat-label">精准格挡窗口</span><span class="stat-value">0.12秒</span></div>
+                    <div class="stat-row"><span class="stat-label">破防所需</span><span class="stat-value">3下</span></div>
+                    <div class="stat-row"><span class="stat-label">格挡消耗</span><span class="stat-value">标准</span></div>
+                    <div class="stat-row"><span class="stat-label">闪避速度</span><span class="stat-value">370</span></div>
+                    <div class="stat-row"><span class="stat-label">甜区距离</span><span class="stat-value" style="color:#44ff88">65-110 (+15%)</span></div>
+                    <div class="stat-row"><span class="stat-label">近身惩罚</span><span class="stat-value" style="color:#ff6666">&lt;40 (-25%)</span></div>
+                  </div>
+                  <div class="section-title">🌟 特殊能力</div>
+                  <div class="help-item"><span class="help-key" style="color:#44ccbb">自动反刺</span><span class="help-desc">精准格挡后自动反击（无需手动操作）</span></div>
+                  <div class="help-item"><span class="help-key" style="color:#44ccbb">后撤刺</span><span class="help-desc">被攻击时闪避后撤可触发反刺</span></div>
+                  <div class="help-item"><span class="help-key" style="color:#44ccbb">距离加成</span><span class="help-desc">甜区内伤害+15%，近身伤害-25%</span></div>
+                  <div class="section-title">🔥 绝技 · 龙舞</div>
+                  <div class="help-item"><span class="help-key hl-gold">龙舞</span><span class="help-desc">360°旋转4段横扫 · 每段伤害6+击退 · 可追敌</span></div>
+                  <div class="section-title">💡 战术建议</div>
+                  <div class="weapon-tip">保持甜区距离获得伤害加成，利用后撤刺和自动反刺维持空间控制。避免被近身缠斗——近距离伤害惩罚严重。重击虽远但弧度极窄，需要精准瞄准。</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 剑盾 -->
+            <div class="weapon-tab-content" id="weapon-shield">
+              <div class="weapon-profile">
+                <div class="weapon-profile-header" style="border-left-color:#ffcc44">
+                  <span class="weapon-icon-lg">🛡️</span>
+                  <div>
+                    <div class="weapon-name" style="color:#ffcc44">剑盾</div>
+                    <div class="weapon-role">防御型 · 反击/盾行</div>
+                  </div>
+                </div>
+                <div class="weapon-desc">全武器最强防御：格挡不消耗体力、4下才破防、精准格挡反弹30%伤害、可以边举盾边移动（盾行）。重击为盾击，扣对方2体力。代价是攻击距离短、输出偏低。适合以防反为核心的坚守打法。</div>
+              </div>
+              <div class="help-columns">
+                <div class="help-col">
+                  <div class="section-title">⚔ 轻击连招 (3段)</div>
+                  <div class="help-item"><span class="help-key" style="color:#ffcc44">横斜</span><span class="help-desc">伤害8 · 距离52 · 前摇0.15秒</span></div>
+                  <div class="help-item"><span class="help-key" style="color:#ffcc44">刺击</span><span class="help-desc">伤害8 · 距离56 · 前摇0.15秒</span></div>
+                  <div class="help-item"><span class="help-key hl-gold">上斜</span><span class="help-desc">伤害12 · 距离60 · 前摇0.20秒</span></div>
+                  <div class="section-title">💥 重击 · 盾击</div>
+                  <div class="help-item"><span class="help-key" style="color:#ffcc44">盾击</span><span class="help-desc">伤害15 · 大弧度 · 蓄力0.50秒 · 霸体 · <b style="color:#ff6666">扣对方2体力</b></span></div>
+                </div>
+                <div class="help-col">
+                  <div class="section-title">📊 基础属性</div>
+                  <div class="weapon-stats">
+                    <div class="stat-row"><span class="stat-label">攻速倍率</span><span class="stat-value">×0.95</span></div>
+                    <div class="stat-row"><span class="stat-label">精准格挡窗口</span><span class="stat-value" style="color:#44ff88">0.13秒</span></div>
+                    <div class="stat-row"><span class="stat-label">破防所需</span><span class="stat-value" style="color:#44ff88">4下</span></div>
+                    <div class="stat-row"><span class="stat-label">格挡消耗</span><span class="stat-value" style="color:#44ff88">0 (免费)</span></div>
+                    <div class="stat-row"><span class="stat-label">弹反伤害反弹</span><span class="stat-value" style="color:#44ff88">30%</span></div>
+                    <div class="stat-row"><span class="stat-label">格挡后摇</span><span class="stat-value" style="color:#44ff88">0.45秒 (最短)</span></div>
+                    <div class="stat-row"><span class="stat-label">盾行</span><span class="stat-value" style="color:#44ff88">可边格挡边移动</span></div>
+                  </div>
+                  <div class="section-title">🌟 特殊能力</div>
+                  <div class="help-item"><span class="help-key" style="color:#ffcc44">盾行</span><span class="help-desc">格挡时可以40%速度移动</span></div>
+                  <div class="help-item"><span class="help-key" style="color:#ffcc44">伤害反弹</span><span class="help-desc">精准格挡反弹30%伤害给攻击者</span></div>
+                  <div class="section-title">🔥 绝技 · 绝对防御</div>
+                  <div class="help-item"><span class="help-key hl-gold">绝对防御</span><span class="help-desc">进入1.2秒防御姿态，被攻击则反击伤害35 · 无人攻击返还60%炁</span></div>
+                  <div class="section-title">💡 战术建议</div>
+                  <div class="weapon-tip">利用免费格挡和盾行靠近对手，精准格挡后配合弹反+反击最大化伤害。盾击消耗对方体力是消耗战核心。绝对防御在对手连招时使用收益最大。</div>
+                </div>
+              </div>
+            </div>
+
           </div>
         </div>
         <div class="help-footer">
-          按 <span class="key-badge">H</span> 关闭帮助并继续游戏
+          按 <span class="key-badge">H</span> 关闭帮助
           <button id="help-close-btn" style="margin-left:16px;padding:4px 18px;font-size:15px;border-radius:6px;border:1px solid rgba(100,150,255,0.3);background:rgba(40,50,80,0.8);color:#cce;cursor:pointer;">✕ 关闭</button>
         </div>
       </div>
     </div>
+
+    <script>
+    // 指南标签页切换逻辑
+    (function() {
+      const overlay = document.getElementById('help-overlay');
+      if (!overlay) return;
+      // 一级标签
+      overlay.querySelectorAll('.help-tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+          overlay.querySelectorAll('.help-tab').forEach(t => t.classList.remove('active'));
+          overlay.querySelectorAll('.help-tab-content').forEach(c => c.classList.remove('active'));
+          tab.classList.add('active');
+          const target = document.getElementById('tab-' + tab.dataset.tab);
+          if (target) target.classList.add('active');
+        });
+      });
+      // 武器子标签
+      overlay.querySelectorAll('.weapon-tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+          overlay.querySelectorAll('.weapon-tab').forEach(t => t.classList.remove('active'));
+          overlay.querySelectorAll('.weapon-tab-content').forEach(c => c.classList.remove('active'));
+          tab.classList.add('active');
+          const target = document.getElementById('weapon-' + tab.dataset.weapon);
+          if (target) target.classList.add('active');
+        });
+      });
+    })();
+    </script>
 
     <!-- 联机房间面板 -->
     <div id="room-overlay" class="hidden">
