@@ -169,10 +169,11 @@ export const WEAPON_DAGGERS = {
 
   aiHints: {
     preferredRange: [30, 50],
-    aggressiveness: 0.70,
-    dodgeBias: 0.70,
+    aggressiveness: 0.50,
+    dodgeBias: 0.55,
     blockBias: 0.15,
-    heavyBias: 0.30,
+    heavyBias: 0.15,
+    maxComboBonus: -1,
   },
 };
 
@@ -257,7 +258,7 @@ export const WEAPON_HAMMER = {
 
   aiHints: {
     preferredRange: [50, 72],
-    aggressiveness: 0.60,
+    aggressiveness: 0.40,
     dodgeBias: 0.25,
     blockBias: 0.40,
     heavyBias: 0.50,
@@ -431,7 +432,7 @@ export const WEAPON_SHIELD = {
 
   aiHints: {
     preferredRange: [40, 58],
-    aggressiveness: 0.50,
+    aggressiveness: 0.40,
     dodgeBias: 0.25,
     blockBias: 0.50,
     heavyBias: 0.25,

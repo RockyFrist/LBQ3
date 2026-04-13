@@ -6,6 +6,18 @@
 import * as C from '../core/constants.js';
 import { dist, angleBetween } from '../core/utils.js';
 
+/**
+ * 难度缩放：低难度AI使用插件行为概率更低，更多走默认逻辑
+ * D1=0.20  D2=0.40  D3=0.60  D4=0.80  D5=1.00
+ * @param {object} enemy - Enemy实例
+ * @param {number} baseChance - 基准概率（D5水平）
+ * @returns {boolean} 按难度缩放后的掷骰结果
+ */
+function pluginRoll(enemy, baseChance) {
+  const scale = 0.2 + (enemy.difficulty - 1) / 4 * 0.8; // D1=0.20 D5=1.00
+  return Math.random() < baseChance * scale;
+}
+
 // ===================== 匕首 AI — 闪避绕背，快速压制 =====================
 export const DAGGERS_AI = {
   /**
@@ -13,8 +25,7 @@ export const DAGGERS_AI = {
    * @returns {boolean} true=已处理
    */
   postParried(enemy, f, pf, d, ang, cmd, cfg) {
-    const roll = Math.random();
-    if (roll < 0.55 && f.stamina >= C.DODGE_COST) {
+    if (pluginRoll(enemy, 0.55) && f.stamina >= C.DODGE_COST) {
       // 侧闪绕背（匕首核心战术）
       const behindAngle = ang + (Math.random() < 0.5 ? Math.PI * 0.7 : -Math.PI * 0.7);
       cmd.dodge = true;
@@ -22,7 +33,7 @@ export const DAGGERS_AI = {
       enemy.aiState = 'punish';
       enemy.aiTimer = 0.15;
       return true;
-    } else if (roll < 0.80) {
+    } else if (pluginRoll(enemy, 0.35)) {
       // 快速轻击连打（匕首速度优势）
       cmd.lightAttack = true;
       enemy.comboTarget = Math.min(3, cfg.maxCombo);
@@ -31,7 +42,7 @@ export const DAGGERS_AI = {
       enemy.aiTimer = 0.4;
       return true;
     }
-    // 20% 走默认逻辑
+    // 走默认逻辑（低难度更频繁走这里）
     return false;
   },
 
@@ -39,8 +50,7 @@ export const DAGGERS_AI = {
    * 成功格挡后决策：匕首利用速度优势快速反击
    */
   postParry(enemy, f, pf, d, ang, cmd, cfg) {
-    const roll = Math.random();
-    if (roll < 0.60) {
+    if (pluginRoll(enemy, 0.60)) {
       // 快速连击（利用parryBoost加速）
       cmd.lightAttack = true;
       enemy.comboTarget = Math.min(3, cfg.maxCombo);
@@ -48,7 +58,7 @@ export const DAGGERS_AI = {
       enemy.aiState = 'recover';
       enemy.aiTimer = 0.5;
       return true;
-    } else if (roll < 0.85 && f.stamina >= C.DODGE_COST) {
+    } else if (pluginRoll(enemy, 0.35) && f.stamina >= C.DODGE_COST) {
       // 闪避绕背再攻击
       const behindAngle = ang + (Math.random() < 0.5 ? Math.PI * 0.6 : -Math.PI * 0.6);
       cmd.dodge = true;
@@ -65,14 +75,16 @@ export const DAGGERS_AI = {
    */
   approachOverride(enemy, f, pf, d, ang, cmd, cfg) {
     if (d > cfg.approachDist + 20) return false; // 远距离正常接近
-    // 近距离绕侧（匕首独有的弧形切入）
+    if (enemy.difficulty < 3) return false; // 低难度不绕侧
+    // 近距离绕侧（匕首独有的弧形切入），难度越高侧向比例越大
     const fwdX = Math.cos(ang);
     const fwdY = Math.sin(ang);
     const perpX = -fwdY * enemy._strafeDir;
     const perpY = fwdX * enemy._strafeDir;
-    // 匕首更激进的侧向比例
-    cmd.moveX = fwdX * 0.4 + perpX * 0.8;
-    cmd.moveY = fwdY * 0.4 + perpY * 0.8;
+    const effectiveDiff = Math.min(4, enemy.difficulty); // D5绕侧不超过D4，避免接近太慢
+    const strafeScale = 0.4 + (effectiveDiff - 3) / 2 * 0.4; // D3=0.4 D4/D5=0.6
+    cmd.moveX = fwdX * (1 - strafeScale * 0.75) + perpX * strafeScale;
+    cmd.moveY = fwdY * (1 - strafeScale * 0.75) + perpY * strafeScale;
     return true;
   },
 
@@ -80,7 +92,8 @@ export const DAGGERS_AI = {
    * 硬直中反应：匕首永远优先闪避，不做霸体交换
    */
   staggerReact(enemy, f, pf, d, ang, cmd, cfg) {
-    if (f.stamina >= C.DODGE_COST && Math.random() < cfg.dodgeChance * 2.0) {
+    // dodgeChance已含难度缩放，再乘1.5（原2.0太强导致低难度也高闪避）
+    if (f.stamina >= C.DODGE_COST && Math.random() < cfg.dodgeChance * 1.5) {
       const behindAngle = ang + (Math.random() < 0.5 ? Math.PI * 0.7 : -Math.PI * 0.7);
       cmd.dodge = true;
       cmd.dodgeAngle = behindAngle;
@@ -98,15 +111,14 @@ export const HAMMER_AI = {
    * 被格挡后决策：大锤依靠霸体硬抗，不轻易退让
    */
   postParried(enemy, f, pf, d, ang, cmd, cfg) {
-    const roll = Math.random();
-    if (roll < 0.50 && enemy._heavyCD <= 0) {
+    if (pluginRoll(enemy, 0.50) && enemy._heavyCD <= 0) {
       // 霸体重击交换（大锤的核心策略：挨打不怕，重击回敬）
       cmd.heavyAttack = true;
       enemy.aiState = 'recover';
       enemy.aiTimer = 1.5;
       enemy._heavyCD = cfg.heavyCooldown || 0;
       return true;
-    } else if (roll < 0.70) {
+    } else if (pluginRoll(enemy, 0.30)) {
       // 轻击压制（大锤轻击也有霸体）
       cmd.lightAttack = true;
       enemy.comboTarget = Math.min(2, cfg.maxCombo);
@@ -114,7 +126,7 @@ export const HAMMER_AI = {
       enemy.aiState = 'recover';
       enemy.aiTimer = 0.7;
       return true;
-    } else if (roll < 0.85) {
+    } else if (pluginRoll(enemy, 0.20)) {
       // 站立不退（等对手先动手，霸体吸收后反打）
       enemy.aiState = 'approach';
       enemy.aiTimer = 0.3;
@@ -127,15 +139,14 @@ export const HAMMER_AI = {
    * 成功格挡后决策：大锤利用格挡加速蓄力重击
    */
   postParry(enemy, f, pf, d, ang, cmd, cfg) {
-    const roll = Math.random();
-    if (roll < 0.55 && enemy._heavyCD <= 0) {
+    if (pluginRoll(enemy, 0.55) && enemy._heavyCD <= 0) {
       // 加速重击（parryBoost缩短蓄力，大锤最大化重击价值）
       cmd.heavyAttack = true;
       enemy.aiState = 'recover';
       enemy.aiTimer = 1.5;
       enemy._heavyCD = cfg.heavyCooldown || 0;
       return true;
-    } else if (roll < 0.80) {
+    } else if (pluginRoll(enemy, 0.35)) {
       // 轻击连压（霸体连招）
       cmd.lightAttack = true;
       enemy.comboTarget = Math.min(2, cfg.maxCombo);
@@ -152,6 +163,7 @@ export const HAMMER_AI = {
    */
   approachOverride(enemy, f, pf, d, ang, cmd, cfg) {
     if (d > cfg.approachDist + 50) return false;
+    if (enemy.difficulty < 2) return false; // D1走默认接近
     // 霸气直线推进（偶尔小幅横移避免被穿裆）
     const fwdX = Math.cos(ang);
     const fwdY = Math.sin(ang);
@@ -167,8 +179,8 @@ export const HAMMER_AI = {
    */
   staggerReact(enemy, f, pf, d, ang, cmd, cfg) {
     const diffScale = (enemy.difficulty - 1) / 4;
-    if (enemy._heavyCD <= 0 && Math.random() < 0.4 + diffScale * 0.3) {
-      // 霸体重击硬交换
+    if (enemy._heavyCD <= 0 && Math.random() < 0.15 + diffScale * 0.45) {
+      // 霸体重击硬交换（D1=15% D3=37% D5=60%）
       cmd.heavyAttack = true;
       enemy.aiState = 'recover';
       enemy.aiTimer = 1.5;
@@ -186,13 +198,12 @@ export const SPEAR_AI = {
    * 被格挡后决策：长枪拉开距离重新建立优势
    */
   postParried(enemy, f, pf, d, ang, cmd, cfg) {
-    const roll = Math.random();
-    if (roll < 0.35) {
+    if (pluginRoll(enemy, 0.35)) {
       // 后退拉开距离（长枪核心：保持射程优势）
       enemy.aiState = 'retreat';
       enemy.aiTimer = 0.15 + Math.random() * 0.20;
       return true;
-    } else if (roll < 0.55 && f.stamina >= C.DODGE_COST) {
+    } else if (pluginRoll(enemy, 0.25) && f.stamina >= C.DODGE_COST) {
       // 后跳拉距（闪避向后）
       cmd.dodge = true;
       cmd.dodgeAngle = ang + Math.PI + (Math.random() - 0.5) * 0.5;
@@ -207,16 +218,15 @@ export const SPEAR_AI = {
    * 成功格挡后决策：长枪在安全距离轻击戳刺
    */
   postParry(enemy, f, pf, d, ang, cmd, cfg) {
-    const roll = Math.random();
-    if (roll < 0.60) {
+    if (pluginRoll(enemy, 0.60)) {
       // 快速前刺利用加速（长枪射程长，不需要贴近）
       cmd.lightAttack = true;
-      enemy.comboTarget = 1; // 单次戳刺后拉开
+      enemy.comboTarget = 1; // 单次戛刺后拉开
       enemy.comboCount = 1;
       enemy.aiState = 'recover';
       enemy.aiTimer = 0.5;
       return true;
-    } else if (roll < 0.85 && enemy._heavyCD <= 0) {
+    } else if (pluginRoll(enemy, 0.30) && enemy._heavyCD <= 0) {
       // 加速重击突刺（长距离精准打击）
       cmd.heavyAttack = true;
       enemy.aiState = 'recover';
@@ -235,10 +245,14 @@ export const SPEAR_AI = {
     const sweetMax = hints?.preferredRange ? hints.preferredRange[1] : 85;
     const sweetMin = hints?.preferredRange ? hints.preferredRange[0] : 65;
 
+    // D1-D2不做距离管理，D3+开始保持甜点距离
+    if (enemy.difficulty < 3) return false;
+
     if (d < sweetMin) {
-      // 过近 → 后退到甜点距离
-      cmd.moveX = -Math.cos(ang) * 0.7;
-      cmd.moveY = -Math.sin(ang) * 0.7;
+      // 过近 → 后退到甜点距离（难度越高后退越果断）
+      const retreatStr = 0.4 + (enemy.difficulty - 3) / 2 * 0.3; // D3=0.4 D5=0.7
+      cmd.moveX = -Math.cos(ang) * retreatStr;
+      cmd.moveY = -Math.sin(ang) * retreatStr;
       // 仍然允许攻击决策
       return false;
     }
@@ -265,7 +279,8 @@ export const SPEAR_AI = {
    * 硬直中反应：长枪优先向后闪避拉距
    */
   staggerReact(enemy, f, pf, d, ang, cmd, cfg) {
-    if (f.stamina >= C.DODGE_COST && Math.random() < cfg.dodgeChance * 1.8) {
+    // dodgeChance已含难度缩放，再乘1.5
+    if (f.stamina >= C.DODGE_COST && Math.random() < cfg.dodgeChance * 1.5) {
       cmd.dodge = true;
       cmd.dodgeAngle = ang + Math.PI + (Math.random() - 0.5) * 0.6;
       enemy.aiState = 'recover';
@@ -282,23 +297,22 @@ export const SHIELD_AI = {
    * 被格挡后决策：剑盾先举盾防御，等对手出手再反击
    */
   postParried(enemy, f, pf, d, ang, cmd, cfg) {
-    const roll = Math.random();
-    if (roll < 0.50 && enemy.blockCooldown <= 0.1) {
-      // 立刻举盾（剑盾特权：blockCooldown缩短）
+    if (pluginRoll(enemy, 0.25) && enemy.blockCooldown <= 0.1) {
+      // 举盾防御（降低概率，被弹后应优先反击）
       cmd.blockHeld = true;
       enemy.aiState = 'defend';
-      enemy.aiTimer = 0.4 + Math.random() * 0.3;
-      enemy.blockCooldown = 0; // 剑盾被弹后可以更快举盾
+      enemy.aiTimer = 0.3 + Math.random() * 0.2;
+      enemy.blockCooldown = 0;
       return true;
-    } else if (roll < 0.75) {
-      // 反击轻击（稳健选择）
+    } else if (pluginRoll(enemy, 0.45)) {
+      // 反击轻击（主要选择）
       cmd.lightAttack = true;
       enemy.comboTarget = Math.min(2, cfg.maxCombo);
       enemy.comboCount = 1;
       enemy.aiState = 'recover';
       enemy.aiTimer = 0.5;
       return true;
-    } else if (roll < 0.90 && enemy._heavyCD <= 0) {
+    } else if (pluginRoll(enemy, 0.25) && enemy._heavyCD <= 0) {
       // 盾击（消耗对方体力）
       cmd.heavyAttack = true;
       enemy.aiState = 'recover';
@@ -310,42 +324,37 @@ export const SHIELD_AI = {
   },
 
   /**
-   * 成功格挡后决策：剑盾稳健反击
+   * 成功格挡后决策：剑盾积极反击（不浪费格反优势）
    */
   postParry(enemy, f, pf, d, ang, cmd, cfg) {
-    const roll = Math.random();
-    if (roll < 0.45) {
-      // 稳健轻击反击
+    if (pluginRoll(enemy, 0.55)) {
+      // 稳健轻击反击（提高概率，格反后应积极利用优势）
       cmd.lightAttack = true;
       enemy.comboTarget = Math.min(2, cfg.maxCombo);
       enemy.comboCount = 1;
       enemy.aiState = 'recover';
       enemy.aiTimer = 0.5;
       return true;
-    } else if (roll < 0.70 && enemy._heavyCD <= 0) {
+    } else if (pluginRoll(enemy, 0.35) && enemy._heavyCD <= 0) {
       // 盾击压体力
       cmd.heavyAttack = true;
       enemy.aiState = 'recover';
       enemy.aiTimer = 1.0;
       enemy._heavyCD = cfg.heavyCooldown || 0;
       return true;
-    } else if (roll < 0.85) {
-      // 保持格挡（等对手再出手，再格挡一次）
-      cmd.blockHeld = true;
-      enemy.aiState = 'defend';
-      enemy.aiTimer = 0.5 + Math.random() * 0.3;
-      return true;
     }
     return false;
   },
 
   /**
-   * 接近行为：盾行推进（边格挡边走）
+   * 接近行为：盾行推进（对手有攻击威胁时边格挡边走）
    */
   approachOverride(enemy, f, pf, d, ang, cmd, cfg) {
     if (d > cfg.approachDist + 40) return false;
-    // 盾行：近距离时举盾前进
-    if (d > cfg.approachDist && enemy.blockCooldown <= 0 && f.stamina >= 2) {
+    if (enemy.difficulty < 3) return false; // 低难度不盾行
+    // 仅在对手有攻击威胁时才盾行（避免无意义举盾浪费时间+暂停体力回复）
+    const oppThreat = pf.state === 'lightAttack' || pf.state === 'heavyAttack' || pf.state === 'parryCounter';
+    if (oppThreat && d > cfg.approachDist && enemy.blockCooldown <= 0 && f.stamina >= 2) {
       cmd.blockHeld = true;
       cmd.moveX = Math.cos(ang) * 0.8;
       cmd.moveY = Math.sin(ang) * 0.8;
@@ -357,10 +366,11 @@ export const SHIELD_AI = {
   },
 
   /**
-   * 硬直中反应：剑盾优先格挡
+   * 硬直中反应：剑盾优先格挡（但不过度防御）
    */
   staggerReact(enemy, f, pf, d, ang, cmd, cfg) {
-    if (enemy.blockCooldown <= 0 && Math.random() < cfg.reactChance * 1.2) {
+    // 使用pluginRoll缩放 + 降低乘数（原0.8过高导致D5过度防御）
+    if (enemy.blockCooldown <= 0 && pluginRoll(enemy, 0.45)) {
       cmd.blockHeld = true;
       enemy.aiState = 'defend';
       enemy.aiTimer = 0.3 + Math.random() * 0.2;

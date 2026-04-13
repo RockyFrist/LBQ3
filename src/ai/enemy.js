@@ -102,9 +102,9 @@ export class Enemy {
       cfg.attackRate = total - cfg.heavyRate;
     }
 
-    // dodgeBias → 缩放闪避概率（匕首高闪、大锤低闪）
+    // dodgeBias → 缩放闪避概率（匕首高闪、大锤低闪）—— 上限控制避免体力耗尽
     const dodgeScale = (hints.dodgeBias ?? 0.5) / 0.5;
-    cfg.dodgeChance = Math.min(0.55, cfg.dodgeChance * dodgeScale);
+    cfg.dodgeChance = Math.min(0.25, cfg.dodgeChance * dodgeScale);
 
     // blockBias → 缩放格挡概率与持续时间（剑盾高格、匕首低格）
     const block = hints.blockBias ?? 0.5;
@@ -112,6 +112,11 @@ export class Enemy {
     cfg.blockChance = Math.min(0.35, cfg.blockChance * blockScale);
     cfg.blockDurBase *= (0.7 + block * 0.6);
     cfg.blockCooldownBase *= Math.max(0.5, 1.5 - block);
+
+    // maxComboBonus → 武器特化连击加成，按难度缩放（D3=0, D4=一半, D5=全量）
+    if (hints.maxComboBonus) {
+      cfg.maxCombo += Math.floor(hints.maxComboBonus * Math.max(0, this.difficulty - 2) / 3);
+    }
   }
 
   _logDecision(time, reason, action, context) {
@@ -413,8 +418,8 @@ export class Enemy {
         this.attackCooldown = 0.15;
         return cmd;
       }
-      // D1=15% D2=30% D3=45% D4=60% D5=75%
-      const cautionChance = 0.15 + (this.difficulty - 1) / 4 * 0.60;
+      // D3+统一15%出硬直谨慎率（高难度不额外惩罚）
+      const cautionChance = this.difficulty >= 3 ? 0.15 : 0.05 + (this.difficulty - 1) / 4 * 0.10;
       if (Math.random() < cautionChance) {
         const roll = Math.random();
         if (roll < 0.45) {
@@ -467,9 +472,9 @@ export class Enemy {
     const wasAttacking = this._wasAttacking || false;
     if (isAttacking && !wasAttacking) {
       // 刚进入攻击状态，一次性投掷承诺
-      // 二次方缩放：高难度AI更多读招机会 D1=0% D3=14% D4=31% D5=55%
+      // D3+统一取消概率6%，避免高难度反而损失DPS
       const diffScale = (this.difficulty - 1) / 4;
-      const commitBreakChance = diffScale * diffScale * 0.55;
+      const commitBreakChance = this.difficulty >= 3 ? 0.06 : diffScale * diffScale * 0.12;
       this._attackCommitted = Math.random() > commitBreakChance;
     } else if (!isAttacking) {
       this._attackCommitted = false;
@@ -735,11 +740,19 @@ export class Enemy {
       const isHeavyThreat = pf.state === 'heavyAttack';
 
       // 高难度AI能区分轻/重攻击并采取最优反应（二次方缩放拉开识别精度）
-      // D1=0% D3=25% D4=56% D5=100%
-      const identifyChance = diffScaleR * diffScaleR;
+      // D3+=25% D4=56% D5=56%（D5不跑防御路径更多，保持进攻节奏）
+      const identifyChance = Math.min(0.56, diffScaleR * diffScaleR);
       if (isHeavyThreat && Math.random() < identifyChance) {
-        // === 识别重击 → 格挡（争取精准格反 → 巨大收益） ===
-        if (Math.random() < cfg.reactChance && this.blockCooldown <= 0) {
+        // === 识别重击 → 交换/格挡/闪避（高难度偏进攻，保持节奏） ===
+        // D4+ 有概率选择霸体重击交换（牺牲防御换攻击节奏）
+        const tradeOverBlock = this.difficulty >= 4 ? 0.20 + (this.difficulty - 4) * 0.30 : 0; // D4=20% D5=50%
+        if (this._heavyCD <= 0 && Math.random() < tradeOverBlock) {
+          cmd.heavyAttack = true;
+          this.aiState = 'recover';
+          this.aiTimer = 1.2;
+          this._heavyCD = cfg.heavyCooldown || 0;
+        } else if (Math.random() < cfg.reactChance && this.blockCooldown <= 0) {
+          // D5 reactChance已降至0.82，不再需要额外封顶
           this.aiState = 'defend';
           this.blockDuration = cfg.blockDurBase + Math.random() * 0.4;
           this.aiTimer = this.blockDuration;
@@ -747,29 +760,28 @@ export class Enemy {
           const dodgeA = ang + (Math.random() < 0.5 ? Math.PI / 2 : -Math.PI / 2);
           cmd.dodge = true;
           cmd.dodgeAngle = dodgeA;
-          this.aiState = 'recover';
-          this.aiTimer = 0.4;
+          // D3+闪避后追击（闪避产生正收益），D1-D2闪避后恢复
+          this.aiState = this.difficulty >= 3 ? 'punish' : 'recover';
+          this.aiTimer = this.difficulty >= 3 ? 0.15 : 0.4;
         }
       } else if (!isHeavyThreat && Math.random() < identifyChance) {
-        // === 识别轻击 → 反击/闪避（体力低时少量格挡） ===
-        const stmLowL = f.stamina <= 2;
-        if (stmLowL && this.blockCooldown <= 0 && Math.random() < 0.20) {
-          // 体力低时少量格挡（闪避太贵）
-          this.aiState = 'defend';
-          this.blockDuration = cfg.blockDurBase * 0.5 + Math.random() * 0.2;
-          this.aiTimer = this.blockDuration;
+        // === 识别轻击 → 反击/闪避（体力低时优先撑距） ===
+        if (f.stamina <= 2) {
+          // 体力低：优先撤退保命（不格挡，格挡会暂停体力回复）
+          this.aiState = 'retreat';
+          this.aiTimer = 0.3 + Math.random() * 0.3;
         } else if (d < 70 && Math.random() < 0.55) {
           cmd.lightAttack = true;
           this.comboTarget = Math.min(2, cfg.maxCombo);
           this.comboCount = 1;
           this.aiState = 'recover';
           this.aiTimer = 0.6;
-        } else if (f.stamina >= C.DODGE_COST && Math.random() < 0.5) {
+        } else if (f.stamina >= C.DODGE_COST && Math.random() < 0.40) {
           const dodgeA = ang + (Math.random() < 0.5 ? Math.PI / 2 : -Math.PI / 2);
           cmd.dodge = true;
           cmd.dodgeAngle = dodgeA;
-          this.aiState = 'recover';
-          this.aiTimer = 0.4;
+          this.aiState = this.difficulty >= 3 ? 'punish' : 'recover';
+          this.aiTimer = this.difficulty >= 3 ? 0.15 : 0.4;
         } else {
           cmd.heavyAttack = true;
           this.aiState = 'recover';
@@ -777,14 +789,16 @@ export class Enemy {
         }
       } else {
         // === 基础反应（低难度默认 + 高难度未识别时） ===
-        // 不确定攻击类型时：只在有可能是重击时才格挡
         const r = Math.random();
         const opponentHeavyRate = this._getPlayerHeavyRate();
-        // 只有对手重击率较高时才考虑格挡（否则大概率是轻击，格挡无意义）
         const adjustedBlockChance = cfg.blockChance + (opponentHeavyRate > 0.20 ? cfg.reactChance * opponentHeavyRate * 0.5 : 0);
         const adjustedDodgeChance = cfg.dodgeChance;
 
-        if (r < adjustedBlockChance && this.blockCooldown <= 0) {
+        // 体力低时优先撤退保命（不格挡也不闪避，防止体力耗尽被处决）
+        if (f.stamina <= 2) {
+          this.aiState = 'retreat';
+          this.aiTimer = 0.3 + Math.random() * 0.3;
+        } else if (r < adjustedBlockChance && this.blockCooldown <= 0) {
           this.aiState = 'defend';
           this.blockDuration = cfg.blockDurBase + Math.random() * 0.4;
           this.aiTimer = this.blockDuration;
@@ -792,8 +806,8 @@ export class Enemy {
           const dodgeA = ang + (Math.random() < 0.5 ? Math.PI / 2 : -Math.PI / 2);
           cmd.dodge = true;
           cmd.dodgeAngle = dodgeA;
-          this.aiState = 'recover';
-          this.aiTimer = 0.4;
+          this.aiState = this.difficulty >= 3 ? 'punish' : 'recover';
+          this.aiTimer = this.difficulty >= 3 ? 0.15 : 0.4;
         } else {
           // 用霸体硬抗（但如果对手爱用重击就别硬抗）
           const heavyRate = this._getPlayerHeavyRate();
@@ -810,7 +824,9 @@ export class Enemy {
           }
         }
       }
-      this.thinkCD = this._jitteredThinkCD();
+      // 反应冷却：难度越高恢复越快（D1=0.22s D3=0.16s D5=0.10s）
+      const reactionFloor = 0.10 + (5 - this.difficulty) * 0.03;
+      this.thinkCD = Math.max(this._jitteredThinkCD(), reactionFloor);
       return cmd;
     }
 
@@ -842,15 +858,15 @@ export class Enemy {
           if (d < cfg.approachDist + 80 && this.difficulty >= 2) {
             this._strafeTimer += dt;
             // 低难度变向慢（可预测），高难度变向快
-            const strafePeriod = 1.2 - (this.difficulty - 1) * 0.15; // D2=1.05 D5=0.60
+            const strafePeriod = 1.2 - Math.min(3, this.difficulty - 1) * 0.15; // D2=1.05 D4=D5=0.75
             if (this._strafeTimer > strafePeriod + Math.random() * 0.3) {
               this._strafeTimer = 0;
               this._strafeDir = -this._strafeDir;
             }
             const perpX = -fwdY * this._strafeDir;
             const perpY = fwdX * this._strafeDir;
-            const strafe = 0.4 + (this.difficulty - 1) * 0.1; // D2=0.5, D5=0.8
-            const fwd = 0.9 - (this.difficulty - 1) * 0.05; // D2=0.85(直冲) D5=0.70(斜切)
+            const strafe = 0.4 + Math.min(3, this.difficulty - 1) * 0.1; // D2=0.5, D4=D5=0.7
+            const fwd = 0.9 - Math.min(3, this.difficulty - 1) * 0.05; // D2=0.85 D4=D5=0.75
             cmd.moveX = fwdX * fwd + perpX * strafe;
             cmd.moveY = fwdY * fwd + perpY * strafe;
           } else {
@@ -858,8 +874,8 @@ export class Enemy {
             cmd.moveY = fwdY;
           }
         } else if (this.thinkCD <= 0) {
-          // 到达攻击距离：偶尔进入footsie试探
-          if (this.difficulty >= 3 && Math.random() < 0.15) {
+          // 到达攻击距离：偶尔进入footsie试探（降低概率避免浪费攻击时间）
+          if (this.difficulty >= 3 && Math.random() < 0.08) {
             this.aiState = 'footsie';
             this.aiTimer = 0.6 + Math.random() * 0.8;
             this._footsiePhase = 0;
@@ -867,7 +883,7 @@ export class Enemy {
           }
           // 接近范围内直接发起变招探试（不经_decide，缩短决策链）
           if (cfg.feintChance > 0.15 && f.stamina >= C.FEINT_COST + 1 &&
-              this.attackCooldown <= 0 && Math.random() < cfg.feintChance * 0.25) {
+              this.attackCooldown <= 0 && Math.random() < cfg.feintChance * 0.15) {
             // 直接发起重击变招
             cmd.heavyAttack = true;
             this.aiState = 'feint_wait';
@@ -882,8 +898,8 @@ export class Enemy {
       }
       case 'attack': {
         if (this.attackCooldown > 0) { this.aiState = 'approach'; break; }
-        // 高难度变招：轻击→防御
-        if (cfg.feintChance > 0 && Math.random() < cfg.feintChance &&
+        // 高难度变招：轻击→防御（概率缩半避免过度变招）
+        if (cfg.feintChance > 0 && Math.random() < cfg.feintChance * 0.3 &&
             f.stamina >= C.FEINT_COST + 1) {
           cmd.lightAttack = true;
           this.aiState = 'feint_wait';
@@ -910,8 +926,8 @@ export class Enemy {
           this.attackCooldown = C.AI_MIN_ATTACK_INTERVAL;
           break;
         }
-        // 高难度重击变招（概率与轻击持平）
-        if (cfg.feintChance > 0 && Math.random() < cfg.feintChance &&
+        // 高难度重击变招（概率缩半避免过度变招）
+        if (cfg.feintChance > 0 && Math.random() < cfg.feintChance * 0.3 &&
             f.stamina >= C.FEINT_COST + 1) {
           cmd.heavyAttack = true;
           this.aiState = 'feint_wait';
@@ -957,20 +973,26 @@ export class Enemy {
       case 'punish': {
         // 闪避后追击反击
         if (this.aiTimer <= 0) {
-          if (d < 80) {
+          const weapon = this.fighter.weapon;
+          const maxLightRange = (weapon.lightAttacks?.[weapon.lightAttacks.length - 1]?.range || 55)
+            + (weapon.lightLunge || 12);
+          const heavyReach = (weapon.heavy?.range || 70) + (weapon.heavy?.lunge || 15);
+          if (d < maxLightRange + 20) {
+            // 轻击距离内直接出手
             cmd.lightAttack = true;
             this.comboTarget = Math.min(2, cfg.maxCombo);
             this.comboCount = 1;
             this.aiState = 'recover';
             this.aiTimer = 0.5;
+          } else if (d < heavyReach + 20 && this._heavyCD <= 0) {
+            // 重击距离内用重击（匕首冲刺重击、长枪突刺等）
+            cmd.heavyAttack = true;
+            this._heavyCD = cfg.heavyCooldown || 0;
+            this.aiState = 'recover';
+            this.aiTimer = 0.5;
           } else {
-            // 靠近对手
-            cmd.moveX = Math.cos(ang);
-            cmd.moveY = Math.sin(ang);
-            // 追不到就放弃
-            if (this.aiTimer < -0.5) {
-              this.aiState = 'approach';
-            }
+            // 超出所有攻击距离，直接放弃回到接近
+            this.aiState = 'approach';
           }
         }
         break;
@@ -1059,11 +1081,11 @@ export class Enemy {
       case 'recover': {
         // 等待恢复
         if (this.aiTimer <= 0) {
-          // 恢复后有概率直接发起变招试探（不经_decide，增加变招频率）
+          // 恢复后有概率直接发起变招试探（降低概率避免过度变招）
           if (cfg.feintChance > 0.25 && d < cfg.approachDist + 10 &&
               f.state === 'idle' && f.stamina >= C.FEINT_COST + 1 &&
               this.attackCooldown <= 0 && !this._hasPlan() &&
-              Math.random() < cfg.feintChance * 0.25) {
+              Math.random() < cfg.feintChance * 0.15) {
             this._createFeintPlan(d);
             this._logDecision(this._gameTime, 'feint_recover', 'plan', { dist: +d.toFixed(0) });
           }
@@ -1106,10 +1128,10 @@ export class Enemy {
         this.aiState = 'approach';
     }
 
-    // 低体力时更保守
-    if (f.stamina <= 1 && this.aiState === 'approach' && Math.random() < cfg.retreatWhenLow) {
+    // 低体力时更保守（提前到stamina<=2触发，高难度更敏感）
+    if (f.stamina <= 2 && this.aiState === 'approach' && Math.random() < cfg.retreatWhenLow * 2) {
       this.aiState = 'retreat';
-      this.aiTimer = 0.5 + Math.random() * 0.5;
+      this.aiTimer = 0.4 + Math.random() * 0.4;
     }
 
     return cmd;
@@ -1164,9 +1186,9 @@ export class Enemy {
     }
 
     if (r < cfg.attackRate) {
-      // 主动变招：有概率不直接攻击，而是发起变招计划
+      // 主动变招：有概率不直接攻击，而是发起变招计划（概率降低避免过度变招）
       if (cfg.feintChance > 0.1 && f.stamina >= C.FEINT_COST + 1 &&
-          Math.random() < cfg.feintChance * 0.7) {
+          Math.random() < cfg.feintChance * 0.20) {
         this._createFeintPlan(d);
         return;
       }
@@ -1175,9 +1197,9 @@ export class Enemy {
       this.comboCount = 0;
       this._logDecision(this._gameTime, 'decide', 'attack', { dist: +d.toFixed(0), combo: this.comboTarget });
     } else if (r < cfg.attackRate + cfg.heavyRate) {
-      // 重击也可以变招
+      // 重击也可以变招（概率降低）
       if (cfg.feintChance > 0.1 && f.stamina >= C.FEINT_COST + 1 &&
-          Math.random() < cfg.feintChance * 0.6) {
+          Math.random() < cfg.feintChance * 0.15) {
         this._createFeintPlan(d);
         return;
       }
