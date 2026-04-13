@@ -8,7 +8,7 @@ import { createRoomManager } from './rooms.js';
 const PORT = parseInt(process.argv[2] || process.env.PORT || '3000', 10);
 const manager = createRoomManager();
 
-const wss = new WebSocketServer({ port: PORT });
+const wss = new WebSocketServer({ port: PORT, path: '/ws' });
 
 wss.on('connection', (ws, req) => {
   const addr = req.socket.remoteAddress;

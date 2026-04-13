@@ -14,11 +14,12 @@ import { jianghuModeMethods } from './jianghu-mode.js';
 import { settingsPanelMethods } from './settings-panel.js';
 import { effectsMethods } from './effects.js';
 import { tutorialModeMethods } from './tutorial-mode.js';
-import { JIANGHU_MAX_LIVES } from './jianghu-stages.js';
+import { JIANGHU_MAX_LIVES, JIANGHU_STAGES } from './jianghu-stages.js';
 import { Fighter } from '../combat/fighter.js';
 import { snapshotFighter, applyFighterSnapshot, serializeEvent, deserializeEvent } from '../net/net-sync.js';
 import { AudioManager } from '../core/audio.js';
-import { getWeapon } from '../weapons/weapon-defs.js';
+import { getWeapon, WEAPON_LIST } from '../weapons/weapon-defs.js';
+import { GamepadPlayer } from '../core/gamepad-input.js';
 
 export class Game {
   constructor(canvas, input, opts = {}) {
@@ -123,6 +124,12 @@ export class Game {
     // ===== 连战模式 =====
     this.chainKills = 0;         // 连战击杀数
     this._chainSpawnDelay = 0;   // 击杀后延迟spawn
+
+    // ===== 本地双人 =====
+    this.player2 = null;         // GamepadPlayer (P2手柄)
+    if (this.mode === 'local2p') {
+      this._setupLocal2P(opts);
+    }
 
     this._rebuildFighterList();
 
@@ -284,6 +291,77 @@ export class Game {
     for (const e of this.enemies) {
       this.allFighters.push(e.fighter);
     }
+    if (this.player2 && this.player2.fighter) {
+      this.allFighters.push(this.player2.fighter);
+    }
+  }
+
+  // ===================== 本地双人 =====================
+  _setupLocal2P(opts) {
+    const weaponA = opts.weaponA || 'dao';
+    const weaponB = opts.weaponB || 'dao';
+    const wA = getWeapon(weaponA);
+    const wB = getWeapon(weaponB);
+
+    // P1: 键盘+鼠标（左侧）
+    this.player.fighter.x = C.ARENA_W / 2 - 80;
+    this.player.fighter.y = C.ARENA_H / 2;
+    this.player.fighter.color = wA.color;
+    this.player.fighter.name = 'P1';
+    this.player.fighter.team = 0;
+
+    // P2: 手柄（右侧）
+    this.player2 = new GamepadPlayer();
+    const p2f = new Fighter(
+      C.ARENA_W / 2 + 80, C.ARENA_H / 2,
+      { color: wB.color, team: 1, name: 'P2', weapon: wB }
+    );
+    this.player2.fighter = p2f;
+    // 初始朝向面对P1
+    p2f.facing = Math.PI;
+    this.player2._lastFacing = Math.PI;
+
+    this.combat.playerFighter = null; // 双人都触发特效
+
+    // 五局三胜
+    this._local2pWins = [0, 0];
+    this._local2pRound = 1;
+    this._local2pRoundDelay = -1;
+    this._local2pMatchOver = false;
+  }
+
+  /** 本地双人: 重置单局，进入下一局 */
+  _local2pResetRound() {
+    this._local2pRound++;
+    this._victoryTimer = -1;
+    this._local2pRoundDelay = -1;
+    this.particles.particles = [];
+    this.floatingTexts = [];
+    const f0 = this.player.fighter;
+    const f1 = this.player2.fighter;
+    this._resetOnlineFighter(f0, C.ARENA_W / 2 - 80);
+    this._resetOnlineFighter(f1, C.ARENA_W / 2 + 80);
+    f1.facing = Math.PI;
+    this.player2._lastFacing = Math.PI;
+    this.ui.addLog(`--- 第${this._local2pRound}局 ---`);
+  }
+
+  /** 本地双人: 重置整场比赛 */
+  _local2pRematch() {
+    this._local2pWins = [0, 0];
+    this._local2pRound = 1;
+    this._local2pRoundDelay = -1;
+    this._local2pMatchOver = false;
+    this._victoryTimer = -1;
+    this.particles.particles = [];
+    this.floatingTexts = [];
+    const f0 = this.player.fighter;
+    const f1 = this.player2.fighter;
+    this._resetOnlineFighter(f0, C.ARENA_W / 2 - 80);
+    this._resetOnlineFighter(f1, C.ARENA_W / 2 + 80);
+    f1.facing = Math.PI;
+    this.player2._lastFacing = Math.PI;
+    this.ui.addLog('=== 新一场比赛开始 ===');
   }
 
   _getTarget() {
@@ -301,6 +379,9 @@ export class Game {
   update(dt) {
     const input = this.input;
 
+    // 手柄轮询（本地双人）
+    if (this.player2) this.player2.poll();
+
     // 同步视口尺寸（窗口可能被拉伸）
     this.camera.resize(this.canvas._logicW || this.canvas.width, this.canvas._logicH || this.canvas.height);
 
@@ -311,7 +392,6 @@ export class Game {
 
     // ESC 返回菜单
     if (input.pressed('Escape') && this.onExit) {
-      if (this.netClient) this.netClient.disconnect();
       this.onExit();
       return;
     }
@@ -357,6 +437,10 @@ export class Game {
         this.settingsOpen = !this.settingsOpen;
         this._settingsClickCd = 0.3;
       }
+    }
+    // 武器切换点击（对战/训练/连战模式）
+    if ((this.mode === 'pvai' || this.mode === 'training' || this.mode === 'chainKill') && input.mouseLeftDown) {
+      this._handleWeaponPanelClick(input.mouseX, input.mouseY);
     }
     if (this.settingsOpen) {
       this._updateSettings(dt);
@@ -427,7 +511,7 @@ export class Game {
       this.hitFreezeTimer -= dt;
 
       // 冻结期间仍然采集玩家输入到缓冲（防止点击被吞）
-      if (this.mode === 'pvai' || this.mode === 'wusheng' || this.mode === 'training' || this.mode === 'chainKill' || this.mode === 'online_host') {
+      if (this.mode === 'pvai' || this.mode === 'wusheng' || this.mode === 'training' || this.mode === 'chainKill' || this.mode === 'online_host' || this.mode === 'local2p' || this.mode === 'jianghu') {
         const freezeCmd = this.player.getCommands(this.input);
         const pf = this.player.fighter;
         // 只缓冲攻击/闪避意图，不缓冲持续按住的格挡（避免格挡后误入blocking）
@@ -437,6 +521,16 @@ export class Game {
         else if (freezeCmd.ultimate) pf.bufferInput('ultimate');
         // Freeze期间松开Space则解除blockSuppressed，后续可正常格挡
         if (!freezeCmd.blockHeld) pf.blockSuppressed = false;
+      }
+      // 本地双人: P2手柄冻结期间也缓冲输入
+      if (this.mode === 'local2p' && this.player2 && this.player2.fighter) {
+        const p2Cmd = this.player2.getCommands();
+        const p2f = this.player2.fighter;
+        if (p2Cmd.lightAttack) p2f.bufferInput('lightAttack');
+        else if (p2Cmd.heavyAttack) p2f.bufferInput('heavyAttack');
+        else if (p2Cmd.dodge) p2f.bufferInput('dodge', { angle: p2Cmd.dodgeAngle });
+        else if (p2Cmd.ultimate) p2f.bufferInput('ultimate');
+        if (!p2Cmd.blockHeld) p2f.blockSuppressed = false;
       }
 
       if (this.mode !== 'test') {
@@ -483,7 +577,7 @@ export class Game {
       const pf = this.player.fighter;
       const enemy0 = this.enemies[0]?.fighter;
       const noop = { moveX: 0, moveY: 0, faceAngle: 0, lightAttack: false, heavyAttack: false, blockHeld: false, dodge: false, dodgeAngle: 0 };
-      const isPlayerMode = this.mode === 'pvai' || this.mode === 'wusheng' || this.mode === 'jianghu' || this.mode === 'training' || this.mode === 'chainKill';
+      const isPlayerMode = this.mode === 'pvai' || this.mode === 'wusheng' || this.mode === 'jianghu' || this.mode === 'training' || this.mode === 'chainKill' || this.mode === 'local2p';
 
       // 联机主机: 单局结束倒计时 → 重置进入下一局
       if (this.mode === 'online_host' && this._onlineRoundDelay > 0) {
@@ -492,6 +586,20 @@ export class Game {
           this._onlineResetRound();
           return;
         }
+      }
+
+      // 本地双人: 单局结束倒计时 → 重置进入下一局
+      if (this.mode === 'local2p' && this._local2pRoundDelay > 0) {
+        this._local2pRoundDelay -= dt;
+        if (this._local2pRoundDelay <= 0) {
+          this._local2pResetRound();
+          return;
+        }
+      }
+      // 本地双人: 比赛结束后按R重开
+      if (this.mode === 'local2p' && this._local2pMatchOver && input.pressed('KeyR')) {
+        this._local2pRematch();
+        return;
       }
 
       // 联机: 比赛结束后按R请求再来一局
@@ -529,8 +637,16 @@ export class Game {
         if (this.remoteFighter.alive) {
           this.remoteFighter.update(dt, this._remoteCmd || noop, this.gameTime);
         }
-        this.combat.events = []; // 胜利阶段不产生新事件，清空防止重发
-        this._sendNetState();
+        this.combat.events = []; // 胜利阶段不产生新事件
+        this._throttledNetSend(dt);
+      }
+      // 本地双人: 胜利阶段P2也可自由移动
+      if (this.mode === 'local2p' && this.player2 && this.player2.fighter) {
+        const p2f = this.player2.fighter;
+        if (p2f.alive) {
+          const raw2 = this.player2.getCommands();
+          p2f.update(dt, { ...noop, moveX: raw2.moveX, moveY: raw2.moveY, faceAngle: raw2.faceAngle }, this.gameTime);
+        }
       }
       for (const enemy of this.enemies) {
         if (!enemy.fighter.alive) continue;
@@ -569,6 +685,17 @@ export class Game {
       pCmd = this.player.getCommands(input);
     }
 
+    // 联机主机: 输入延迟补偿 — 本地输入也缓冲N帧再生效，使双方公平
+    if (this.mode === 'online_host' && this._hostInputDelayFrames > 0) {
+      this._hostInputQueue.push({ ...pCmd });
+      if (this._hostInputQueue.length > this._hostInputDelayFrames) {
+        pCmd = this._hostInputQueue.shift();
+      } else {
+        // 队列还没填满，用空命令（启动前几帧缓冲期）
+        pCmd = { moveX: 0, moveY: 0, faceAngle: pCmd.faceAngle, lightAttack: false, heavyAttack: false, blockHeld: false, dodge: false, dodgeAngle: 0, ultimate: false };
+      }
+    }
+
     // 完美闪避标记清理
     if (pf.perfectDodged && pf.perfectDodged !== 'refunded' && pf.state === 'idle') {
       pf.perfectDodged = false;
@@ -579,10 +706,26 @@ export class Game {
 
     pf.update(dt, pCmd, this.gameTime);
 
+    // 本地双人: P2手柄更新
+    if (this.mode === 'local2p' && this.player2 && this.player2.fighter && this.player2.fighter.alive) {
+      const p2Cmd = this.player2.getCommands();
+      const p2f = this.player2.fighter;
+      if (p2f.perfectDodged && p2f.perfectDodged !== 'refunded' && p2f.state === 'idle') p2f.perfectDodged = false;
+      if (p2f.perfectDodged === 'refunded' && p2f.state === 'idle') p2f.perfectDodged = false;
+      p2f.update(dt, p2Cmd, this.gameTime);
+    }
+
     // 联机主机: 用网络输入更新远程玩家
     if (this.mode === 'online_host' && this.remoteFighter && this.remoteFighter.alive) {
       const noop = { moveX: 0, moveY: 0, faceAngle: 0, lightAttack: false, heavyAttack: false, blockHeld: false, dodge: false, dodgeAngle: 0 };
       this.remoteFighter.update(dt, this._remoteCmd || noop, this.gameTime);
+      // 消费后清除一帧脉冲，保留连续输入
+      if (this._remoteCmd) {
+        this._remoteCmd.lightAttack = false;
+        this._remoteCmd.heavyAttack = false;
+        this._remoteCmd.dodge = false;
+        this._remoteCmd.ultimate = false;
+      }
     }
 
     // 敌人更新（选择最近的对手为目标，不一定是玩家）
@@ -631,52 +774,35 @@ export class Game {
     // 碰撞分离
     this._separateFighters();
 
-    // 绝技蓄势预警（startup开始瞬间：红光闪烁 + 微震 + 浮字提示）
+    // 收集一次性视觉触发（在combat.resolve清空events之前）
+    const _visualEvents = [];
     for (const f of this.allFighters) {
       if (f.ultimateStartupBegin) {
         f.ultimateStartupBegin = false;
-        if (this.mode !== 'test') {
-          this.flashScreen('rgba(255,60,30,0.18)', 0.12);
-          this.camera.shake(6, 0.15);
-          f.flash('#ff4422', 0.15);
-          this.addFloatingText(f.x, f.y - 45, '⚡蓄势!', '#ff6633', 22, 0.8, -35);
-        }
+        _visualEvents.push({ type: 'ultimateStartup', target: f });
       }
-    }
-
-    // 绝技触发电影表现（时停 + 红光 + 震动）
-    for (const f of this.allFighters) {
       if (f.ultimateJustActivated) {
         f.ultimateJustActivated = false;
-        if (this.mode !== 'test') {
-          this.applyHitFreeze(0.18);
-          this.flashScreen('rgba(255,30,20,0.35)', 0.25);
-          this.camera.shake(16, 0.3);
-          this.applyTimeScale(0.15, 0.8);
-          f.flash('#ff3020', 0.25);
-          this.addFloatingText(f.x, f.y - 55, '拔刀!', '#ff4422', 32, 1.5, -25);
-        }
+        _visualEvents.push({ type: 'ultimateActivate', target: f });
       }
     }
 
     // 战斗判定
     this.combat.resolve(this.allFighters, this.gameTime, dt);
 
-    // 变招视觉反馈
+    // 变招 + 绝技视觉事件注入到战斗事件流（同步给客机）
     for (const fighter of this.allFighters) {
       if (fighter.feinted) {
-        if (this.mode !== 'test') {
-          this.addFloatingText(fighter.x, fighter.y - 30, '变招!', '#ff88ff', 20, 0.8, -40);
-        }
-        this.ui.addLog(`${fighter.name} 变招! (-${C.FEINT_COST}体力)`);
+        this.combat.events.push({ type: 'feint', target: fighter });
         // 教学模式由 _updateTutorial 检测后清除，此处跳过
         if (this.mode !== 'tutorial') {
           fighter.feinted = false;
         }
       }
     }
+    this.combat.events.push(..._visualEvents);
 
-    // 战斗事件
+    // 战斗事件（含变招/绝技视觉事件，主机和客机统一走 _logEvent）
     for (const evt of this.combat.events) {
       this._logEvent(evt);
       if (this.mode === 'test' && this.testRoundStats) {
@@ -684,10 +810,10 @@ export class Game {
       }
     }
 
-    // 联机主机: 发送状态快照给客机
+    // 联机主机: 节流发送状态快照+事件
     if (this.mode === 'online_host' && this.netClient) {
-      this._sendNetState();
-      this.combat.events = []; // 发送后清空，避免下帧重发
+      this._throttledNetSend(dt);
+      this.combat.events = [];
     }
 
     // 粒子等
@@ -764,7 +890,24 @@ export class Game {
           this._onlineRoundDelay = 2.5; // 2.5秒后进入下一局
         }
       }
-    } else if (this.mode !== 'jianghu' && this.mode !== 'chainKill' && this.mode !== 'online_host' && this.mode !== 'online_guest' && this.mode !== 'tutorial' && this._victoryTimer < 0 && this.enemies.length > 0) {
+    } else if (this.mode === 'local2p' && this._victoryTimer < 0 && this.player2) {
+      const p1Alive = pf.alive;
+      const p2Alive = this.player2.fighter.alive;
+      if (!p1Alive || !p2Alive) {
+        this._victoryTimer = 0;
+        const winIdx = p1Alive ? 0 : 1;
+        this._local2pWins[winIdx]++;
+        const w = this._local2pWins;
+        const winnerName = p1Alive ? 'P1' : 'P2';
+        if (w[0] >= 3 || w[1] >= 3) {
+          this._local2pMatchOver = true;
+          this.ui.addLog(`${winnerName} 赢得比赛! (${w[0]}:${w[1]}) 按R再来 / ESC返回`);
+        } else {
+          this.ui.addLog(`第${this._local2pRound}局 ${winnerName} 胜! (${w[0]}:${w[1]}) 准备下一局...`);
+          this._local2pRoundDelay = 2.5;
+        }
+      }
+    } else if (this.mode !== 'jianghu' && this.mode !== 'chainKill' && this.mode !== 'online_host' && this.mode !== 'online_guest' && this.mode !== 'tutorial' && this.mode !== 'local2p' && this._victoryTimer < 0 && this.enemies.length > 0) {
       const aAlive = pf.alive;
       const bAlive = this.enemies.some(e => e.fighter.alive);
       if (!aAlive || !bAlive) {
@@ -852,6 +995,10 @@ export class Game {
       for (const ally of this.allies) {
         this.renderer.drawFighter(ally.fighter);
       }
+      // 本地双人: P2先画（P1在上层）
+      if (this.player2 && this.player2.fighter) {
+        this.renderer.drawFighter(this.player2.fighter);
+      }
       this.renderer.drawFighter(this.player.fighter);
     }
 
@@ -875,8 +1022,11 @@ export class Game {
     }
 
     // HUD
-    const target = this.remoteFighter || this._getTarget();
-    this.ui.draw(this.player.fighter, target, this.remoteFighter ? [this.remoteFighter] : this.enemies.map(e => e.fighter), this.difficulty);
+    const target = this.remoteFighter || (this.player2 ? this.player2.fighter : null) || this._getTarget();
+    const enemyList = this.remoteFighter ? [this.remoteFighter]
+      : this.player2 ? [this.player2.fighter]
+      : this.enemies.map(e => e.fighter);
+    this.ui.draw(this.player.fighter, target, enemyList, this.difficulty);
 
     // 模式标签
     if (this.mode === 'online_host' || this.mode === 'online_guest') {
@@ -895,6 +1045,9 @@ export class Game {
       this._drawModeLabel(`⚔ 连战模式 · 连斩 ×${this.chainKills} · R重置 · ESC返回`);
     } else if (this.mode === 'tutorial') {
       this._drawModeLabel('📖 教学模式 · R重置当前步骤 · ESC返回菜单');
+    } else if (this.mode === 'local2p') {
+      const w = this._local2pWins;
+      this._drawModeLabel(`🎮 本地双人 · P1 ${w[0]} : ${w[1]} P2 · 第${this._local2pRound}局 · ESC返回`);
     }
 
     // 江湖行覆盖层（剧情/过关/失败）
@@ -910,6 +1063,11 @@ export class Game {
     // 训练模式控制面板
     if (this.mode === 'training') {
       this._drawTrainingPanel();
+    }
+
+    // 武器切换面板（对战/训练/连战模式）
+    if (this.mode === 'pvai' || this.mode === 'training' || this.mode === 'chainKill') {
+      this._drawWeaponPanel();
     }
 
     // 测试结果
@@ -987,6 +1145,77 @@ export class Game {
       ctx.fillStyle = it.color || (it.highlight ? '#ff8866' : '#ccc');
       ctx.font = '12px "Microsoft YaHei", sans-serif';
       ctx.fillText(it.label, px + 42, iy + 16);
+    }
+  }
+
+  // ===================== 武器切换面板 =====================
+  _getWeaponPanelLayout() {
+    const lw = this.canvas._logicW || this.canvas.width;
+    const itemW = 36, itemH = 36, gap = 4;
+    const panelW = itemW + 16;
+    const panelH = WEAPON_LIST.length * (itemH + gap) + 28;
+    const px = lw - panelW - 8, py = 50;
+    return { px, py, panelW, panelH, itemW, itemH, gap };
+  }
+
+  _drawWeaponPanel() {
+    const ctx = this.canvas.getContext('2d');
+    const mx = this.input.mouseX, my = this.input.mouseY;
+    const { px, py, panelW, panelH, itemW, itemH, gap } = this._getWeaponPanelLayout();
+    const currentId = this.player.fighter.weapon.id;
+
+    // 背景
+    ctx.fillStyle = 'rgba(0,0,0,0.50)';
+    ctx.beginPath();
+    ctx.roundRect(px, py, panelW, panelH, 6);
+    ctx.fill();
+
+    // 标题
+    ctx.fillStyle = '#aaa';
+    ctx.font = '10px "Microsoft YaHei", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('武器', px + panelW / 2, py + 14);
+
+    for (let i = 0; i < WEAPON_LIST.length; i++) {
+      const w = WEAPON_LIST[i];
+      const ix = px + 8;
+      const iy = py + 22 + i * (itemH + gap);
+      const selected = w.id === currentId;
+      const hovered = mx >= ix && mx <= ix + itemW && my >= iy && my <= iy + itemH;
+
+      ctx.fillStyle = selected ? w.color : hovered ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.04)';
+      ctx.fillRect(ix, iy, itemW, itemH);
+      ctx.strokeStyle = selected ? '#fff' : hovered ? 'rgba(255,255,255,0.4)' : 'rgba(255,255,255,0.10)';
+      ctx.lineWidth = selected ? 2 : 1;
+      ctx.strokeRect(ix, iy, itemW, itemH);
+
+      ctx.fillStyle = selected ? '#fff' : '#bbb';
+      ctx.font = '16px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(w.icon, ix + itemW / 2, iy + 16);
+
+      ctx.fillStyle = selected ? '#fff' : '#888';
+      ctx.font = '10px "Microsoft YaHei", sans-serif';
+      ctx.fillText(w.name, ix + itemW / 2, iy + 30);
+    }
+  }
+
+  _handleWeaponPanelClick(mx, my) {
+    const { px, py, panelW, panelH, itemW, itemH, gap } = this._getWeaponPanelLayout();
+    for (let i = 0; i < WEAPON_LIST.length; i++) {
+      const ix = px + 8;
+      const iy = py + 22 + i * (itemH + gap);
+      if (mx >= ix && mx <= ix + itemW && my >= iy && my <= iy + itemH) {
+        const w = WEAPON_LIST[i];
+        if (this.player.fighter.weapon.id === w.id) return; // 已选中
+        this.player.fighter.weapon = w;
+        this.player.fighter.color = w.color;
+        this.playerWeaponId = w.id;
+        this.ui.addLog(`切换武器: ${w.name}`);
+        this.addFloatingText(this.player.fighter.x, this.player.fighter.y - 30,
+          `${w.icon} ${w.name}`, w.color, 16, 0.8, -40);
+        return;
+      }
     }
   }
 
@@ -1125,6 +1354,11 @@ export class Game {
     if (this.remoteFighter && this.remoteFighter.alive) {
       tx = (pf.x + this.remoteFighter.x) / 2;
       ty = (pf.y + this.remoteFighter.y) / 2;
+    } else if (this.player2 && this.player2.fighter) {
+      // 本地双人: 跟踪P1和P2中点
+      const p2f = this.player2.fighter;
+      tx = (pf.x + p2f.x) / 2;
+      ty = (pf.y + p2f.y) / 2;
     } else {
       const target = this._getTarget();
       if (target && target.alive) {
@@ -1144,27 +1378,62 @@ export class Game {
     this._pendingNetState = null;
     this.remoteFighter = null;
 
+    // 主机: 节流发送状态（60Hz，独立于帧率）
+    this._netSendAccum = 0;
+    this._netSendInterval = 1 / 60;
+
+    // 主机输入延迟补偿：缓冲本地输入N帧，使双方体验对称
+    // LAN ~2ms RTT → 客机感知延迟 ≈ 1-2帧，主机加2帧延迟匹配
+    this._hostInputDelayFrames = isHost ? 2 : 0;
+    this._hostInputQueue = [];
+
+    const myWeapon = opts.weaponA || 'dao';
+    const otherWeapon = opts.weaponB || 'dao';
+
+    // 玩家槽位色板（按slot分配，最多8人）
+    // 刻意避开所有武器色相: 刀蓝#4488ff 匕紫#cc66ff 锤橙#ff8844 枪青#44ccbb 盾金#ffcc44
+    const SLOT_COLORS = [
+      '#dd4466', // 0: 玫红
+      '#55bb55', // 1: 翠绿
+      '#ee55bb', // 2: 品红
+      '#88cc33', // 3: 青柠
+      '#cc4444', // 4: 砖红
+      '#55cc88', // 5: 薄荷
+      '#cc55cc', // 6: 兰紫
+      '#aacc55', // 7: 橄榄
+    ];
+    // 自己=武器色, 对手=其槽位色（保证与自身武器色有辨识度）
+    const selfColor = getWeapon(myWeapon).color;
+    const enemySlot = isHost ? 1 : 0;
+    let enemyColor = SLOT_COLORS[enemySlot];
+    // 安全检查：如果槽位色和自己武器色太接近，换下一个
+    if (enemyColor === selfColor) {
+      enemyColor = SLOT_COLORS[(enemySlot + 2) % SLOT_COLORS.length];
+    }
+    this._localPlayerColor = selfColor;
+    this._localRemoteColor = enemyColor;
+
     if (isHost) {
-      // 主机 = slot 0 (蓝, 左)
+      // 主机 = slot 0 (左)
       this.player.fighter.x = C.ARENA_W / 2 - 80;
-      this.player.fighter.color = '#4499ff';
+      this.player.fighter.color = selfColor;
       this.player.fighter.name = '玩家1';
       this.player.fighter.team = 0;
-      // 远程 = slot 1 (红, 右)
+      // 远程 = slot 1 (右)
       this.remoteFighter = new Fighter(
         C.ARENA_W / 2 + 80, C.ARENA_H / 2,
-        { color: '#ff4444', team: 1, name: '玩家2' }
+        { color: enemyColor, team: 1, name: '玩家2', weaponId: otherWeapon }
       );
     } else {
-      // 客机 = slot 1 (红, 右)
+      // 客机 = slot 1 (右)
       this.player.fighter.x = C.ARENA_W / 2 + 80;
-      this.player.fighter.color = '#ff4444';
+      this.player.fighter.color = selfColor;
       this.player.fighter.name = '玩家2';
       this.player.fighter.team = 1;
-      // 远程 = slot 0 (蓝, 左)
+      // 远程 = slot 0 (左)
       this.remoteFighter = new Fighter(
         C.ARENA_W / 2 - 80, C.ARENA_H / 2,
-        { color: '#4499ff', team: 0, name: '玩家1' }
+        { color: enemyColor, team: 0, name: '玩家1', weaponId: otherWeapon }
       );
     }
 
@@ -1190,7 +1459,22 @@ export class Game {
 
   _onNetMessage(data) {
     if (this.mode === 'online_host' && data.type === 'input') {
-      this._remoteCmd = data.cmd;
+      // OR-合并一帧脉冲输入（防止两帧间多条消息覆盖导致丢失）
+      if (!this._remoteCmd) {
+        this._remoteCmd = data.cmd;
+      } else {
+        // 连续输入取最新值
+        this._remoteCmd.moveX = data.cmd.moveX;
+        this._remoteCmd.moveY = data.cmd.moveY;
+        this._remoteCmd.faceAngle = data.cmd.faceAngle;
+        this._remoteCmd.blockHeld = data.cmd.blockHeld;
+        this._remoteCmd.dodgeAngle = data.cmd.dodgeAngle;
+        // 一帧脉冲：OR 合并（只要有一条消息为 true 就保留）
+        if (data.cmd.lightAttack) this._remoteCmd.lightAttack = true;
+        if (data.cmd.heavyAttack) this._remoteCmd.heavyAttack = true;
+        if (data.cmd.dodge) this._remoteCmd.dodge = true;
+        if (data.cmd.ultimate) this._remoteCmd.ultimate = true;
+      }
     } else if (this.mode === 'online_guest' && data.type === 'state') {
       this._pendingNetState = data;
     }
@@ -1200,15 +1484,21 @@ export class Game {
     }
   }
 
-  /** 主机: 每帧发送状态快照给客机 */
+  /** 主机: 每帧发送状态快照 + 事件 */
   _sendNetState() {
     if (!this.netClient) return;
+    const ev = [];
+    if (this.combat.events && this.combat.events.length > 0) {
+      for (const e of this.combat.events) {
+        ev.push(serializeEvent(e, this.allFighters));
+      }
+    }
     const state = {
       type: 'state',
       f: this.allFighters.map(f => snapshotFighter(f)),
       gt: this.gameTime,
       vt: this._victoryTimer,
-      ev: this.combat.events.map(e => serializeEvent(e, this.allFighters)),
+      ev,
       // 五局三胜
       ow: this._onlineWins,
       or: this._onlineRound,
@@ -1218,6 +1508,16 @@ export class Game {
       rr: this._rematchRemote,
     };
     this.netClient.sendRelay(state);
+  }
+
+  /** 主机: 节流发送（60Hz，独立于帧率） */
+  _throttledNetSend(dt) {
+    this._netSendAccum += dt;
+    if (this._netSendAccum >= this._netSendInterval) {
+      this._netSendAccum -= this._netSendInterval;
+      if (this._netSendAccum > this._netSendInterval) this._netSendAccum = 0;
+      this._sendNetState();
+    }
   }
 
   /** 主机: 重置单局，进入下一局 */
@@ -1296,7 +1596,6 @@ export class Game {
 
     // ESC 退出
     if (input.pressed('Escape') && this.onExit) {
-      if (this.netClient) this.netClient.disconnect();
       this.onExit();
       return;
     }
@@ -1308,7 +1607,7 @@ export class Game {
       this.ui.addLog('你请求了再来一局，等待对手同意...');
     }
 
-    // 发送输入给主机
+    // 发送输入给主机 + 本地移动预测
     if (this._victoryTimer < 0) {
       const pCmd = this.player.getCommands(input);
       if (this.netClient) {
@@ -1322,12 +1621,83 @@ export class Game {
             blockHeld: pCmd.blockHeld,
             dodge: pCmd.dodge,
             dodgeAngle: pCmd.dodgeAngle,
+            ultimate: pCmd.ultimate,
           }
         });
       }
+      // === 客机本地预测：立即播放动画，主机状态到达后覆盖 ===
+      const pf = this.player.fighter;
+
+      // 移动预测（idle/blocking状态）
+      if (pf.alive && (pf.state === 'idle' || pf.state === 'blocking')) {
+        const speed = (pf.weapon ? pf.weapon.speedMult : 1) * C.FIGHTER_SPEED * (pf.isExhausted ? 0.5 : 1) * pf.speedMult;
+        pf.x += pCmd.moveX * speed * dt;
+        pf.y += pCmd.moveY * speed * dt;
+        pf.facing = pCmd.faceAngle;
+        pf.x = Math.max(pf.radius, Math.min(C.ARENA_W - pf.radius, pf.x));
+        pf.y = Math.max(pf.radius, Math.min(C.ARENA_H - pf.radius, pf.y));
+      }
+
+      // 攻击/闪避预测（idle状态下按键 → 立即进入前摇/闪避动画）
+      if (pf.alive && pf.state === 'idle') {
+        if (pCmd.lightAttack) {
+          const atkDef = pf.weapon.lightAttacks[0];
+          pf.state = 'lightAttack';
+          pf.phase = 'startup';
+          pf.phaseTimer = 0;
+          pf.stateTimer = 0;
+          pf.attackType = 'light';
+          pf.comboStep = 1;
+          pf.attackData = {
+            startup: atkDef.startup, active: atkDef.active,
+            recovery: atkDef.recovery, range: atkDef.range * pf.scale,
+            arc: atkDef.arc, damage: atkDef.damage, type: 'light'
+          };
+          pf.hasHit = new Set();
+          pf._predicted = true;
+        } else if (pCmd.heavyAttack) {
+          const h = pf.weapon.heavy;
+          pf.state = 'heavyAttack';
+          pf.phase = 'startup';
+          pf.phaseTimer = 0;
+          pf.stateTimer = 0;
+          pf.attackType = 'heavy';
+          pf.attackData = {
+            startup: h.startup, active: h.active,
+            recovery: h.recovery, range: h.range * pf.scale,
+            arc: h.arc, damage: h.damage, type: 'heavy'
+          };
+          pf.hasHit = new Set();
+          pf._predicted = true;
+        } else if (pCmd.dodge && pCmd.dodgeAngle !== undefined) {
+          pf.state = 'dodging';
+          pf.stateTimer = 0;
+          pf.dodgeAngle = pCmd.dodgeAngle;
+          pf.vx = Math.cos(pCmd.dodgeAngle) * C.DODGE_SPEED;
+          pf.vy = Math.sin(pCmd.dodgeAngle) * C.DODGE_SPEED;
+          pf._predicted = true;
+        }
+      }
+
+      // 预测动画推进：让前摇弧线/闪避位移平滑播放
+      if (pf._predicted && pf.alive) {
+        pf.phaseTimer += dt;
+        pf.stateTimer += dt;
+        if (pf.state === 'dodging') {
+          pf.x += pf.vx * dt;
+          pf.y += pf.vy * dt;
+          pf.x = Math.max(pf.radius, Math.min(C.ARENA_W - pf.radius, pf.x));
+          pf.y = Math.max(pf.radius, Math.min(C.ARENA_H - pf.radius, pf.y));
+          pf.afterimages.push({ x: pf.x, y: pf.y, timer: 0.2 });
+        }
+        // 攻击前摇期间允许调整朝向
+        if ((pf.state === 'lightAttack' || pf.state === 'heavyAttack') && pf.phase === 'startup') {
+          pf.facing = pCmd.faceAngle;
+        }
+      }
     }
 
-    // 应用主机发来的状态
+    // 应用主机发来的状态（覆盖预测位置，保持权威同步）
     if (this._pendingNetState) {
       this._applyNetState(this._pendingNetState);
       this._pendingNetState = null;
@@ -1347,6 +1717,13 @@ export class Game {
       if (this.timeScaleTimer <= 0) this.timeScale = 1;
     }
 
+    // 满炁气流粒子（客机本地生成）
+    for (const f of this.allFighters) {
+      if (f.alive && f.qi >= (f.qiMax || C.QI_MAX) && f.state !== 'ultimate') {
+        this.particles.qiAura(f.x, f.y, f.radius + 8);
+      }
+    }
+
     // 视觉更新
     this.particles.update(dt);
     this._updateCameraTarget();
@@ -1360,6 +1737,12 @@ export class Game {
     for (let i = 0; i < state.f.length && i < this.allFighters.length; i++) {
       applyFighterSnapshot(this.allFighters[i], state.f[i]);
     }
+    // 预测标记清除（服务器状态已到达，以服务器为准）
+    if (this.player) this.player.fighter._predicted = false;
+    // 本地颜色覆盖：自己=武器色, 对手=红色（防止快照覆盖）
+    if (this._localPlayerColor && this.player) this.player.fighter.color = this._localPlayerColor;
+    if (this._localRemoteColor && this.remoteFighter) this.remoteFighter.color = this._localRemoteColor;
+
     this.gameTime = state.gt;
     this._victoryTimer = state.vt;
 

@@ -333,3 +333,146 @@ body {
   vertical-align: middle;
   cursor: pointer;
 }
+
+/* ============ 房间大厅 ============ */
+.room-player-list-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: #aac;
+  font-size: 14px;
+  padding: 8px 0 4px;
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+}
+
+.room-player-list-header span {
+  color: #44ffaa;
+  font-weight: bold;
+}
+
+.room-player-list {
+  max-height: 240px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.room-player-item {
+  padding: 6px 12px;
+  border-radius: 4px;
+  background: rgba(255,255,255,0.04);
+  color: #ccc;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.room-player-item:nth-child(odd) {
+  background: rgba(255,255,255,0.07);
+}
+
+.room-host-badge {
+  color: #ffcc44;
+  font-size: 12px;
+}
+
+.room-self-badge {
+  color: #44aaff;
+  font-size: 12px;
+}
+
+.room-start-btn {
+  width: 100%;
+  padding: 12px;
+  font-size: 18px;
+  margin-top: 8px;
+  background: linear-gradient(180deg, rgba(68,200,150,0.4), rgba(40,120,90,0.4));
+  border-color: rgba(68,200,150,0.6);
+  color: #fff;
+  font-weight: bold;
+  letter-spacing: 2px;
+}
+
+.room-start-btn:hover {
+  background: linear-gradient(180deg, rgba(68,200,150,0.6), rgba(40,120,90,0.6));
+  border-color: rgba(68,200,150,0.9);
+  text-shadow: 0 0 8px rgba(68,255,170,0.5);
+}
+
+/* 武器选择 */
+.room-weapon-select {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.room-weapon-btn {
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: 1px solid rgba(255,255,255,0.15);
+  background: rgba(255,255,255,0.06);
+  color: #ccc;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.room-weapon-btn:hover:not(.disabled) {
+  background: rgba(100,150,255,0.2);
+  border-color: rgba(100,150,255,0.5);
+}
+
+.room-weapon-btn.selected {
+  background: rgba(68,170,255,0.35);
+  border-color: rgba(68,170,255,0.8);
+  color: #fff;
+  font-weight: bold;
+  box-shadow: 0 0 8px rgba(68,170,255,0.3);
+}
+
+.room-weapon-btn.disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.room-weapon-pool {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.room-pool-label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: #bbc;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.room-pool-label input[type="checkbox"] {
+  accent-color: #44aaff;
+}
+
+.room-weapon-tag {
+  font-size: 12px;
+  color: #88bbff;
+  margin-left: 4px;
+}
+
+#room-nickname {
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 6px;
+  padding: 8px 12px;
+  color: #fff;
+  font-size: 15px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+#room-nickname:focus {
+  border-color: rgba(68, 255, 170, 0.5);
+}

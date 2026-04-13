@@ -3,53 +3,48 @@ import { WebSocketServer } from 'ws';
 import { createRoomManager } from './server/rooms.js';
 import os from 'os';
 
-// 获取本机所有局域网IPv4地址
-function getLanIPs() {
-  const ips = [];
+// 获取本机局域网IP
+function getLocalIP() {
   const nets = os.networkInterfaces();
   for (const name of Object.keys(nets)) {
     for (const net of nets[name]) {
-      if (net.family === 'IPv4' && !net.internal) ips.push(net.address);
+      if (net.family === 'IPv4' && !net.internal) return net.address;
     }
   }
-  return ips;
+  return 'localhost';
 }
-
-const lanIPs = getLanIPs();
-// 优先选 192.168.x.x（常见局域网），其次 10.x.x.x，最后取第一个
-const primaryIP = lanIPs.find(ip => ip.startsWith('192.168.')) 
-  || lanIPs.find(ip => ip.startsWith('10.'))
-  || lanIPs[0] || 'localhost';
-console.log('[LBQ3] 检测到网络接口:', lanIPs.join(', '), ' 默认使用:', primaryIP);
 
 export default defineConfig({
   base: './',
-  define: {
-    __LAN_IP__: JSON.stringify(primaryIP),
-  },
   server: {
     host: '0.0.0.0',
     open: true
   },
   plugins: [{
     name: 'lbq3-ws-server',
-    configureServer() {
-      // 在 Vite 开发服务器启动时同时启动联机 WS 服务器（端口 3000）
+    configureServer(server) {
+      // 提供 /api/lan-ip 接口，让前端获取本机局域网IP
+      const lanIP = getLocalIP();
+      server.middlewares.use('/api/lan-ip', (_req, res) => {
+        res.setHeader('Content-Type', 'application/json');
+        res.end(JSON.stringify({ ip: lanIP }));
+      });
+
+      // 联机 WS 服务器：共享 Vite HTTP 端口，路径 /ws
       const manager = createRoomManager();
-      try {
-        const wss = new WebSocketServer({ port: 3000 });
-        wss.on('connection', (ws) => manager.handleConnection(ws));
-        wss.on('error', (err) => {
-          if (err.code === 'EADDRINUSE') {
-            console.warn('[LBQ3] 端口 3000 被占用，联机服务未启动。可用 npm run server 单独运行');
-          } else {
-            console.error('[LBQ3] WebSocket 错误:', err.message);
-          }
-        });
-        console.log('[LBQ3] 联机WebSocket运行在 ws://localhost:3000');
-      } catch (e) {
-        console.warn('[LBQ3] 联机WebSocket启动失败:', e.message);
-      }
+      const wss = new WebSocketServer({ noServer: true });
+      wss.on('connection', (ws) => manager.handleConnection(ws));
+
+      server.httpServer.on('upgrade', (req, socket, head) => {
+        const url = req.url || '';
+        // 只拦截 /ws 路径，其它(如 Vite HMR)放行
+        if (url === '/ws' || url.startsWith('/ws?')) {
+          wss.handleUpgrade(req, socket, head, (ws) => {
+            wss.emit('connection', ws, req);
+          });
+        }
+      });
+      console.log('[LBQ3] 联机WebSocket共享Vite端口，路径 /ws');
     },
   }]
 });

@@ -7,8 +7,8 @@ import * as C from '../core/constants.js';
 export const eventLogMethods = {
   /** 判断事件是否涉及玩家（非AI-vs-AI） */
   _isPlayerInvolved(evt) {
-    // 斗蛐蛐/观战模式 → 保留所有表现特效
-    if (this.mode === 'spectate') return true;
+    // 斗蛐蛐/观战/联机模式 → 保留所有表现特效
+    if (this.mode === 'spectate' || this.mode === 'online_host' || this.mode === 'online_guest' || this.mode === 'local2p') return true;
     const pf = this.player && this.player.fighter;
     if (!pf || !pf.alive) return true;
     if (evt.attacker === pf || evt.target === pf) return true;
@@ -195,6 +195,32 @@ export const eventLogMethods = {
       case 'hyperAbsorb':
         this.ui.addLog(`${evt.a.name} 霸体吸收了 ${evt.b.name} 的轻击`);
         if (!isTest) this.addFloatingText(evt.a.x, evt.a.y - 25, '霸体!', '#ff8844', 14, 0.5, -55);
+        break;
+      case 'feint':
+        if (evt.target) {
+          this.ui.addLog(`${evt.target.name} 变招! (-${C.FEINT_COST}体力)`);
+          if (!isTest) {
+            this.addFloatingText(evt.target.x, evt.target.y - 30, '变招!', '#ff88ff', 20, 0.8, -40);
+          }
+        }
+        break;
+      case 'ultimateStartup':
+        if (evt.target && !isTest) {
+          this.flashScreen('rgba(255,60,30,0.18)', 0.12);
+          this.camera.shake(6, 0.15);
+          evt.target.flash('#ff4422', 0.15);
+          this.addFloatingText(evt.target.x, evt.target.y - 45, '⚡蓄势!', '#ff6633', 22, 0.8, -35);
+        }
+        break;
+      case 'ultimateActivate':
+        if (evt.target && !isTest) {
+          this.applyHitFreeze(0.18);
+          this.flashScreen('rgba(255,30,20,0.35)', 0.25);
+          this.camera.shake(16, 0.3);
+          this.applyTimeScale(0.15, 0.8);
+          evt.target.flash('#ff3020', 0.25);
+          this.addFloatingText(evt.target.x, evt.target.y - 55, '拔刀!', '#ff4422', 32, 1.5, -25);
+        }
         break;
     }
   },

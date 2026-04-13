@@ -7,6 +7,7 @@ import { BrowserTrainer } from './nn/browser-train.js';
 import { NetClient } from './net/net-client.js';
 import { AudioManager } from './core/audio.js';
 import * as C from './core/constants.js';
+import { WEAPON_LIST } from './weapons/weapon-defs.js';
 
 const canvas = document.getElementById('game-canvas');
 const ctx = canvas.getContext('2d');
@@ -157,7 +158,8 @@ function startGame(result) {
     weaponB: result.weaponB || 'dao',
   });
   if (game.mode !== 'test' && game.mode !== 'jianghu' && game.mode !== 'training'
-      && game.mode !== 'online_host' && game.mode !== 'online_guest' && game.mode !== 'tutorial') {
+      && game.mode !== 'online_host' && game.mode !== 'online_guest' && game.mode !== 'tutorial'
+      && game.mode !== 'local2p') {
     game.spawnEnemy();
   }
 }
@@ -165,6 +167,15 @@ function startGame(result) {
 function returnToMenu() {
   appState = 'menu';
   game = null;
+  // 清理联机状态
+  if (netClient) {
+    netClient.onMessage = null;
+    netClient.onStateChange = null;
+    netClient.onPlayersUpdate = null;
+    netClient.onPoolUpdate = null;
+    netClient.disconnect();
+    netClient = null;
+  }
   menu = new Menu(canvas, input);
   // 恢复 NN 加载状态
   if (nnWeights) menu.nnWeightsLoaded = true;
@@ -173,6 +184,8 @@ function returnToMenu() {
   setupOnlineCallback(menu);
   if (controlsHelp) controlsHelp.style.display = 'none';
   if (helpOverlay) helpOverlay.classList.add('hidden');
+  // 确保房间面板关闭
+  if (roomOverlay) roomOverlay.classList.add('hidden');
 }
 
 /** 根据游戏模式更新右侧快捷键提示内容 */
@@ -197,19 +210,28 @@ function _updateControlsHelp(mode) {
   controlsHelp.innerHTML = lines.map(l => `<div>${l}</div>`).join('');
 }
 
-// ===================== 联机房间控制器 =====================
+// ===================== 联机房间控制器（大厅模式，最多8人） =====================
 const roomOverlay = document.getElementById('room-overlay');
 const roomServer = document.getElementById('room-server');
+const roomNickname = document.getElementById('room-nickname');
 const roomStatus = document.getElementById('room-status');
-const roomCodeDisplay = document.getElementById('room-code-display');
 const roomCodeText = document.getElementById('room-code-text');
 const roomCodeInput = document.getElementById('room-code-input');
-const actionsInit = document.getElementById('room-actions-init');
+const roomStepInit = document.getElementById('room-step-init');
+const roomStepLobby = document.getElementById('room-step-lobby');
+const roomPlayerList = document.getElementById('room-player-list');
+const roomPlayerCount = document.getElementById('room-player-count');
+const btnHostStart = document.getElementById('btn-host-start');
+const roomWeaponSelect = document.getElementById('room-weapon-select');
+const roomHostWeapons = document.getElementById('room-host-weapons');
+const roomWeaponPool = document.getElementById('room-weapon-pool');
 
 let netClient = null;
+let _lanIP = ''; // 服务端检测的局域网IP
+let _selectedWeaponId = 'dao'; // 当前选择的武器
 
-// 本机局域网IP（Vite服务端检测注入，优先192.168.x.x）
-const _lanIP = (typeof __LAN_IP__ !== 'undefined') ? __LAN_IP__ : '';
+// 从 Vite 开发服务器获取本机局域网IP（GitHub Pages上会404，无影响）
+fetch('/api/lan-ip').then(r => r.json()).then(d => { _lanIP = d.ip || ''; }).catch(() => {});
 
 function setRoomStatus(text, cls = '') {
   if (roomStatus) {
@@ -219,17 +241,120 @@ function setRoomStatus(text, cls = '') {
 }
 
 function resetRoomUI() {
-  if (actionsInit) actionsInit.classList.remove('hidden');
-  if (roomCodeDisplay) roomCodeDisplay.classList.add('hidden');
+  if (roomStepInit) roomStepInit.style.display = '';
+  if (roomStepLobby) roomStepLobby.style.display = 'none';
+  if (btnHostStart) btnHostStart.style.display = 'none';
   if (roomCodeInput) roomCodeInput.value = '';
+  if (roomPlayerList) roomPlayerList.innerHTML = '';
+  if (roomWeaponSelect) roomWeaponSelect.innerHTML = '';
+  if (roomWeaponPool) roomWeaponPool.innerHTML = '';
+  if (roomHostWeapons) roomHostWeapons.style.display = 'none';
+  _selectedWeaponId = 'dao';
   setRoomStatus('');
+}
+
+// 进入大厅界面
+function showLobby() {
+  if (roomStepInit) roomStepInit.style.display = 'none';
+  if (roomStepLobby) roomStepLobby.style.display = '';
+  if (roomCodeText) roomCodeText.textContent = netClient.roomCode;
+  const allowed = netClient ? netClient.allowedWeapons : ['dao'];
+  // 如果当前选择不在允许列表中，重置
+  if (!allowed.includes(_selectedWeaponId)) _selectedWeaponId = allowed[0] || 'dao';
+  renderWeaponSelect(allowed);
+  // 房主显示武器池设置
+  if (roomHostWeapons) {
+    roomHostWeapons.style.display = (netClient && netClient.isHost) ? '' : 'none';
+  }
+  if (netClient && netClient.isHost) {
+    renderWeaponPool(allowed);
+  }
+  updatePlayerListUI(netClient.players);
+}
+
+// 更新玩家列表UI
+function updatePlayerListUI(players) {
+  if (!roomPlayerList) return;
+  if (roomPlayerCount) roomPlayerCount.textContent = `${players.length}/8`;
+  const weaponMap = {};
+  for (const w of WEAPON_LIST) weaponMap[w.id] = w;
+  roomPlayerList.innerHTML = players.map((p, i) => {
+    const hostBadge = p.isHost ? ' <span class="room-host-badge">👑房主</span>' : '';
+    const selfBadge = (netClient && p.slot === netClient.slot) ? ' <span class="room-self-badge">(我)</span>' : '';
+    const wp = weaponMap[p.weaponId] || weaponMap['dao'];
+    const weaponTag = ` <span class="room-weapon-tag">${wp.icon}${wp.name}</span>`;
+    return `<div class="room-player-item">${i + 1}. ${escapeHtml(p.name)}${weaponTag}${hostBadge}${selfBadge}</div>`;
+  }).join('');
+  // 只有房主显示开始按钮
+  if (btnHostStart) {
+    btnHostStart.style.display = (netClient && netClient.isHost) ? '' : 'none';
+  }
+}
+
+function escapeHtml(s) {
+  const div = document.createElement('div');
+  div.textContent = s;
+  return div.innerHTML;
+}
+
+// 渲染武器选择按钮
+function renderWeaponSelect(allowedWeapons) {
+  if (!roomWeaponSelect) return;
+  roomWeaponSelect.innerHTML = WEAPON_LIST.map(w => {
+    const allowed = allowedWeapons.includes(w.id);
+    const selected = w.id === _selectedWeaponId;
+    const cls = 'room-weapon-btn' + (selected ? ' selected' : '') + (!allowed ? ' disabled' : '');
+    return `<button class="${cls}" data-wid="${w.id}" ${!allowed ? 'disabled' : ''}>${w.icon} ${w.name}</button>`;
+  }).join('');
+  // 绑定点击
+  for (const btn of roomWeaponSelect.querySelectorAll('.room-weapon-btn:not(.disabled)')) {
+    btn.addEventListener('click', () => {
+      _selectedWeaponId = btn.dataset.wid;
+      renderWeaponSelect(netClient ? netClient.allowedWeapons : ['dao']);
+      if (netClient) netClient.updateWeapon(_selectedWeaponId);
+    });
+  }
+}
+
+// 渲染房主武器池设置
+function renderWeaponPool(allowedWeapons) {
+  if (!roomWeaponPool) return;
+  roomWeaponPool.innerHTML = WEAPON_LIST.map(w => {
+    const checked = allowedWeapons.includes(w.id);
+    return `<label class="room-pool-label"><input type="checkbox" data-wid="${w.id}" ${checked ? 'checked' : ''} /> ${w.icon} ${w.name}</label>`;
+  }).join('');
+  // 绑定变更
+  for (const cb of roomWeaponPool.querySelectorAll('input[type="checkbox"]')) {
+    cb.addEventListener('change', () => {
+      const selected = [];
+      for (const c of roomWeaponPool.querySelectorAll('input[type="checkbox"]:checked')) {
+        selected.push(c.dataset.wid);
+      }
+      // 至少保留一个
+      if (selected.length === 0) {
+        cb.checked = true;
+        return;
+      }
+      if (netClient) netClient.updatePool(selected);
+    });
+  }
 }
 
 function showRoomOverlay() {
   resetRoomUI();
-  // 默认填入服务端检测的局域网IP
+  // 默认昵称
+  if (roomNickname && !roomNickname.value.trim()) {
+    roomNickname.value = '玩家' + Math.floor(Math.random() * 900 + 100);
+  }
+  // 默认填入当前页面地址（WS共享同一端口）
   if (roomServer && !roomServer.value.trim()) {
-    roomServer.value = (_lanIP || location.hostname) + ':3000';
+    const host = _lanIP || location.hostname || 'localhost';
+    const port = location.port || '5173';
+    roomServer.value = host + ':' + port;
+  }
+  // HTTPS环境提示
+  if (location.protocol === 'https:') {
+    setRoomStatus('⚠️ 当前是HTTPS页面，无法连接ws服务器。\n请访问 http://主机IP:5173 来联机', 'error');
   }
   if (roomOverlay) roomOverlay.classList.remove('hidden');
 }
@@ -239,99 +364,108 @@ function hideRoomOverlay() {
   if (netClient) { netClient.disconnect(); netClient = null; }
 }
 
+// 获取昵称
+function getNickname() {
+  return (roomNickname ? roomNickname.value.trim() : '') || ('玩家' + Math.floor(Math.random() * 900 + 100));
+}
+
+// 通用状态处理
+function setupNetClientHandlers(afterConnect) {
+  netClient.onPlayersUpdate = (players) => updatePlayerListUI(players);
+  netClient.onPoolUpdate = (allowedWeapons) => {
+    // 如果当前选择不在允许列表中，重置
+    if (!allowedWeapons.includes(_selectedWeaponId)) {
+      _selectedWeaponId = allowedWeapons[0] || 'dao';
+      netClient.updateWeapon(_selectedWeaponId);
+    }
+    renderWeaponSelect(allowedWeapons);
+    if (netClient.isHost) renderWeaponPool(allowedWeapons);
+  };
+  netClient.onStateChange = (state, detail) => {
+    switch (state) {
+      case 'connecting':
+        setRoomStatus('连接中...', 'waiting');
+        break;
+      case 'connected':
+        setRoomStatus('已连接...', 'waiting');
+        afterConnect();
+        break;
+      case 'lobby':
+        setRoomStatus('等待房主开始游戏...', 'waiting');
+        showLobby();
+        break;
+      case 'game_start': {
+        setRoomStatus('游戏开始!', 'success');
+        // 找到自己和对手的武器
+        const myPlayer = netClient.players.find(p => p.slot === netClient.slot);
+        const otherPlayer = netClient.players.find(p => p.slot !== netClient.slot);
+        const myWeapon = myPlayer ? myPlayer.weaponId : _selectedWeaponId;
+        const otherWeapon = otherPlayer ? otherPlayer.weaponId : 'dao';
+        setTimeout(() => {
+          if (roomOverlay) roomOverlay.classList.add('hidden');
+          startGame({
+            mode: netClient.isHost ? 'online_host' : 'online_guest',
+            netClient: netClient,
+            weaponA: myWeapon,
+            weaponB: otherWeapon,
+          });
+        }, 300);
+        break;
+      }
+      case 'player_left': {
+        const who = detail ? detail.name : '对手';
+        if (game) {
+          // 游戏中有人离开，显示提示后返回菜单
+          returnToMenu();
+          // returnToMenu 会重建 menu，这里用 alert 弹出提示
+          setTimeout(() => alert(`${who} 已断开连接，对局结束。`), 50);
+        }
+        break;
+      }
+      case 'error':
+        setRoomStatus(netClient.errorMessage || '连接失败', 'error');
+        resetRoomUI();
+        break;
+      case 'disconnected':
+        setRoomStatus('已断开', 'error');
+        resetRoomUI();
+        break;
+    }
+  };
+}
+
 // 创建房间
 if (document.getElementById('btn-create-room')) {
   document.getElementById('btn-create-room').addEventListener('click', () => {
-    const addr = roomServer ? roomServer.value.trim() : 'localhost:3000';
+    const addr = roomServer ? roomServer.value.trim() : (location.host || 'localhost:5173');
     if (!addr) { setRoomStatus('请输入服务器地址', 'error'); return; }
+    const name = getNickname();
     netClient = new NetClient();
-    netClient.onStateChange = (state) => {
-      switch (state) {
-        case 'connecting':
-          setRoomStatus('连接中...', 'waiting');
-          if (actionsInit) actionsInit.classList.add('hidden');
-          break;
-        case 'connected':
-          setRoomStatus('已连接，创建房间...', 'waiting');
-          netClient.createRoom();
-          break;
-        case 'waiting':
-          setRoomStatus('等待对手加入...', 'waiting');
-          if (roomCodeDisplay) roomCodeDisplay.classList.remove('hidden');
-          if (roomCodeText) roomCodeText.textContent = netClient.roomCode;
-          break;
-        case 'game_start':
-          setRoomStatus('对手已加入! 游戏开始!', 'success');
-          setTimeout(() => {
-            if (roomOverlay) roomOverlay.classList.add('hidden');
-            startGame({
-              mode: netClient.slot === 0 ? 'online_host' : 'online_guest',
-              netClient: netClient,
-            });
-          }, 300);
-          break;
-        case 'opponent_left':
-          setRoomStatus('对手已断开', 'error');
-          if (game) { returnToMenu(); showRoomOverlay(); }
-          resetRoomUI();
-          break;
-        case 'error':
-          setRoomStatus(netClient.errorMessage || '连接失败', 'error');
-          resetRoomUI();
-          break;
-        case 'disconnected':
-          setRoomStatus('已断开', 'error');
-          resetRoomUI();
-          break;
-      }
-    };
-    netClient.connect('ws://' + addr);
+    setupNetClientHandlers(() => netClient.createRoom(name));
+    netClient.connect('ws://' + addr + '/ws');
   });
 }
 
 // 加入房间
 if (document.getElementById('btn-confirm-join')) {
   document.getElementById('btn-confirm-join').addEventListener('click', () => {
-    const addr = roomServer ? roomServer.value.trim() : 'localhost:3000';
+    const addr = roomServer ? roomServer.value.trim() : (location.host || 'localhost:5173');
     const code = roomCodeInput ? roomCodeInput.value.trim() : '';
     if (!addr) { setRoomStatus('请输入服务器地址', 'error'); return; }
     if (!code || code.length !== 4) { setRoomStatus('请输入4位房间号', 'error'); return; }
+    const name = getNickname();
     netClient = new NetClient();
-    netClient.onStateChange = (state) => {
-      switch (state) {
-        case 'connecting':
-          setRoomStatus('连接中...', 'waiting');
-          break;
-        case 'connected':
-          setRoomStatus('已连接，加入房间...', 'waiting');
-          netClient.joinRoom(code);
-          break;
-        case 'game_start':
-          setRoomStatus('加入成功! 游戏开始!', 'success');
-          setTimeout(() => {
-            if (roomOverlay) roomOverlay.classList.add('hidden');
-            startGame({
-              mode: netClient.slot === 0 ? 'online_host' : 'online_guest',
-              netClient: netClient,
-            });
-          }, 300);
-          break;
-        case 'opponent_left':
-          setRoomStatus('对手已断开', 'error');
-          if (game) { returnToMenu(); showRoomOverlay(); }
-          resetRoomUI();
-          break;
-        case 'error':
-          setRoomStatus(netClient.errorMessage || '连接失败', 'error');
-          resetRoomUI();
-          break;
-        case 'disconnected':
-          setRoomStatus('已断开', 'error');
-          resetRoomUI();
-          break;
-      }
-    };
-    netClient.connect('ws://' + addr);
+    setupNetClientHandlers(() => netClient.joinRoom(code, name));
+    netClient.connect('ws://' + addr + '/ws');
+  });
+}
+
+// 房主点击开始
+if (btnHostStart) {
+  btnHostStart.addEventListener('click', () => {
+    if (netClient && netClient.isHost) {
+      netClient.hostStart();
+    }
   });
 }
 
@@ -351,26 +485,34 @@ if (document.getElementById('btn-room-back')) {
   });
 }
 
-// 复制房间号（包含服务器地址，方便分享给好友）
+// 复制邀请信息（包含访问地址+服务器地址+房间号）
 if (document.getElementById('btn-copy-code')) {
   document.getElementById('btn-copy-code').addEventListener('click', () => {
     const code = roomCodeText ? roomCodeText.textContent : '';
     if (!code) return;
     let addr = roomServer ? roomServer.value.trim() : '';
-    // 分享时把 localhost / 127.0.0.1 替换为局域网IP
+    // 复制时把 localhost 替换为局域网IP
     if (_lanIP && /^(localhost|127\.0\.0\.1)(:\d+)?$/.test(addr)) {
       addr = addr.replace(/^(localhost|127\.0\.0\.1)/, _lanIP);
     }
-    const shareText = `【冷兵器对战】联机邀请\n服务器: ${addr}\n房间号: ${code}`;
-    navigator.clipboard.writeText(shareText).then(() => {
-      const btn = document.getElementById('btn-copy-code');
-      if (btn) { btn.textContent = '✅ 已复制'; setTimeout(() => btn.textContent = '📋 复制', 1500); }
-    }).catch(() => {
-      // fallback
-      const ta = document.createElement('textarea');
-      ta.value = shareText; document.body.appendChild(ta); ta.select();
-      document.execCommand('copy'); document.body.removeChild(ta);
-    });
+    // 拼接访问地址（WS和页面共享同一端口）
+    const gameUrl = `http://${addr}/`;
+    const shareText = `【冷兵器对战】联机邀请\n游戏地址: ${gameUrl}\n房间号: ${code}`;
+    const doCopy = (text) => {
+      navigator.clipboard.writeText(text).then(() => {
+        const btn = document.getElementById('btn-copy-code');
+        if (btn) { btn.textContent = '✅ 已复制'; setTimeout(() => btn.textContent = '📋 复制', 1500); }
+      }).catch(() => {
+        const ta = document.createElement('textarea');
+        ta.value = text; ta.style.position = 'fixed'; ta.style.left = '-9999px';
+        document.body.appendChild(ta); ta.select();
+        try { document.execCommand('copy'); } catch(_) {}
+        document.body.removeChild(ta);
+        const btn = document.getElementById('btn-copy-code');
+        if (btn) { btn.textContent = '✅ 已复制'; setTimeout(() => btn.textContent = '📋 复制', 1500); }
+      });
+    };
+    doCopy(shareText);
   });
 }
 

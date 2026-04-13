@@ -1,6 +1,6 @@
 // ===================== 开始菜单（多页设计） =====================
 import { WEAPON_LIST, WEAPONS, getWeapon } from '../weapons/weapon-defs.js';
-const GAME_VERSION = 'v0.9.1';
+const GAME_VERSION = 'v0.11.0';
 
 export class Menu {
   constructor(canvas, input) {
@@ -8,7 +8,7 @@ export class Menu {
     this.ctx = canvas.getContext('2d');
     this.input = input;
 
-    this.page = 'main'; // 'main' | 'pvai' | 'spectate' | 'test' | 'wusheng' | 'jianghu' | 'training' | 'entertainment' | 'chainKill'
+    this.page = 'main'; // 'main' | 'pvai' | 'spectate' | 'test' | 'wusheng' | 'jianghu' | 'training' | 'entertainment' | 'chainKill' | 'local2p'
     this.pvaiDiff = 3;
     this.nnWeightsLoaded = false;
     this.nnLoadError = null;
@@ -52,6 +52,7 @@ export class Menu {
       case 'training': this._updateTraining(mx, my); break;
       case 'entertainment': this._updateEntertainment(mx, my); break;
       case 'chainKill': this._updateChainKill(mx, my); break;
+      case 'local2p': this._updateLocal2P(mx, my); break;
     }
   }
 
@@ -256,6 +257,7 @@ export class Menu {
       case 'training': this._drawTraining(); break;
       case 'entertainment': this._drawEntertainment(); break;
       case 'chainKill': this._drawChainKill(); break;
+      case 'local2p': this._drawLocal2P(); break;
     }
   }
 
@@ -665,8 +667,17 @@ export class Menu {
   // ---- 江湖行页 ----
   _updateJianghu(mx, my) {
     const L = this._layoutJianghu();
+    // 武器选择
+    for (let i = 0; i < WEAPON_LIST.length; i++) {
+      const bx = L.weaponAx + i * 52;
+      if (this._hit(mx, my, bx, L.weaponAy, 46, 38)) {
+        this.weaponA = WEAPON_LIST[i].id;
+        this._clickCooldown = 0.12;
+        return;
+      }
+    }
     if (this._hit(mx, my, L.startBtn.x, L.startBtn.y, L.startBtn.w, L.startBtn.h)) {
-      this.result = { mode: 'jianghu' };
+      this.result = { mode: 'jianghu', weaponA: this.weaponA };
       this._clickCooldown = 0.3;
       return;
     }
@@ -686,17 +697,20 @@ export class Menu {
 
     this._drawSubHeader(ctx, cw, '🏔 江湖行', '十关爬塔 · 3条命 · 闯荡江湖');
 
+    // 武器选择
+    this._drawWeaponSelector(ctx, L.weaponAx, L.weaponAy, '你的武器', this.weaponA, mx, my);
+
     // 描述
     ctx.textAlign = 'center';
     ctx.fillStyle = '#aaa';
     ctx.font = '14px "Microsoft YaHei", sans-serif';
-    ctx.fillText('从山贼到武林盟主，敌人体型、血量、智能逐步升级', cw / 2, ch * 0.32);
-    ctx.fillText('每关战胜后恢复40%HP，挑战到底!', cw / 2, ch * 0.37);
+    ctx.fillText('从山贼到武林盟主，敌人体型、血量、智能逐步升级', cw / 2, ch * 0.40);
+    ctx.fillText('每关战胜后恢复40%HP，挑战到底!', cw / 2, ch * 0.45);
 
     // 关卡预览
     ctx.fillStyle = '#666';
     ctx.font = '12px "Microsoft YaHei", sans-serif';
-    ctx.fillText('关卡: 山贼 → 镖师 → 恶霸 → 剑客 → 力士 → 捕快 → 武僧 → 长老 → 剑仙 → 盟主', cw / 2, ch * 0.44);
+    ctx.fillText('关卡: 山贼 → 镖师 → 恶霸 → 剑客 → 力士 → 捕快 → 武僧 → 长老 → 剑仙 → 盟主', cw / 2, ch * 0.52);
 
     this._drawActionBtn(ctx, L.startBtn, '⚔ 踏入江湖', '#ffcc44', mx, my);
     this._drawActionBtn(ctx, L.backBtn, '← 返回', '#666', mx, my);
@@ -708,9 +722,13 @@ export class Menu {
     const cx = cw / 2;
     const btnW = 280;
     const btnH = 48;
+    const weaponW = WEAPON_LIST.length * 52;
+    const weaponAx = cx - weaponW / 2;
+    const weaponAy = ch * 0.26;
     return {
-      startBtn: { x: cx - btnW / 2, y: ch * 0.54, w: btnW, h: btnH },
-      backBtn: { x: cx - 60, y: ch * 0.54 + btnH + 20, w: 120, h: 34 },
+      weaponAx, weaponAy,
+      startBtn: { x: cx - btnW / 2, y: ch * 0.58, w: btnW, h: btnH },
+      backBtn: { x: cx - 60, y: ch * 0.58 + btnH + 20, w: 120, h: 34 },
     };
   }
 
@@ -958,6 +976,11 @@ export class Menu {
       this._clickCooldown = 0.3;
       return;
     }
+    if (this._hit(mx, my, L.local2pBtn.x, L.local2pBtn.y, L.local2pBtn.w, L.local2pBtn.h)) {
+      this.page = 'local2p';
+      this._clickCooldown = 0.2;
+      return;
+    }
     if (this._hit(mx, my, L.backBtn.x, L.backBtn.y, L.backBtn.w, L.backBtn.h)) {
       this.page = 'main';
       this._clickCooldown = 0.2;
@@ -976,13 +999,14 @@ export class Menu {
     this._drawActionBtn(ctx, L.wushengBtn, '🏆 挑战武圣', '#ff00ff', mx, my);
     this._drawActionBtn(ctx, L.chainBtn, '⚔ 连战模式', '#ff6633', mx, my);
     this._drawActionBtn(ctx, L.trainingBtn, '🎯 自由训练', '#66ccff', mx, my);
+    this._drawActionBtn(ctx, L.local2pBtn, '🎮 本地双人', '#44dd88', mx, my);
 
     // 简要说明
     ctx.fillStyle = '#666';
     ctx.font = '12px "Microsoft YaHei", sans-serif';
     ctx.textAlign = 'center';
-    const descY = L.trainingBtn.y + L.trainingBtn.h + 16;
-    ctx.fillText('江湖行: 十关爬塔  |  武圣: 对战神经网络  |  连战: 无尽挑战  |  训练: 自由练习', cw / 2, descY);
+    const descY = L.local2pBtn.y + L.local2pBtn.h + 16;
+    ctx.fillText('江湖行: 十关爬塔  |  武圣: 对战神经网络  |  连战: 无尽挑战  |  双人: 键盘+手柄', cw / 2, descY);
 
     this._drawActionBtn(ctx, L.backBtn, '← 返回', '#666', mx, my);
   }
@@ -1000,7 +1024,79 @@ export class Menu {
       wushengBtn:  { x: cx - btnW / 2, y: startY + (btnH + gap), w: btnW, h: btnH },
       chainBtn:    { x: cx - btnW / 2, y: startY + (btnH + gap) * 2, w: btnW, h: btnH },
       trainingBtn: { x: cx - btnW / 2, y: startY + (btnH + gap) * 3, w: btnW, h: btnH },
-      backBtn:     { x: cx - 60, y: startY + (btnH + gap) * 4 + 16, w: 120, h: 34 },
+      local2pBtn:  { x: cx - btnW / 2, y: startY + (btnH + gap) * 4, w: btnW, h: btnH },
+      backBtn:     { x: cx - 60, y: startY + (btnH + gap) * 5 + 16, w: 120, h: 34 },
+    };
+  }
+
+  // ---- 本地双人页 ----
+  _updateLocal2P(mx, my) {
+    const L = this._layoutLocal2P();
+    // P1 武器选择
+    for (let i = 0; i < WEAPON_LIST.length; i++) {
+      const bx = L.weaponAx + i * 52;
+      if (this._hit(mx, my, bx, L.weaponAy, 46, 38)) {
+        this.weaponA = WEAPON_LIST[i].id;
+        this._clickCooldown = 0.12;
+        return;
+      }
+    }
+    // P2 武器选择
+    for (let i = 0; i < WEAPON_LIST.length; i++) {
+      const bx = L.weaponBx + i * 52;
+      if (this._hit(mx, my, bx, L.weaponBy, 46, 38)) {
+        this.weaponB = WEAPON_LIST[i].id;
+        this._clickCooldown = 0.12;
+        return;
+      }
+    }
+    if (this._hit(mx, my, L.startBtn.x, L.startBtn.y, L.startBtn.w, L.startBtn.h)) {
+      this.result = { mode: 'local2p', weaponA: this.weaponA, weaponB: this.weaponB };
+      this._clickCooldown = 0.3;
+      return;
+    }
+    if (this._hit(mx, my, L.backBtn.x, L.backBtn.y, L.backBtn.w, L.backBtn.h)) {
+      this.page = 'entertainment';
+      this._clickCooldown = 0.2;
+    }
+  }
+
+  _drawLocal2P() {
+    const ctx = this.ctx;
+    const cw = this.canvas._logicW || this.canvas.width;
+    const mx = this.input.mouseX;
+    const my = this.input.mouseY;
+    const L = this._layoutLocal2P();
+
+    this._drawSubHeader(ctx, cw, '🎮 本地双人', 'P1 键盘+鼠标  vs  P2 手柄');
+    this._drawWeaponSelector(ctx, L.weaponAx, L.weaponAy, 'P1 武器', this.weaponA, mx, my);
+    this._drawWeaponSelector(ctx, L.weaponBx, L.weaponBy, 'P2 武器', this.weaponB, mx, my);
+
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#aaa';
+    ctx.font = '13px "Microsoft YaHei", sans-serif';
+    ctx.fillText('P1: WASD移动 · 鼠标瞄准 · 左键轻击 · 右键重击 · 空格招架 · Shift闪避 · F绝技', cw / 2, L.weaponBy + 56);
+    ctx.fillText('P2: 左摇杆移动+朝向 · X轻击 · Y重击 · B招架 · RB/A/LB闪避 · RT绝技', cw / 2, L.weaponBy + 76);
+
+    this._drawActionBtn(ctx, L.startBtn, '⚔ 开始对战', '#44dd88', mx, my);
+    this._drawActionBtn(ctx, L.backBtn, '← 返回', '#666', mx, my);
+  }
+
+  _layoutLocal2P() {
+    const cw = this.canvas._logicW || this.canvas.width;
+    const ch = this.canvas._logicH || this.canvas.height;
+    const cx = cw / 2;
+    const btnW = 280;
+    const btnH = 44;
+    const weaponW = WEAPON_LIST.length * 52;
+    const weaponAx = cx - weaponW - 10;
+    const weaponBx = cx + 10;
+    const weaponY = ch * 0.30;
+    return {
+      weaponAx, weaponAy: weaponY,
+      weaponBx, weaponBy: weaponY,
+      startBtn: { x: cx - btnW / 2, y: weaponY + 130, w: btnW, h: btnH },
+      backBtn:  { x: cx - 60, y: weaponY + 190, w: 120, h: 34 },
     };
   }
 

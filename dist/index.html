@@ -4,8 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>冷兵器战斗系统 Demo</title>
-  <script type="module" crossorigin src="./assets/index-p9fStz6n.js"></script>
-  <link rel="stylesheet" crossorigin href="./assets/index-wjDhdQOo.css">
+  <script type="module" crossorigin src="./assets/index-GX9Ijaq5.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-D2ocv27c.css">
 </head>
 <body>
   <div id="game-container">
@@ -123,22 +123,47 @@
       <div class="room-panel">
         <div class="room-header">🌐 联机对战</div>
         <div class="room-body">
-          <div class="room-row">
-            <label>服务器地址</label>
-            <input id="room-server" type="text" value="localhost:3000" spellcheck="false" autocomplete="off" />
+          <!-- 第一步：输入昵称和服务器 -->
+          <div id="room-step-init">
+            <div class="room-row">
+              <label>昵称</label>
+              <input id="room-nickname" type="text" value="" maxlength="12" placeholder="输入你的昵称" spellcheck="false" autocomplete="off" />
+            </div>
+            <div class="room-row">
+              <label>服务器地址</label>
+              <input id="room-server" type="text" value="" placeholder="自动检测" spellcheck="false" autocomplete="off" />
+            </div>
+            <div class="room-actions" id="room-actions-init">
+              <button id="btn-create-room" class="room-btn">创建房间</button>
+            </div>
+            <div class="room-join-row">
+              <input id="room-code-input" type="text" maxlength="4" placeholder="输入4位房间号" spellcheck="false" autocomplete="off" />
+              <button id="btn-confirm-join" class="room-btn">加入房间</button>
+            </div>
           </div>
-          <div class="room-actions" id="room-actions-init">
-            <button id="btn-create-room" class="room-btn">创建房间</button>
-          </div>
-          <div class="room-join-row">
-            <input id="room-code-input" type="text" maxlength="4" placeholder="输入4位房间号" spellcheck="false" autocomplete="off" />
-            <button id="btn-confirm-join" class="room-btn">加入房间</button>
+          <!-- 第二步：大厅（玩家列表+武器选择） -->
+          <div id="room-step-lobby" style="display:none;">
+            <div id="room-code-display" class="room-code">
+              房间号: <span id="room-code-text"></span>
+              <button id="btn-copy-code" class="room-btn room-copy-btn" title="复制邀请信息">📋 复制</button>
+            </div>
+            <div class="room-row">
+              <label>选择武器</label>
+              <div id="room-weapon-select" class="room-weapon-select"></div>
+            </div>
+            <div id="room-host-weapons" style="display:none;">
+              <div class="room-row">
+                <label>可用武器 (房主设置)</label>
+                <div id="room-weapon-pool" class="room-weapon-pool"></div>
+              </div>
+            </div>
+            <div class="room-player-list-header">
+              玩家列表 <span id="room-player-count">0/8</span>
+            </div>
+            <div id="room-player-list" class="room-player-list"></div>
+            <button id="btn-host-start" class="room-btn room-start-btn" style="display:none;">🚀 开始游戏</button>
           </div>
           <div id="room-status" class="room-status"></div>
-          <div id="room-code-display" class="room-code hidden">
-            房间号: <span id="room-code-text"></span>
-            <button id="btn-copy-code" class="room-btn room-copy-btn" title="复制房间号">📋 复制</button>
-          </div>
         </div>
         <button id="btn-room-back" class="room-btn room-back">返回菜单</button>
       </div>
