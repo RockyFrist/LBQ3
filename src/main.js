@@ -208,7 +208,7 @@ const actionsInit = document.getElementById('room-actions-init');
 
 let netClient = null;
 
-// 本机局域网IP（由Vite服务端注入）
+// 本机局域网IP（Vite服务端检测注入，优先192.168.x.x）
 const _lanIP = (typeof __LAN_IP__ !== 'undefined') ? __LAN_IP__ : '';
 
 function setRoomStatus(text, cls = '') {
@@ -227,7 +227,7 @@ function resetRoomUI() {
 
 function showRoomOverlay() {
   resetRoomUI();
-  // 默认填入本机局域网IP，方便分享给好友
+  // 默认填入服务端检测的局域网IP
   if (roomServer && !roomServer.value.trim()) {
     roomServer.value = (_lanIP || location.hostname) + ':3000';
   }

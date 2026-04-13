@@ -3,23 +3,29 @@ import { WebSocketServer } from 'ws';
 import { createRoomManager } from './server/rooms.js';
 import os from 'os';
 
-// 获取本机局域网IP
-function getLocalIP() {
+// 获取本机所有局域网IPv4地址
+function getLanIPs() {
+  const ips = [];
   const nets = os.networkInterfaces();
   for (const name of Object.keys(nets)) {
     for (const net of nets[name]) {
-      if (net.family === 'IPv4' && !net.internal) return net.address;
+      if (net.family === 'IPv4' && !net.internal) ips.push(net.address);
     }
   }
-  return 'localhost';
+  return ips;
 }
 
-const lanIP = getLocalIP();
+const lanIPs = getLanIPs();
+// 优先选 192.168.x.x（常见局域网），其次 10.x.x.x，最后取第一个
+const primaryIP = lanIPs.find(ip => ip.startsWith('192.168.')) 
+  || lanIPs.find(ip => ip.startsWith('10.'))
+  || lanIPs[0] || 'localhost';
+console.log('[LBQ3] 检测到网络接口:', lanIPs.join(', '), ' 默认使用:', primaryIP);
 
 export default defineConfig({
   base: './',
   define: {
-    __LAN_IP__: JSON.stringify(lanIP),
+    __LAN_IP__: JSON.stringify(primaryIP),
   },
   server: {
     host: '0.0.0.0',
