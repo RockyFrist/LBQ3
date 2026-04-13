@@ -6,6 +6,7 @@ export class Player {
   constructor(x, y, { scale = 1, hpMult = 1, weaponId = 'dao' } = {}) {
     const weapon = getWeapon(weaponId);
     this.fighter = new Fighter(x, y, { color: weapon.color || '#4499ff', team: 0, name: '玩家', scale, hpMult, weapon });
+    this.isLocal2P = false; // 本地双人模式时 P1 不使用方向键（留给P2）
   }
 
   getCommands(input) {
@@ -26,10 +27,17 @@ export class Player {
 
     // 移动
     let mx = 0, my = 0;
-    if (input.held('KeyW') || input.held('ArrowUp'))    my -= 1;
-    if (input.held('KeyS') || input.held('ArrowDown'))  my += 1;
-    if (input.held('KeyA') || input.held('ArrowLeft'))  mx -= 1;
-    if (input.held('KeyD') || input.held('ArrowRight')) mx += 1;
+    if (input.held('KeyW'))    my -= 1;
+    if (input.held('KeyS'))    my += 1;
+    if (input.held('KeyA'))    mx -= 1;
+    if (input.held('KeyD'))    mx += 1;
+    // 非本地双人模式时，方向键也可移动（本地双人时方向键留给P2）
+    if (!this.isLocal2P) {
+      if (input.held('ArrowUp'))    my -= 1;
+      if (input.held('ArrowDown'))  my += 1;
+      if (input.held('ArrowLeft'))  mx -= 1;
+      if (input.held('ArrowRight')) mx += 1;
+    }
     const mv = vec2Normalize(mx, my);
     cmd.moveX = mv.x;
     cmd.moveY = mv.y;
@@ -43,14 +51,14 @@ export class Player {
     }
 
     // 攻击：按下瞬间触发（配合预输入缓冲系统，不会丢输入）
-    if (input.mouseLeftDown) cmd.lightAttack = true;
-    if (input.mouseRightDown) cmd.heavyAttack = true;
+    if (input.mouseLeftDown || input.pressed('KeyJ')) cmd.lightAttack = true;
+    if (input.mouseRightDown || input.pressed('KeyK')) cmd.heavyAttack = true;
 
     // 防御
     cmd.blockHeld = input.held('Space');
 
     // 绝技
-    if (input.pressed('KeyF')) cmd.ultimate = true;
+    if (input.pressed('KeyF') || input.pressed('KeyL')) cmd.ultimate = true;
 
     return cmd;
   }

@@ -1,6 +1,6 @@
 // ===================== 开始菜单（多页设计） =====================
 import { WEAPON_LIST, WEAPONS, getWeapon } from '../weapons/weapon-defs.js';
-const GAME_VERSION = 'v0.11.0';
+const GAME_VERSION = 'v0.11.1';
 
 export class Menu {
   constructor(canvas, input) {
@@ -361,7 +361,7 @@ export class Menu {
     ctx.fillStyle = '#444';
     ctx.font = '12px "Microsoft YaHei", sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText('游戏中可按 1-5 切换难度 · 6 拼刀训练 · 7 格挡训练 · H 帮助', cw / 2, (this.canvas._logicH || this.canvas.height) - 24);
+    ctx.fillText('J轻击 K重击 L绝技 · 游戏中可按 1-5 切换难度 · 6 拼刀训练 · 7 格挡训练 · H 帮助', cw / 2, (this.canvas._logicH || this.canvas.height) - 24);
   }
 
   // ---- 斗蛐蛐页 ----
@@ -1068,15 +1068,15 @@ export class Menu {
     const my = this.input.mouseY;
     const L = this._layoutLocal2P();
 
-    this._drawSubHeader(ctx, cw, '🎮 本地双人', 'P1 键盘+鼠标  vs  P2 手柄');
+    this._drawSubHeader(ctx, cw, '🎮 本地双人', 'P1 键盘+鼠标  vs  P2 手柄/键盘');
     this._drawWeaponSelector(ctx, L.weaponAx, L.weaponAy, 'P1 武器', this.weaponA, mx, my);
     this._drawWeaponSelector(ctx, L.weaponBx, L.weaponBy, 'P2 武器', this.weaponB, mx, my);
 
     ctx.textAlign = 'center';
     ctx.fillStyle = '#aaa';
     ctx.font = '13px "Microsoft YaHei", sans-serif';
-    ctx.fillText('P1: WASD移动 · 鼠标瞄准 · 左键轻击 · 右键重击 · 空格招架 · Shift闪避 · F绝技', cw / 2, L.weaponBy + 56);
-    ctx.fillText('P2: 左摇杆移动+朝向 · X轻击 · Y重击 · B招架 · RB/A/LB闪避 · RT绝技', cw / 2, L.weaponBy + 76);
+    ctx.fillText('P1: WASD移动 · 鼠标瞄准 · 左键/J轻击 · 右键/K重击 · 空格招架 · Shift闪避 · F/L绝技', cw / 2, L.weaponBy + 56);
+    ctx.fillText('P2: 方向键/左摇杆移动 · 小键盘1/X轻击 · 小键盘3/Y重击 · 小键盘5/B招架 · 小键盘2/RB闪避 · 小键盘4/RT绝技', cw / 2, L.weaponBy + 76);
 
     this._drawActionBtn(ctx, L.startBtn, '⚔ 开始对战', '#44dd88', mx, my);
     this._drawActionBtn(ctx, L.backBtn, '← 返回', '#666', mx, my);

@@ -179,7 +179,21 @@ export class CombatSystem {
 
     // 目标有霸体但攻击者是轻击
     if (target.hasHyperArmor() && atkInfo.type === 'light') {
-      // 轻击被霸体无视
+      // 检查攻击者是否有霸体穿透（如匕首灵巧精准，见缝插针）
+      // 仅对拥有轻攻链霸体的武器生效（如大锤），不影响仅重击霸体的武器（如刀）
+      const pierce = attacker.weapon.hyperArmorPierce || 0;
+      const targetHasLightHA = target.weapon.lightAttacks?.some(atk => atk.hyperArmor);
+      if (pierce > 0 && targetHasLightHA) {
+        // 穿透：造成减伤但不打断霸体
+        const pierceDmg = Math.round(atkInfo.damage * pierce);
+        target.takeDamage(pierceDmg);
+        target.flash('#fff', 0.06);
+        this.particles.blood(midX, midY, ang, 3);
+        this.events.push({ type: 'hit', attacker, target, damage: pierceDmg, atkType: 'light', pierced: true });
+        attacker.hasHit.add(target);
+        return;
+      }
+      // 无穿透：轻击被霸体无视
       this.particles.blockSpark(midX, midY, ang, 3);
       return;
     }

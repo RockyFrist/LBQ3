@@ -309,8 +309,9 @@ export class Game {
     this.player.fighter.color = wA.color;
     this.player.fighter.name = 'P1';
     this.player.fighter.team = 0;
+    this.player.isLocal2P = true; // P1不使用方向键（留给P2）
 
-    // P2: 手柄（右侧）
+    // P2: 手柄+键盘（右侧）
     this.player2 = new GamepadPlayer();
     const p2f = new Fighter(
       C.ARENA_W / 2 + 80, C.ARENA_H / 2,
@@ -524,7 +525,7 @@ export class Game {
       }
       // 本地双人: P2手柄冻结期间也缓冲输入
       if (this.mode === 'local2p' && this.player2 && this.player2.fighter) {
-        const p2Cmd = this.player2.getCommands();
+        const p2Cmd = this.player2.getCommands(this.input);
         const p2f = this.player2.fighter;
         if (p2Cmd.lightAttack) p2f.bufferInput('lightAttack');
         else if (p2Cmd.heavyAttack) p2f.bufferInput('heavyAttack');
@@ -644,7 +645,7 @@ export class Game {
       if (this.mode === 'local2p' && this.player2 && this.player2.fighter) {
         const p2f = this.player2.fighter;
         if (p2f.alive) {
-          const raw2 = this.player2.getCommands();
+          const raw2 = this.player2.getCommands(this.input);
           p2f.update(dt, { ...noop, moveX: raw2.moveX, moveY: raw2.moveY, faceAngle: raw2.faceAngle }, this.gameTime);
         }
       }
@@ -708,7 +709,7 @@ export class Game {
 
     // 本地双人: P2手柄更新
     if (this.mode === 'local2p' && this.player2 && this.player2.fighter && this.player2.fighter.alive) {
-      const p2Cmd = this.player2.getCommands();
+      const p2Cmd = this.player2.getCommands(this.input);
       const p2f = this.player2.fighter;
       if (p2f.perfectDodged && p2f.perfectDodged !== 'refunded' && p2f.state === 'idle') p2f.perfectDodged = false;
       if (p2f.perfectDodged === 'refunded' && p2f.state === 'idle') p2f.perfectDodged = false;

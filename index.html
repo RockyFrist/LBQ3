@@ -11,10 +11,11 @@
     <canvas id="game-canvas"></canvas>
     <div id="controls-help">
       <div>WASD 移动</div>
-      <div>左键 轻击</div>
-      <div>右键 重击</div>
+      <div>左键/J 轻击</div>
+      <div>右键/K 重击</div>
       <div>空格 招架</div>
       <div>Shift+方向 闪避</div>
+      <div>F/L 绝技</div>
       <div>E 刷敌人</div>
       <div>R 重置</div>
       <div>H 帮助</div>
@@ -31,8 +32,8 @@
               <div class="section-title">基础操作</div>
               <div class="help-item"><span class="help-key">WASD</span><span class="help-desc">移动</span></div>
               <div class="help-item"><span class="help-key">鼠标</span><span class="help-desc">控制朝向</span></div>
-              <div class="help-item"><span class="help-key">左键单击</span><span class="help-desc">轻击（可连按3下组成连招）</span></div>
-              <div class="help-item"><span class="help-key">右键单击</span><span class="help-desc">重击（蓄力0.7秒，有霸体，<b style="color:#ff6666">0体力时无霸体</b>）</span></div>
+              <div class="help-item"><span class="help-key">左键单击 / J</span><span class="help-desc">轻击（可连按3下组成连招）</span></div>
+              <div class="help-item"><span class="help-key">右键单击 / K</span><span class="help-desc">重击（蓄力0.7秒，有霸体，<b style="color:#ff6666">0体力时无霸体</b>）</span></div>
               <div class="help-item"><span class="help-key">空格按住</span><span class="help-desc">招架（精准时机格挡重击）</span></div>
               <div class="help-item"><span class="help-key">Shift+方向</span><span class="help-desc">闪避（消耗1体力）</span></div>
 
@@ -96,7 +97,7 @@
               <div class="help-item"><span class="help-key hl-red">处决</span><span class="help-desc">体力=0时被打→扣25%最大血量，处决后恢复满体力</span></div>
 
               <div class="section-title">🔥 绝技 · 拔刀（炁系统）</div>
-              <div class="help-item"><span class="help-key hl-gold">F</span><span class="help-desc">炁满时按F释放「拔刀」— 前方扇形4段连斩</span></div>
+              <div class="help-item"><span class="help-key hl-gold">F / L</span><span class="help-desc">炁满时按F或L释放「拔刀」— 前方扇形4段连斩</span></div>
               <div class="help-item"><span class="help-key" style="color:#aaa">充能</span><span class="help-desc">命中/格挡/受击/处决均可积攒炁（HP条下方炁槽）</span></div>
               <div class="help-item"><span class="help-key hl-yellow">命中锁定</span><span class="help-desc">首段命中后目标被锁定，无法闪避脱离后续3段</span></div>
               <div class="help-item"><span class="help-key" style="color:#ff6666">可被打断</span><span class="help-desc">蓄势阶段(startup)可被攻击打断，返还部分炁</span></div>
@@ -107,6 +108,14 @@
               <div class="help-item"><span class="help-key" style="color:#aaa">恢复</span><span class="help-desc">每2.0秒回1点</span></div>
               <div class="help-item"><span class="help-key" style="color:#aaa">招架中</span><span class="help-desc">暂停恢复2.5秒</span></div>
               <div class="help-item"><span class="help-key hl-red">体力=0</span><span class="help-desc">速度减半，重击无霸体，可被处决</span></div>
+
+              <div class="section-title">🎮 本地双人 P2 操作</div>
+              <div class="help-item"><span class="help-key">方向键</span><span class="help-desc">移动+朝向（手柄左摇杆同理）</span></div>
+              <div class="help-item"><span class="help-key">小键盘1</span><span class="help-desc">轻击（手柄X）</span></div>
+              <div class="help-item"><span class="help-key">小键盘2</span><span class="help-desc">闪避（手柄RB/A/LB）</span></div>
+              <div class="help-item"><span class="help-key">小键盘3</span><span class="help-desc">重击（手柄Y）</span></div>
+              <div class="help-item"><span class="help-key">小键盘4</span><span class="help-desc">绝技（手柄RT）</span></div>
+              <div class="help-item"><span class="help-key">小键盘5</span><span class="help-desc">招架（手柄B）</span></div>
             </div>
           </div>
         </div>

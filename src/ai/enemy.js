@@ -56,6 +56,57 @@ export class Enemy {
     //           6=拼刀训练  7=格挡乒乓训练
     this._cfg = buildAIConfig(difficulty);
     this.trainingMode = difficulty >= 6 ? difficulty : 0;
+
+    // 武器AI特化：将 weapon.aiHints 融入基础难度配置
+    this._applyWeaponHints();
+  }
+
+  /**
+   * 根据武器 aiHints 调整 AI 配置参数
+   * 基准值均为 0.5（刀的默认值），偏离基准即产生差异化行为
+   */
+  _applyWeaponHints() {
+    const hints = this.fighter.weapon.aiHints;
+    if (!hints || this.trainingMode > 0) return;
+    const cfg = this._cfg;
+
+    // preferredRange → 调整接近距离（用中值替代默认 approachDist）
+    if (hints.preferredRange) {
+      cfg.approachDist = (hints.preferredRange[0] + hints.preferredRange[1]) / 2;
+    }
+
+    // aggressiveness → 按比例缩放攻击总频率（保持轻/重原始比例）
+    const aggScale = (hints.aggressiveness ?? 0.5) / 0.5;
+    const origTotal = cfg.attackRate + cfg.heavyRate;
+    const newTotal = Math.min(0.95, origTotal * aggScale);
+    if (origTotal > 0) {
+      const origRatio = cfg.attackRate / origTotal;
+      cfg.attackRate = newTotal * origRatio;
+      cfg.heavyRate = newTotal * (1 - origRatio);
+    }
+    cfg.retreatWhenLow = Math.max(0.001, cfg.retreatWhenLow * (2 - aggScale));
+
+    // heavyBias → 调整轻/重攻击比例（0.5=保持难度原始比例）
+    const hBias = hints.heavyBias;
+    if (hBias !== undefined && hBias !== 0.5) {
+      const total = cfg.attackRate + cfg.heavyRate;
+      const origHeavyP = total > 0 ? cfg.heavyRate / total : 0.3;
+      // 混合60%偏向hint值，保留40%难度特征
+      const blendedHeavyP = origHeavyP + (hBias - origHeavyP) * 0.6;
+      cfg.heavyRate = total * Math.max(0.05, Math.min(0.85, blendedHeavyP));
+      cfg.attackRate = total - cfg.heavyRate;
+    }
+
+    // dodgeBias → 缩放闪避概率（匕首高闪、大锤低闪）
+    const dodgeScale = (hints.dodgeBias ?? 0.5) / 0.5;
+    cfg.dodgeChance = Math.min(0.55, cfg.dodgeChance * dodgeScale);
+
+    // blockBias → 缩放格挡概率与持续时间（剑盾高格、匕首低格）
+    const block = hints.blockBias ?? 0.5;
+    const blockScale = block / 0.5;
+    cfg.blockChance = Math.min(0.35, cfg.blockChance * blockScale);
+    cfg.blockDurBase *= (0.7 + block * 0.6);
+    cfg.blockCooldownBase *= Math.max(0.5, 1.5 - block);
   }
 
   _logDecision(time, reason, action, context) {
@@ -962,6 +1013,16 @@ export class Enemy {
     const r = Math.random();
     const f = this.fighter;
     const cfg = this._cfg;
+
+    // 武器距离管理：过近时偏向后退保持最佳交战距离
+    const hints = f.weapon.aiHints;
+    if (hints?.preferredRange && d < hints.preferredRange[0]) {
+      if (Math.random() < 0.5) {
+        this.aiState = 'retreat';
+        this.aiTimer = 0.15 + Math.random() * 0.25;
+        return;
+      }
+    }
 
     if (f.isExhausted) {
       // 体力空了：优先撤退拉距等回复，格挡会暂停回复所以尽量少用

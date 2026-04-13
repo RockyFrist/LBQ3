@@ -15,9 +15,9 @@ export const WEAPON_DAO = {
   speedMult: 1.0,
 
   lightAttacks: [
-    { startup: 0.15, active: 0.14, recovery: 0.36, range: 55, arc: Math.PI * 0.28, damage: 8,  name: '前刺' },
-    { startup: 0.15, active: 0.14, recovery: 0.36, range: 58, arc: Math.PI * 0.35, damage: 8,  name: '斜砍' },
-    { startup: 0.22, active: 0.18, recovery: 0.70, range: 62, arc: Math.PI * 0.50, damage: 12, name: '横扫' },
+    { startup: 0.15, active: 0.14, recovery: 0.36, range: 55, arc: Math.PI * 0.32, damage: 8,  name: '前刺' },
+    { startup: 0.15, active: 0.14, recovery: 0.36, range: 58, arc: Math.PI * 0.40, damage: 9,  name: '斜砍' },
+    { startup: 0.22, active: 0.18, recovery: 0.70, range: 62, arc: Math.PI * 0.50, damage: 13, name: '横扫' },
   ],
   comboWindow: 0.45,
   lightLunge: 12,
@@ -76,6 +76,7 @@ export const WEAPON_DAO = {
     aggressiveness: 0.50,
     dodgeBias: 0.50,
     blockBias: 0.50,
+    heavyBias: 0.50,
   },
 };
 
@@ -90,20 +91,20 @@ export const WEAPON_DAGGERS = {
   speedMult: 1.20,
 
   lightAttacks: [
-    { startup: 0.08, active: 0.10, recovery: 0.25, range: 40, arc: Math.PI * 0.22, damage: 5, name: '左刺' },
-    { startup: 0.08, active: 0.10, recovery: 0.25, range: 42, arc: Math.PI * 0.22, damage: 5, name: '右刺' },
-    { startup: 0.10, active: 0.10, recovery: 0.25, range: 44, arc: Math.PI * 0.25, damage: 5, name: '双刺' },
-    { startup: 0.10, active: 0.12, recovery: 0.28, range: 44, arc: Math.PI * 0.25, damage: 5, name: '旋刺' },
-    { startup: 0.12, active: 0.14, recovery: 0.55, range: 48, arc: Math.PI * 0.30, damage: 8, name: '交叉斩' },
+    { startup: 0.08, active: 0.10, recovery: 0.22, range: 42, arc: Math.PI * 0.24, damage: 7, name: '左刺' },
+    { startup: 0.08, active: 0.10, recovery: 0.22, range: 44, arc: Math.PI * 0.24, damage: 7, name: '右刺' },
+    { startup: 0.10, active: 0.10, recovery: 0.22, range: 46, arc: Math.PI * 0.27, damage: 8, name: '双刺' },
+    { startup: 0.10, active: 0.12, recovery: 0.25, range: 46, arc: Math.PI * 0.27, damage: 9, name: '旋刺' },
+    { startup: 0.12, active: 0.14, recovery: 0.50, range: 50, arc: Math.PI * 0.32, damage: 12, name: '交叉斩' },
   ],
   comboWindow: 0.35,
-  lightLunge: 10,
-  lightDrift: 90,
+  lightLunge: 14,
+  lightDrift: 100,
 
   heavy: {
-    startup: 0.40, active: 0.14, recovery: 0.50,
-    range: 55, arc: Math.PI * 0.16, damage: 20,
-    lunge: 80, drift: 40, knockback: 40,
+    startup: 0.35, active: 0.14, recovery: 0.45,
+    range: 58, arc: Math.PI * 0.30, damage: 25,
+    lunge: 40, drift: 40, knockback: 40,
     hyperArmor: false,
     hitStagger: C.HIT_STAGGER,
     staminaDrain: 0,
@@ -123,8 +124,8 @@ export const WEAPON_DAGGERS = {
   parryReflectPct: 0,
   autoCounter: false,
 
-  dodgeSpeed: 400,
-  dodgeInvuln: 0.22,
+  dodgeSpeed: 420,
+  dodgeInvuln: 0.24,
   perfectDodgeStaminaBonus: 2,   // 完美闪避净回复2体力
 
   canMoveWhileBlocking: false,
@@ -133,18 +134,18 @@ export const WEAPON_DAGGERS = {
 
   ultimate: {
     type: 'shadowkill',
-    startup: 0.35,
-    dashDist: 100,
+    startup: 0.30,
+    dashDist: 110,
     dashDuration: 0.15,
-    active: 0.80,
-    recovery: 0.40,
-    missRecovery: 0.60,
-    range: 50,
+    active: 0.70,
+    recovery: 0.35,
+    missRecovery: 0.55,
+    range: 55,
     arc: Math.PI,
-    hitDamage: 5,
+    hitDamage: 6,
     hitCount: 6,
     knockback: 40,
-    drift: 0,
+    drift: 60,
     blockReduction: 1.0,         // 不减伤
     backstabMult: 1.3,
     name: '影杀',
@@ -159,11 +160,15 @@ export const WEAPON_DAGGERS = {
   backstabAngle: Math.PI / 3,    // 背后60°内算背刺
   backstabMult: 1.3,
 
+  // 霸体穿透：轻攻可对霸体目标造成40%伤害（匕首灵巧精准，见缝插针）
+  hyperArmorPierce: 0.80,
+
   aiHints: {
     preferredRange: [30, 50],
-    aggressiveness: 0.65,
-    dodgeBias: 0.75,
-    blockBias: 0.20,
+    aggressiveness: 0.70,
+    dodgeBias: 0.70,
+    blockBias: 0.15,
+    heavyBias: 0.30,
   },
 };
 
@@ -178,19 +183,21 @@ export const WEAPON_HAMMER = {
   speedMult: 0.85,
 
   lightAttacks: [
-    { startup: 0.22, active: 0.16, recovery: 0.40, range: 65, arc: Math.PI * 0.33, damage: 14, name: '横扫' },
-    { startup: 0.22, active: 0.18, recovery: 0.45, range: 70, arc: Math.PI * 0.38, damage: 16, name: '上挑' },
-    { startup: 0.30, active: 0.20, recovery: 0.80, range: 75, arc: Math.PI * 0.50, damage: 22, name: '砸地',
+    { startup: 0.20, active: 0.16, recovery: 0.42, range: 62, arc: Math.PI * 0.33, damage: 14, name: '横扫',
+      hyperArmor: true },
+    { startup: 0.22, active: 0.18, recovery: 0.45, range: 66, arc: Math.PI * 0.38, damage: 16, name: '上挑',
+      hyperArmor: true },
+    { startup: 0.30, active: 0.20, recovery: 0.85, range: 72, arc: Math.PI * 0.50, damage: 18, name: '砸地',
       hyperArmor: true, hitStagger: 0.48 },
   ],
   comboWindow: 0.50,
-  lightLunge: 14,
-  lightDrift: 60,
+  lightLunge: 12,
+  lightDrift: 55,
 
   heavy: {
-    startup: 0.90, active: 0.20, recovery: 0.80,
-    range: 80, arc: Math.PI * 2, damage: 35,    // 360° AoE
-    lunge: 100, drift: 0, knockback: 90,
+    startup: 1.05, active: 0.20, recovery: 0.85,
+    range: 78, arc: Math.PI * 2, damage: 32,    // 360° AoE
+    lunge: 70, drift: 0, knockback: 85,
     hyperArmor: true,
     hitStagger: 0.50,
     staminaDrain: 0,
@@ -220,13 +227,13 @@ export const WEAPON_HAMMER = {
 
   ultimate: {
     type: 'groundslam',
-    startup: 0.50,
+    startup: 0.55,
     jumpDuration: 0.40,
     active: 0.10,
-    recovery: 0.50,
-    range: 100,
+    recovery: 0.55,
+    range: 95,
     arc: Math.PI * 2,            // 360° AoE
-    hitDamage: 40,
+    hitDamage: 35,
     hitCount: 1,
     knockback: 80,
     drift: 0,
@@ -239,10 +246,11 @@ export const WEAPON_HAMMER = {
   specials: ['quakeShield'],
 
   aiHints: {
-    preferredRange: [45, 70],
+    preferredRange: [50, 72],
     aggressiveness: 0.60,
     dodgeBias: 0.25,
     blockBias: 0.40,
+    heavyBias: 0.50,
   },
 };
 
@@ -257,9 +265,9 @@ export const WEAPON_SPEAR = {
   speedMult: 1.0,
 
   lightAttacks: [
-    { startup: 0.14, active: 0.12, recovery: 0.35, range: 75, arc: Math.PI * 0.19, damage: 7, name: '前刺' },
-    { startup: 0.14, active: 0.12, recovery: 0.35, range: 80, arc: Math.PI * 0.22, damage: 7, name: '横扫' },
-    { startup: 0.20, active: 0.16, recovery: 0.65, range: 88, arc: Math.PI * 0.28, damage: 12, name: '突刺' },
+    { startup: 0.13, active: 0.12, recovery: 0.32, range: 75, arc: Math.PI * 0.20, damage: 8, name: '前刺' },
+    { startup: 0.13, active: 0.12, recovery: 0.32, range: 80, arc: Math.PI * 0.23, damage: 8, name: '横扫' },
+    { startup: 0.18, active: 0.16, recovery: 0.60, range: 88, arc: Math.PI * 0.30, damage: 14, name: '突刺' },
   ],
   comboWindow: 0.45,
   lightLunge: 10,
@@ -325,10 +333,11 @@ export const WEAPON_SPEAR = {
   rangeBonusCloseThreshold: 40,
 
   aiHints: {
-    preferredRange: [70, 90],
-    aggressiveness: 0.35,
-    dodgeBias: 0.55,
+    preferredRange: [65, 85],
+    aggressiveness: 0.45,
+    dodgeBias: 0.50,
     blockBias: 0.45,
+    heavyBias: 0.55,
   },
 };
 
@@ -343,28 +352,28 @@ export const WEAPON_SHIELD = {
   speedMult: 0.95,
 
   lightAttacks: [
-    { startup: 0.16, active: 0.14, recovery: 0.38, range: 50, arc: Math.PI * 0.28, damage: 7, name: '横斩' },
-    { startup: 0.16, active: 0.14, recovery: 0.38, range: 54, arc: Math.PI * 0.30, damage: 7, name: '刺击' },
-    { startup: 0.20, active: 0.16, recovery: 0.60, range: 58, arc: Math.PI * 0.33, damage: 10, name: '上斩' },
+    { startup: 0.15, active: 0.14, recovery: 0.35, range: 52, arc: Math.PI * 0.30, damage: 8, name: '横斜' },
+    { startup: 0.15, active: 0.14, recovery: 0.35, range: 56, arc: Math.PI * 0.32, damage: 8, name: '刺击' },
+    { startup: 0.20, active: 0.16, recovery: 0.55, range: 60, arc: Math.PI * 0.36, damage: 12, name: '上斜' },
   ],
   comboWindow: 0.45,
-  lightLunge: 10,
-  lightDrift: 75,
+  lightLunge: 12,
+  lightDrift: 80,
 
   heavy: {
-    startup: 0.55, active: 0.16, recovery: 0.55,
-    range: 45, arc: Math.PI * 0.44, damage: 12,
-    lunge: 60, drift: 30, knockback: 50,
+    startup: 0.50, active: 0.16, recovery: 0.50,
+    range: 60, arc: Math.PI * 0.60, damage: 15,
+    lunge: 30, drift: 10, knockback: 55,
     hyperArmor: true,
     hitStagger: 0.55,
     staminaDrain: 2,            // 盾击消耗对方2体力
     special: 'shieldBash',
   },
 
-  preciseParryWindow: 0.18,     // 50%更宽
+  preciseParryWindow: 0.13,     // 精准弹反窗口
   semiParryWindow: 0.55,
   blockRecovery: 0.45,          // 更快恢复
-  counterDamage: 15,
+  counterDamage: 14,
   counterRange: 65,
   counterArc: Math.PI * 0.35,
   counterLunge: 30,
@@ -386,7 +395,15 @@ export const WEAPON_SHIELD = {
     type: 'absolutedefense',
     startup: 0.20,
     stanceDuration: 1.20,
+    active: 0.10,               // 反击active时间
     recovery: 0.30,
+    range: 70,
+    arc: Math.PI * 2 / 3,       // 前方120°
+    hitDamage: 35,
+    hitCount: 1,
+    knockback: 70,
+    drift: 0,
+    blockReduction: 0.30,
     counterDamage: 35,
     counterRange: 70,
     counterStagger: 0.50,
@@ -397,10 +414,11 @@ export const WEAPON_SHIELD = {
   specials: ['shieldWalk', 'parryReflect'],
 
   aiHints: {
-    preferredRange: [40, 60],
-    aggressiveness: 0.30,
-    dodgeBias: 0.35,
-    blockBias: 0.75,
+    preferredRange: [40, 58],
+    aggressiveness: 0.50,
+    dodgeBias: 0.25,
+    blockBias: 0.50,
+    heavyBias: 0.25,
   },
 };
 

@@ -1,5 +1,6 @@
-// ===================== 手柄输入（本地双人P2） =====================
+// ===================== 手柄+键盘输入（本地双人P2） =====================
 // 读取第一个连接的手柄，每帧轮询
+// 同时支持键盘操作：方向键移动，小键盘 1轻击 2闪避 3重击 4绝技 5招架
 // 布局: 左摇杆移动+朝向, X轻击, Y重击, B防御, RT绝技, RB/A/LB闪避
 
 import { vec2Normalize } from './utils.js';
@@ -57,8 +58,16 @@ export class GamepadPlayer {
    *   RT (btn 7)         → 绝技
    *   RB (btn 5) / A(btn 0) → 闪避
    *   LB (btn 4)         → 闪避（备用）
+   * 
+   * 键盘映射 (P2):
+   *   方向键              → 移动 + 朝向
+   *   小键盘1 / End       → 轻攻击
+   *   小键盘2 / ↓         → 闪避
+   *   小键盘3 / PgDn      → 重攻击
+   *   小键盘4 / ←         → 绝技
+   *   小键盘5 / Clear     → 招架
    */
-  getCommands() {
+  getCommands(input) {
     const f = this.fighter;
     const cmd = {
       moveX: 0, moveY: 0,
@@ -71,9 +80,19 @@ export class GamepadPlayer {
       ultimate: false,
     };
 
+    // ===== 手柄输入 =====
     // 左摇杆: 移动 + 朝向（移动方向即面朝方向）
     let mx = this._axes[0];
     let my = this._axes[1];
+
+    // ===== 键盘输入（方向键移动） =====
+    if (input) {
+      if (input.held('ArrowUp'))    my -= 1;
+      if (input.held('ArrowDown'))  my += 1;
+      if (input.held('ArrowLeft'))  mx -= 1;
+      if (input.held('ArrowRight')) mx += 1;
+    }
+
     const mv = vec2Normalize(mx, my);
     cmd.moveX = mv.x;
     cmd.moveY = mv.y;
@@ -83,14 +102,19 @@ export class GamepadPlayer {
     }
     cmd.faceAngle = this._lastFacing;
 
-    // X → 轻攻击
+    // X → 轻攻击 / 小键盘1
     if (this._justPressed(2)) cmd.lightAttack = true;
-    // Y → 重攻击
+    if (input && input.pressed('Numpad1')) cmd.lightAttack = true;
+    // Y → 重攻击 / 小键盘3
     if (this._justPressed(3)) cmd.heavyAttack = true;
-    // B → 防御
+    if (input && input.pressed('Numpad3')) cmd.heavyAttack = true;
+    // B → 防御 / 小键盘5
     cmd.blockHeld = this._held(1);
-    // RB / A / LB → 闪避
-    if (this._justPressed(5) || this._justPressed(0) || this._justPressed(4)) {
+    if (input && input.held('Numpad5')) cmd.blockHeld = true;
+    // RB / A / LB → 闪避 / 小键盘2
+    const gpDodge = this._justPressed(5) || this._justPressed(0) || this._justPressed(4);
+    const kbDodge = input && input.pressed('Numpad2');
+    if (gpDodge || kbDodge) {
       cmd.dodge = true;
       if (Math.abs(mv.x) > 0 || Math.abs(mv.y) > 0) {
         cmd.dodgeAngle = Math.atan2(mv.y, mv.x);
@@ -98,8 +122,9 @@ export class GamepadPlayer {
         cmd.dodgeAngle = this._lastFacing; // 无方向时朝面向闪避
       }
     }
-    // RT → 绝技
+    // RT → 绝技 / 小键盘4
     if (this._justPressed(7)) cmd.ultimate = true;
+    if (input && input.pressed('Numpad4')) cmd.ultimate = true;
 
     return cmd;
   }
