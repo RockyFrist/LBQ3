@@ -1,5 +1,6 @@
 import * as C from '../core/constants.js';
 import { clamp, normalizeAngle, angleDiff } from '../core/utils.js';
+import { WEAPON_DAO } from '../weapons/weapon-defs.js';
 
 /*
   状态列表:
@@ -9,12 +10,13 @@ import { clamp, normalizeAngle, angleDiff } from '../core/utils.js';
 */
 
 export class Fighter {
-  constructor(x, y, { color = '#4488ff', team = 0, name = '', scale = 1, hpMult = 1 } = {}) {
+  constructor(x, y, { color = '#4488ff', team = 0, name = '', scale = 1, hpMult = 1, weapon = null } = {}) {
     this.x = x;
     this.y = y;
     this.facing = 0;
     this.vx = 0;
     this.vy = 0;
+    this.weapon = weapon || WEAPON_DAO;
     this.color = color;
     this.team = team;
     this.name = name;
@@ -116,6 +118,9 @@ export class Fighter {
     this.qi = 0;
     this.qiMax = C.QI_MAX;
     this.ultimateJustActivated = false;
+
+    // 朝向锁定（影步等特殊效果）
+    this.facingLocked = 0;
   }
 
   // ===================== 状态切换 =====================
@@ -146,7 +151,8 @@ export class Fighter {
         this.comboStep = params.comboStep || 1;
         this.canFeint = params.canFeint !== undefined ? params.canFeint : true;
         const idx = this.comboStep - 1;
-        this.attackData = { ...C.LIGHT_ATTACKS[idx] };
+        const wLA = this.weapon.lightAttacks;
+        this.attackData = { ...wLA[Math.min(idx, wLA.length - 1)] };
         this.attackData.range *= this.scale;
         // 格挡加速增益
         if (this.parryBoost.timer > 0) {
@@ -159,10 +165,11 @@ export class Fighter {
       }
       case 'heavyAttack': {
         this.canFeint = params.canFeint !== undefined ? params.canFeint : true;
+        const wH = this.weapon.heavy;
         this.attackData = {
-          startup: C.HEAVY_CHARGE, active: C.HEAVY_ACTIVE,
-          recovery: C.HEAVY_RECOVERY, range: C.HEAVY_RANGE * this.scale,
-          arc: C.HEAVY_ARC, damage: C.HEAVY_DAMAGE,
+          startup: wH.startup, active: wH.active,
+          recovery: wH.recovery, range: wH.range * this.scale,
+          arc: wH.arc, damage: wH.damage,
         };
         // 格挡加速增益
         if (this.parryBoost.timer > 0) {
@@ -193,8 +200,11 @@ export class Fighter {
           this.setState('idle');
           return;
         }
-        this.vx = Math.cos(this.dodgeAngle) * C.DODGE_SPEED * this.speedMult;
-        this.vy = Math.sin(this.dodgeAngle) * C.DODGE_SPEED * this.speedMult;
+        {
+          const dodgeSpd = (this.weapon.dodgeSpeed || C.DODGE_SPEED) * this.speedMult;
+          this.vx = Math.cos(this.dodgeAngle) * dodgeSpd;
+          this.vy = Math.sin(this.dodgeAngle) * dodgeSpd;
+        }
         break;
 
       case 'staggered':
@@ -212,13 +222,14 @@ export class Fighter {
         const baseStartup = params.counterStartup || 0.16;
         const chain = this.parryChainCount;
         const mult = 1 + chain * C.PARRY_CHAIN_DECAY;
+        const w = this.weapon;
         this.attackData = {
           startup: baseStartup * mult,
           active: C.PARRY_COUNTER_ACTIVE,
           recovery: C.PARRY_COUNTER_RECOVERY,
-          range: C.PARRY_COUNTER_RANGE * this.scale,
-          arc: C.PARRY_COUNTER_ARC,
-          damage: C.PARRY_COUNTER_DAMAGE,
+          range: (w.counterRange || C.PARRY_COUNTER_RANGE) * this.scale,
+          arc: w.counterArc || C.PARRY_COUNTER_ARC,
+          damage: w.counterDamage || C.PARRY_COUNTER_DAMAGE,
         };
         this.attackType = 'parryCounter';
         this.phase = 'startup';
@@ -234,20 +245,22 @@ export class Fighter {
         break;
 
       case 'ultimate': {
-        // 拔刀绝技：startup → active（多段连斩）→ recovery
+        // 绝技：startup → active → recovery
         this.attackType = 'ultimate';
         this.phase = 'startup';
-        this.ultimateStartupBegin = true; // 蓄势开始瞬间，用于触发预警特效
+        this.ultimateStartupBegin = true;
+        const wu = this.weapon.ultimate;
         this.attackData = {
-          startup: C.ULTIMATE_STARTUP,
-          active: C.ULTIMATE_ACTIVE,
-          recovery: C.ULTIMATE_RECOVERY,
-          range: C.ULTIMATE_RANGE * this.scale,
-          arc: C.ULTIMATE_ARC,
-          hitDamage: C.ULTIMATE_HIT_DAMAGE,
-          hitCount: C.ULTIMATE_HIT_COUNT,
+          startup: wu.startup || C.ULTIMATE_STARTUP,
+          active: wu.active || C.ULTIMATE_ACTIVE,
+          recovery: wu.recovery || C.ULTIMATE_RECOVERY,
+          range: (wu.range || C.ULTIMATE_RANGE) * this.scale,
+          arc: wu.arc || C.ULTIMATE_ARC,
+          hitDamage: wu.hitDamage || C.ULTIMATE_HIT_DAMAGE,
+          hitCount: wu.hitCount || C.ULTIMATE_HIT_COUNT,
+          type: wu.type || 'multislash',
         };
-        this.ultimateHitsDone = 0;  // 已命中段数
+        this.ultimateHitsDone = 0;
         this.canFeint = false;
         break;
       }
@@ -290,6 +303,9 @@ export class Fighter {
 
     // 格挡成功后行动延迟计时
     if (this.parryActionDelay > 0) this.parryActionDelay -= dt;
+
+    // 朝向锁定计时
+    if (this.facingLocked > 0) this.facingLocked -= dt;
 
     this.updateStamina(dt);
     this.updateExhaustion(dt);
@@ -431,9 +447,9 @@ export class Fighter {
         this.phase = 'active';
         this.phaseTimer = 0;
         // 攻击位移：进入active瞬间一次性前冲（lunge）
-        const lunge = this.attackType === 'heavy' ? C.HEAVY_ATTACK_LUNGE
-          : this.attackType === 'parryCounter' ? C.PARRY_COUNTER_LUNGE
-          : C.LIGHT_ATTACK_LUNGE;
+        const lunge = this.attackType === 'heavy' ? (this.weapon.heavy.lunge || C.HEAVY_ATTACK_LUNGE)
+          : this.attackType === 'parryCounter' ? (this.weapon.counterLunge || C.PARRY_COUNTER_LUNGE)
+          : (this.weapon.lightLunge || C.LIGHT_ATTACK_LUNGE);
         this.x += Math.cos(this.facing) * lunge;
         this.y += Math.sin(this.facing) * lunge;
       }
@@ -441,9 +457,9 @@ export class Fighter {
 
     if (this.phase === 'active') {
       // 攻击位移：active期间持续前推（drift），模拟挥刀惯性
-      const drift = this.attackType === 'heavy' ? C.HEAVY_ATTACK_DRIFT
-        : this.attackType === 'parryCounter' ? C.PARRY_COUNTER_DRIFT
-        : C.LIGHT_ATTACK_DRIFT;
+      const drift = this.attackType === 'heavy' ? (this.weapon.heavy.drift || C.HEAVY_ATTACK_DRIFT)
+        : this.attackType === 'parryCounter' ? (this.weapon.counterDrift || C.PARRY_COUNTER_DRIFT)
+        : (this.weapon.lightDrift || C.LIGHT_ATTACK_DRIFT);
       this.x += Math.cos(this.facing) * drift * dt;
       this.y += Math.sin(this.facing) * drift * dt;
 
@@ -473,8 +489,9 @@ export class Fighter {
       // 轻击连击衔接（支持buffer输入：玩家在active阶段点击的攻击也能触发连击）
       const wantsLight = (cmd && cmd.lightAttack) ||
         (this.inputBuffer && this.inputBuffer.action === 'lightAttack');
-      if (this.attackType === 'light' && this.comboStep < 3 &&
-          wantsLight && this.phaseTimer < C.LIGHT_COMBO_WINDOW) {
+      const maxCombo = this.weapon.lightAttacks.length;
+      if (this.attackType === 'light' && this.comboStep < maxCombo &&
+          wantsLight && this.phaseTimer < (this.weapon.comboWindow || C.LIGHT_COMBO_WINDOW)) {
         if (this.inputBuffer && this.inputBuffer.action === 'lightAttack') {
           this.inputBuffer = null; // 消费buffer
         }
@@ -561,29 +578,31 @@ export class Fighter {
   update_blockRecovery(dt, cmd) {
     if (cmd && cmd.faceAngle !== undefined) this.facing = cmd.faceAngle;
     this._bufferFromCmd(cmd);
-    if (this.stateTimer >= C.BLOCK_RECOVERY_TIME) {
+    if (this.stateTimer >= (this.weapon.blockRecovery || C.BLOCK_RECOVERY_TIME)) {
       this.setState('idle');
     }
   }
 
   update_dodging(dt, cmd) {
     const t = this.stateTimer;
-    const speed = C.DODGE_SPEED * this.speedMult;
-    this.vx = Math.cos(this.dodgeAngle) * speed;
-    this.vy = Math.sin(this.dodgeAngle) * speed;
+    const dodgeSpd = (this.weapon.dodgeSpeed || C.DODGE_SPEED) * this.speedMult;
+    this.vx = Math.cos(this.dodgeAngle) * dodgeSpd;
+    this.vy = Math.sin(this.dodgeAngle) * dodgeSpd;
 
+    const invulnEnd = this.weapon.dodgeInvuln || C.DODGE_INVULN_END;
     // 残影
-    if (t < C.DODGE_INVULN_END) {
+    if (t < invulnEnd) {
       this.afterimages.push({ x: this.x, y: this.y, alpha: 0.5, timer: 0.2 });
     }
 
     // 预输入缓冲：闪避中记录下一步意图
     this._bufferFromCmd(cmd);
 
-    // 完美闪避回复1点体力（闪避消耗1 + 回复2 = 净回复1点）
+    // 完美闪避回复体力
     if (this.perfectDodged && this.perfectDodged !== 'refunded') {
-      this.stamina = Math.min(this.stamina + C.DODGE_COST + 1, C.STAMINA_MAX);
-      this.perfectDodged = 'refunded'; // 标记已回复，防止重复
+      const bonus = this.weapon.perfectDodgeStaminaBonus != null ? this.weapon.perfectDodgeStaminaBonus : 1;
+      this.stamina = Math.min(this.stamina + C.DODGE_COST + bonus, C.STAMINA_MAX);
+      this.perfectDodged = 'refunded';
     }
 
     if (t >= C.DODGE_DURATION) {
@@ -632,14 +651,14 @@ export class Fighter {
         this.phase = 'active';
         this.phaseTimer = 0;
         this.ultimateHitsDone = 0;
-        this.hasHit = new Set(); // 每段独立判定
-        this.ultimateJustActivated = true; // 触发电影效果
+        this.hasHit = new Set();
+        this.ultimateJustActivated = true;
       }
     } else if (this.phase === 'active') {
-      // 连斩阶段：前冲漂移
-      this.x += Math.cos(this.facing) * C.ULTIMATE_DRIFT * dt;
-      this.y += Math.sin(this.facing) * C.ULTIMATE_DRIFT * dt;
-      // 多段命中由 combat-system 处理
+      // 绝技漂移
+      const drift = this.weapon.ultimate.drift != null ? this.weapon.ultimate.drift : C.ULTIMATE_DRIFT;
+      this.x += Math.cos(this.facing) * drift * dt;
+      this.y += Math.sin(this.facing) * drift * dt;
       if (this.phaseTimer >= d.active) {
         this.phase = 'recovery';
         this.phaseTimer = 0;
@@ -676,7 +695,11 @@ export class Fighter {
       if (movable && cmd && (cmd.moveX || cmd.moveY)) {
         // 体型越大移速越慢: scale 1.5 → ×0.88
         const scaleSpdMult = 1 / Math.pow(this.scale, 0.3);
-        const spd = C.FIGHTER_SPEED * this.speedMult * scaleSpdMult;
+        const weaponSpdMult = this.weapon.speedMult || 1;
+        // 盾行：格挡中可移动
+        const blockMoveMult = (this.state === 'blocking' && this.weapon.canMoveWhileBlocking)
+          ? (this.weapon.blockMoveSpeedMult || 0) : 1;
+        const spd = C.FIGHTER_SPEED * this.speedMult * scaleSpdMult * weaponSpdMult * blockMoveMult;
         this.vx = (cmd.moveX || 0) * spd;
         this.vy = (cmd.moveY || 0) * spd;
       } else if (this.state !== 'dodging') {
@@ -763,15 +786,24 @@ export class Fighter {
   isInvulnerable() {
     // 被绝技锁定时无法获得无敌帧
     if (this.ultimateLocked) return false;
-    return this.state === 'dodging' && this.stateTimer < C.DODGE_INVULN_END;
+    const invulnEnd = this.weapon.dodgeInvuln || C.DODGE_INVULN_END;
+    return this.state === 'dodging' && this.stateTimer < invulnEnd;
   }
 
   hasHyperArmor() {
-    // 绝技连斩阶段强制霸体（不受体力影响，已消耗100炁）
+    // 绝技连斩阶段强制霸体
     if (this.state === 'ultimate') return this.phase !== 'startup';
-    // 体力耗尽时重击失去霸体，使处决更容易触发
+    // 体力耗尽时重击失去霸体
     if (this.isExhausted) return false;
-    return this.state === 'heavyAttack' && (this.phase === 'startup' || this.phase === 'active');
+    // 武器特有霸体逻辑
+    if (this.state === 'heavyAttack' && (this.phase === 'startup' || this.phase === 'active')) {
+      return this.weapon.heavy.hyperArmor !== false;
+    }
+    // 某些武器轻攻击也有霸体（如大锤第3段）
+    if (this.state === 'lightAttack' && this.phase === 'active' && this.attackData && this.attackData.hyperArmor) {
+      return true;
+    }
+    return false;
   }
 
   isBlocking() {

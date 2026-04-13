@@ -5,12 +5,19 @@ import { Menu } from './ui/menu.js';
 import { NeuralNetwork } from './nn/nn-agent.js';
 import { BrowserTrainer } from './nn/browser-train.js';
 import { NetClient } from './net/net-client.js';
+import { AudioManager } from './core/audio.js';
 import * as C from './core/constants.js';
 
 const canvas = document.getElementById('game-canvas');
 const ctx = canvas.getContext('2d');
 const controlsHelp = document.getElementById('controls-help');
 const helpOverlay = document.getElementById('help-overlay');
+const audio = new AudioManager();
+
+// 首次用户交互后恢复 AudioContext
+const resumeAudio = () => { audio.resume(); };
+window.addEventListener('click', resumeAudio, { once: true });
+window.addEventListener('keydown', resumeAudio, { once: true });
 
 // 帮助面板：点击遮罩层关闭
 if (helpOverlay) {
@@ -145,6 +152,9 @@ function startGame(result) {
     nnWeights: nnWeights,
     netClient: result.netClient || null,
     tutorialStep: result.tutorialStep || 0,
+    audio: audio,
+    weaponA: result.weaponA || 'dao',
+    weaponB: result.weaponB || 'dao',
   });
   if (game.mode !== 'test' && game.mode !== 'jianghu' && game.mode !== 'training'
       && game.mode !== 'online_host' && game.mode !== 'online_guest' && game.mode !== 'tutorial') {

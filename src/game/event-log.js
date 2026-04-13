@@ -23,6 +23,8 @@ export const eventLogMethods = {
       case 'hit': {
         const heavy = evt.atkType === 'heavy';
         this.ui.addLog(`${evt.attacker.name} ${heavy ? '重击' : '轻击'}命中 ${evt.target.name} (-${evt.damage}HP)`);
+        // 音效
+        if (this.audio) { heavy ? this.audio.playHeavyHit() : this.audio.playLightHit(); }
         // 炁获取: 攻击者+被击者
         if (evt.attacker.gainQi) {
           const qiGain = evt.atkType === 'parryCounter' ? C.QI_GAIN_COUNTER_HIT
@@ -50,6 +52,11 @@ export const eventLogMethods = {
         const durs = { precise: 1.5, semi: 0.9, nonPrecise: 0.6 };
         const vys = { precise: -30, semi: -45, nonPrecise: -55 };
         this.ui.addLog(`${evt.target.name} ${labels[evt.level]} → ${evt.attacker.name}`);
+        // 音效
+        if (this.audio) {
+          const lvl = { precise: 2, semi: 1, nonPrecise: 0 };
+          this.audio.playParry(lvl[evt.level] || 0);
+        }
         // 炁获取: 格挡方
         if (evt.target.gainQi) {
           const qiGain = evt.level === 'precise' ? C.QI_GAIN_PRECISE : evt.level === 'semi' ? C.QI_GAIN_SEMI : 0;
@@ -72,11 +79,13 @@ export const eventLogMethods = {
         break;
       }
       case 'blocked':
-        this.ui.addLog(`${evt.target.name} 格挡了攻击 (${evt.hitCount}/${C.LIGHT_BREAK_HIT})`);
-        if (!isTest) this.addFloatingText(evt.target.x, evt.target.y - 25, `格挡 ${evt.hitCount}/${C.LIGHT_BREAK_HIT}`, '#88ccff', 13, 0.5, -60);
+        this.ui.addLog(`${evt.target.name} 格挡了攻击 (${evt.hitCount}/${evt.target.weapon.breakHits || C.LIGHT_BREAK_HIT})`);
+        if (this.audio) this.audio.playBlock();
+        if (!isTest) this.addFloatingText(evt.target.x, evt.target.y - 25, `格挡 ${evt.hitCount}/${evt.target.weapon.breakHits || C.LIGHT_BREAK_HIT}`, '#88ccff', 13, 0.5, -60);
         break;
       case 'blockBreak':
         this.ui.addLog(`${evt.target.name} 防御被破!`);
+        if (this.audio) this.audio.playGuardBreak();
         if (!isTest) {
           this.addFloatingText(evt.target.x, evt.target.y - 40, '破防!', '#ffaa00', 30, 1.6, -30);
           if (playerInvolved) this.flashScreen('rgba(255,170,0,0.2)', 0.15);
@@ -84,6 +93,7 @@ export const eventLogMethods = {
         break;
       case 'lightClash': {
         if (!isTest) {
+          if (this.audio) this.audio.playClash(false);
           const mx = (evt.a.x + evt.b.x) / 2;
           const my = (evt.a.y + evt.b.y) / 2;
           this.ui.addLog('拼刀!');
@@ -98,6 +108,7 @@ export const eventLogMethods = {
       }
       case 'heavyClash': {
         if (!isTest) {
+          if (this.audio) this.audio.playClash(true);
           const mx = (evt.a.x + evt.b.x) / 2;
           const my = (evt.a.y + evt.b.y) / 2;
           this.ui.addLog('弹刀! 双方体力-1');
@@ -112,6 +123,7 @@ export const eventLogMethods = {
       }
       case 'execution':
         this.ui.addLog(`${evt.attacker.name} 处决了 ${evt.target.name}! (-${evt.damage}HP)`);
+        if (this.audio) this.audio.playExecution();
         // 炁获取: 处决方
         if (evt.attacker.gainQi) evt.attacker.gainQi(C.QI_GAIN_EXECUTION);
         if (!isTest) {
@@ -121,6 +133,7 @@ export const eventLogMethods = {
         break;
       case 'perfectDodge':
         this.ui.addLog(`${evt.target.name} 完美闪避!`);
+        if (this.audio) this.audio.playPerfectDodge();
         if (!isTest) {
           this.addFloatingText(evt.target.x, evt.target.y - 35, '完美闪避!', '#ffff44', 20, 0.9, -40);
           if (playerInvolved) {
@@ -131,6 +144,7 @@ export const eventLogMethods = {
         break;
       case 'ultimateHit':
         // 每段连斩命中的逐段特效
+        if (this.audio) this.audio.playUltimateHit();
         if (!isTest && playerInvolved) {
           if (evt.isLastHit) {
             // 末段大冲击：强冻帧 + 强震动 + 闪屏 + 慢动作
@@ -167,6 +181,7 @@ export const eventLogMethods = {
         const mx = (evt.a.x + evt.b.x) / 2;
         const my = (evt.a.y + evt.b.y) / 2;
         this.ui.addLog('绝刀相撞! 双方弹开!');
+        if (this.audio) this.audio.playUltimateClash();
         if (!isTest) {
           this.addFloatingText(mx, my - 35, '绝刀相撞!', '#ff3300', 32, 1.8, -25);
           if (playerInvolved) {

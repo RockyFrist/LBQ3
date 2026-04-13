@@ -1,5 +1,6 @@
 // ===================== 开始菜单（多页设计） =====================
-const GAME_VERSION = 'v0.8.6';
+import { WEAPON_LIST, WEAPONS, getWeapon } from '../weapons/weapon-defs.js';
+const GAME_VERSION = 'v0.9.0';
 
 export class Menu {
   constructor(canvas, input) {
@@ -15,6 +16,10 @@ export class Menu {
     this.diffB = 5;
     this.testRounds = 50;
     this.result = null;
+
+    // 武器选择
+    this.weaponA = 'dao';  // 玩家/左方武器
+    this.weaponB = 'dao';  // 敌人/右方武器
 
     this._hoverBtn = null;
     this._clickCooldown = 0;
@@ -97,9 +102,18 @@ export class Menu {
         return;
       }
     }
+    // 玩家武器选择
+    for (let i = 0; i < WEAPON_LIST.length; i++) {
+      const bx = L.weaponAx + i * 52;
+      if (this._hit(mx, my, bx, L.weaponAy, 46, 38)) {
+        this.weaponA = WEAPON_LIST[i].id;
+        this._clickCooldown = 0.12;
+        return;
+      }
+    }
     // 开始按钮
     if (this._hit(mx, my, L.startBtn.x, L.startBtn.y, L.startBtn.w, L.startBtn.h)) {
-      this.result = { mode: 'pvai', diffA: 1, diffB: this.pvaiDiff, rounds: 0, simOnly: false };
+      this.result = { mode: 'pvai', diffA: 1, diffB: this.pvaiDiff, weaponA: this.weaponA, weaponB: 'dao', rounds: 0, simOnly: false };
       this._clickCooldown = 0.3;
       return;
     }
@@ -130,9 +144,27 @@ export class Menu {
         return;
       }
     }
+    // 武器 A
+    for (let i = 0; i < WEAPON_LIST.length; i++) {
+      const bx = L.weaponAx + i * 52;
+      if (this._hit(mx, my, bx, L.weaponAy, 46, 38)) {
+        this.weaponA = WEAPON_LIST[i].id;
+        this._clickCooldown = 0.12;
+        return;
+      }
+    }
+    // 武器 B
+    for (let i = 0; i < WEAPON_LIST.length; i++) {
+      const bx = L.weaponBx + i * 52;
+      if (this._hit(mx, my, bx, L.weaponBy, 46, 38)) {
+        this.weaponB = WEAPON_LIST[i].id;
+        this._clickCooldown = 0.12;
+        return;
+      }
+    }
     // 开始
     if (this._hit(mx, my, L.startBtn.x, L.startBtn.y, L.startBtn.w, L.startBtn.h)) {
-      this.result = { mode: 'spectate', diffA: this.diffA, diffB: this.diffB, rounds: 0, simOnly: false };
+      this.result = { mode: 'spectate', diffA: this.diffA, diffB: this.diffB, weaponA: this.weaponA, weaponB: this.weaponB, rounds: 0, simOnly: false };
       this._clickCooldown = 0.3;
       return;
     }
@@ -163,6 +195,24 @@ export class Menu {
         return;
       }
     }
+    // 武器 A
+    for (let i = 0; i < WEAPON_LIST.length; i++) {
+      const bx = L.weaponAx + i * 52;
+      if (this._hit(mx, my, bx, L.weaponAy, 46, 38)) {
+        this.weaponA = WEAPON_LIST[i].id;
+        this._clickCooldown = 0.12;
+        return;
+      }
+    }
+    // 武器 B
+    for (let i = 0; i < WEAPON_LIST.length; i++) {
+      const bx = L.weaponBx + i * 52;
+      if (this._hit(mx, my, bx, L.weaponBy, 46, 38)) {
+        this.weaponB = WEAPON_LIST[i].id;
+        this._clickCooldown = 0.12;
+        return;
+      }
+    }
     // 轮数 ±
     if (this._hit(mx, my, L.roundsMinus.x, L.roundsMinus.y, L.roundsMinus.w, L.roundsMinus.h)) {
       this.testRounds = Math.max(5, this.testRounds - (this.testRounds > 50 ? 50 : 5));
@@ -176,13 +226,13 @@ export class Menu {
     }
     // 视觉测试
     if (this._hit(mx, my, L.visualBtn.x, L.visualBtn.y, L.visualBtn.w, L.visualBtn.h)) {
-      this.result = { mode: 'test', diffA: this.diffA, diffB: this.diffB, rounds: this.testRounds, simOnly: false };
+      this.result = { mode: 'test', diffA: this.diffA, diffB: this.diffB, rounds: this.testRounds, simOnly: false, weaponA: this.weaponA, weaponB: this.weaponB };
       this._clickCooldown = 0.3;
       return;
     }
     // 纯数据测试
     if (this._hit(mx, my, L.dataBtn.x, L.dataBtn.y, L.dataBtn.w, L.dataBtn.h)) {
-      this.result = { mode: 'test', diffA: this.diffA, diffB: this.diffB, rounds: this.testRounds, simOnly: true };
+      this.result = { mode: 'test', diffA: this.diffA, diffB: this.diffB, rounds: this.testRounds, simOnly: true, weaponA: this.weaponA, weaponB: this.weaponB };
       this._clickCooldown = 0.3;
       return;
     }
@@ -300,8 +350,9 @@ export class Menu {
     const my = this.input.mouseY;
     const L = this._layoutSub('pvai');
 
-    this._drawSubHeader(ctx, cw, '⚔ 对战模式', '选择敌人AI难度');
+    this._drawSubHeader(ctx, cw, '⚔ 对战模式', '选择武器和敌人AI难度');
     this._drawDiffSelector(ctx, L.diffX, L.diffY, '敌人难度', this.pvaiDiff, '#ff4444', mx, my);
+    this._drawWeaponSelector(ctx, L.weaponAx, L.weaponAy, '你的武器', this.weaponA, mx, my);
     this._drawActionBtn(ctx, L.startBtn, '开始对战', '#4499ff', mx, my);
     this._drawActionBtn(ctx, L.backBtn, '← 返回', '#666', mx, my);
 
@@ -319,9 +370,11 @@ export class Menu {
     const my = this.input.mouseY;
     const L = this._layoutSub('spectate');
 
-    this._drawSubHeader(ctx, cw, '🦗 斗蛐蛐', '选择双方AI难度，观看对决');
-    this._drawDiffSelector(ctx, L.diffAx, L.diffAy, '左方 (蓝)', this.diffA, '#4499ff', mx, my);
-    this._drawDiffSelector(ctx, L.diffBx, L.diffBy, '右方 (红)', this.diffB, '#ff4444', mx, my);
+    this._drawSubHeader(ctx, cw, '🦗 斗蛐蛐', '选择双方武器和AI难度，观看对决');
+    this._drawDiffSelector(ctx, L.diffAx, L.diffAy, '左方难度', this.diffA, '#4499ff', mx, my);
+    this._drawWeaponSelector(ctx, L.weaponAx, L.weaponAy, '左方武器', this.weaponA, mx, my);
+    this._drawDiffSelector(ctx, L.diffBx, L.diffBy, '右方难度', this.diffB, '#ff4444', mx, my);
+    this._drawWeaponSelector(ctx, L.weaponBx, L.weaponBy, '右方武器', this.weaponB, mx, my);
     this._drawActionBtn(ctx, L.startBtn, '开始观战', '#ffaa33', mx, my);
     this._drawActionBtn(ctx, L.backBtn, '← 返回', '#666', mx, my);
   }
@@ -336,8 +389,10 @@ export class Menu {
     const L = this._layoutSub('test');
 
     this._drawSubHeader(ctx, cw, '📊 自动测试', '配置参数后选择测试方式');
-    this._drawDiffSelector(ctx, L.diffAx, L.diffAy, '左方 (蓝)', this.diffA, '#4499ff', mx, my);
-    this._drawDiffSelector(ctx, L.diffBx, L.diffBy, '右方 (红)', this.diffB, '#ff4444', mx, my);
+    this._drawDiffSelector(ctx, L.diffAx, L.diffAy, '左方难度', this.diffA, '#4499ff', mx, my);
+    this._drawWeaponSelector(ctx, L.weaponAx, L.weaponAy, '左方武器', this.weaponA, mx, my);
+    this._drawDiffSelector(ctx, L.diffBx, L.diffBy, '右方难度', this.diffB, '#ff4444', mx, my);
+    this._drawWeaponSelector(ctx, L.weaponBx, L.weaponBy, '右方武器', this.weaponB, mx, my);
 
     // 轮数控制
     const ry = L.roundsY;
@@ -373,11 +428,15 @@ export class Menu {
 
     if (page === 'pvai') {
       const diffX = cx - selectorW / 2;
-      const diffY = ch * 0.38;
+      const diffY = ch * 0.30;
+      const weaponW = WEAPON_LIST.length * 52;
+      const weaponAx = cx - weaponW / 2;
+      const weaponAy = diffY + 65;
       return {
         diffX, diffY,
-        startBtn: { x: cx - btnW / 2, y: diffY + 90, w: btnW, h: btnH },
-        backBtn:  { x: cx - 60, y: diffY + 150, w: 120, h: 34 },
+        weaponAx, weaponAy,
+        startBtn: { x: cx - btnW / 2, y: weaponAy + 100, w: btnW, h: btnH },
+        backBtn:  { x: cx - 60, y: weaponAy + 160, w: 120, h: 34 },
       };
     }
 
@@ -385,12 +444,18 @@ export class Menu {
       const diffGap = 50;
       const diffAx = cx - selectorW - diffGap / 2;
       const diffBx = cx + diffGap / 2;
-      const diffY = ch * 0.34;
+      const diffY = ch * 0.26;
+      const weaponW = WEAPON_LIST.length * 52;
+      const weaponAx = cx - weaponW - 10;
+      const weaponBx = cx + 10;
+      const weaponY = diffY + 60;
       return {
         diffAx, diffAy: diffY,
         diffBx, diffBy: diffY,
-        startBtn: { x: cx - btnW / 2, y: diffY + 100, w: btnW, h: btnH },
-        backBtn:  { x: cx - 60, y: diffY + 160, w: 120, h: 34 },
+        weaponAx, weaponAy: weaponY,
+        weaponBx, weaponBy: weaponY,
+        startBtn: { x: cx - btnW / 2, y: weaponY + 110, w: btnW, h: btnH },
+        backBtn:  { x: cx - 60, y: weaponY + 170, w: 120, h: 34 },
       };
     }
 
@@ -398,12 +463,18 @@ export class Menu {
     const diffGap = 50;
     const diffAx = cx - selectorW - diffGap / 2;
     const diffBx = cx + diffGap / 2;
-    const diffY = ch * 0.26;
-    const roundsY = diffY + 90;
+    const diffY = ch * 0.22;
+    const weaponW = WEAPON_LIST.length * 52;
+    const weaponAx = cx - weaponW - 10;
+    const weaponBx = cx + 10;
+    const weaponY = diffY + 60;
+    const roundsY = weaponY + 60;
     const startBtnY = roundsY + 52;
     return {
       diffAx, diffAy: diffY,
       diffBx, diffBy: diffY,
+      weaponAx, weaponAy: weaponY,
+      weaponBx, weaponBy: weaponY,
       roundsY,
       roundsMinus: { x: cx - 80, y: roundsY + 4, w: 32, h: 28 },
       roundsPlus:  { x: cx + 48, y: roundsY + 4, w: 32, h: 28 },
@@ -499,6 +570,36 @@ export class Menu {
     ctx.font = '12px "Microsoft YaHei", sans-serif';
     ctx.textAlign = 'center';
     ctx.fillText(names[value - 1], x + 5 * 42 / 2 - 3, y + 46);
+  }
+
+  _drawWeaponSelector(ctx, x, y, label, selectedId, mx, my) {
+    ctx.fillStyle = '#aaa';
+    ctx.font = 'bold 14px "Microsoft YaHei", sans-serif';
+    ctx.textAlign = 'center';
+    const totalW = WEAPON_LIST.length * 52;
+    ctx.fillText(label, x + totalW / 2 - 3, y - 10);
+
+    for (let i = 0; i < WEAPON_LIST.length; i++) {
+      const w = WEAPON_LIST[i];
+      const bx = x + i * 52;
+      const selected = w.id === selectedId;
+      const hovered = mx >= bx && mx <= bx + 46 && my >= y && my <= y + 38;
+
+      ctx.fillStyle = selected ? w.color : hovered ? 'rgba(255,255,255,0.10)' : 'rgba(255,255,255,0.05)';
+      ctx.fillRect(bx, y, 46, 38);
+      ctx.strokeStyle = selected ? '#fff' : hovered ? 'rgba(255,255,255,0.4)' : 'rgba(255,255,255,0.12)';
+      ctx.lineWidth = selected ? 2 : 1;
+      ctx.strokeRect(bx, y, 46, 38);
+
+      ctx.fillStyle = selected ? '#fff' : '#999';
+      ctx.font = '16px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(w.icon, bx + 23, y + 18);
+
+      ctx.fillStyle = selected ? '#fff' : '#777';
+      ctx.font = '10px "Microsoft YaHei", sans-serif';
+      ctx.fillText(w.name, bx + 23, y + 33);
+    }
   }
 
   // ---- 自由训练页 ----
@@ -916,7 +1017,7 @@ export class Menu {
       }
     }
     if (this._hit(mx, my, L.startBtn.x, L.startBtn.y, L.startBtn.w, L.startBtn.h)) {
-      this.result = { mode: 'chainKill', diffA: 1, diffB: this.pvaiDiff, rounds: 0, simOnly: false };
+      this.result = { mode: 'chainKill', diffA: 1, diffB: this.pvaiDiff, weaponA: this.weaponA, rounds: 0, simOnly: false };
       this._clickCooldown = 0.3;
       return;
     }

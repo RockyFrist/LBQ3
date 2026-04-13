@@ -17,6 +17,8 @@ import { tutorialModeMethods } from './tutorial-mode.js';
 import { JIANGHU_MAX_LIVES } from './jianghu-stages.js';
 import { Fighter } from '../combat/fighter.js';
 import { snapshotFighter, applyFighterSnapshot, serializeEvent, deserializeEvent } from '../net/net-sync.js';
+import { AudioManager } from '../core/audio.js';
+import { getWeapon } from '../weapons/weapon-defs.js';
 
 export class Game {
   constructor(canvas, input, opts = {}) {
@@ -28,6 +30,7 @@ export class Game {
     this.renderer = new Renderer(canvas, this.camera);
     this.combat = new CombatSystem(this.particles, this.camera);
     this.ui = new UI(canvas);
+    this.audio = opts.audio || new AudioManager();
 
     // 模式: 'pvai' | 'spectate' | 'test'
     this.mode = opts.mode || 'pvai';
@@ -37,7 +40,9 @@ export class Game {
     this.paused = false;
     this.showHelp = false;
     this.difficulty = opts.diffB || 2;
-    this.player = new Player(C.ARENA_W / 2, C.ARENA_H / 2);
+    this.playerWeaponId = opts.weaponA || 'dao';
+    this.enemyWeaponId = opts.weaponB || 'dao';
+    this.player = new Player(C.ARENA_W / 2, C.ARENA_H / 2, { weaponId: this.playerWeaponId });
     this.enemies = [];
     this.allFighters = [];
 
@@ -45,7 +50,7 @@ export class Game {
     this.playerAI = null;
     if (this.mode === 'spectate' || this.mode === 'test') {
       const diffA = opts.diffA || 3;
-      this.playerAI = new Enemy(C.ARENA_W / 2, C.ARENA_H / 2, diffA);
+      this.playerAI = new Enemy(C.ARENA_W / 2, C.ARENA_H / 2, diffA, { weaponId: this.playerWeaponId });
       this.playerAI.fighter = this.player.fighter; // 复用player的fighter
       this.playerAI.fighter.name = `AI-${diffA}(蓝)`;
       this.playerAI.fighter.color = '#4499ff';
@@ -177,7 +182,7 @@ export class Game {
       return;
     }
 
-    const enemy = new Enemy(ex, ey, this.difficulty);
+    const enemy = new Enemy(ex, ey, this.difficulty, { weaponId: this.enemyWeaponId });
     if (this.mode === 'spectate' || this.mode === 'test') {
       enemy.fighter.name = `AI-${this.difficulty}(红)`;
     } else {
@@ -215,7 +220,7 @@ export class Game {
 
   reset() {
     this._victoryTimer = -1;
-    this.player = new Player(C.ARENA_W / 2, C.ARENA_H / 2);
+    this.player = new Player(C.ARENA_W / 2, C.ARENA_H / 2, { weaponId: this.playerWeaponId });
     if (this.playerAI && this.playerAI.isNN) {
       // 武圣观战: 重新设置 NN 代理
       this.playerAI = { fighter: this.player.fighter, isNN: true };
@@ -225,7 +230,7 @@ export class Game {
       this._nnLastAction = 0;
     } else if (this.playerAI) {
       const diffA = this.playerAI.difficulty;
-      this.playerAI = new Enemy(C.ARENA_W / 2, C.ARENA_H / 2, diffA);
+      this.playerAI = new Enemy(C.ARENA_W / 2, C.ARENA_H / 2, diffA, { weaponId: this.playerWeaponId });
       this.playerAI.fighter = this.player.fighter;
       this.playerAI.fighter.name = `AI-${diffA}(蓝)`;
       this.playerAI.fighter.color = '#4499ff';

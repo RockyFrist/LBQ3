@@ -3,10 +3,12 @@ import { dist, angleBetween, randomRange, normalizeAngle } from '../core/utils.j
 import * as C from '../core/constants.js';
 import { buildAIConfig } from './ai-config.js';
 import { planMethods } from './ai-plans.js';
+import { getWeapon } from '../weapons/weapon-defs.js';
 
 export class Enemy {
-  constructor(x, y, difficulty = 2, { scale = 1, hpMult = 1, color = '#ff4444', name = '敌人' } = {}) {
-    this.fighter = new Fighter(x, y, { color, team: 1, name, scale, hpMult });
+  constructor(x, y, difficulty = 2, { scale = 1, hpMult = 1, color = '#ff4444', name = '敌人', weaponId = 'dao' } = {}) {
+    const weapon = getWeapon(weaponId);
+    this.fighter = new Fighter(x, y, { color: color || weapon.color, team: 1, name, scale, hpMult, weapon });
     this.difficulty = difficulty;
     this.aiState = 'approach';
     this.aiTimer = 0;
@@ -193,17 +195,23 @@ export class Enemy {
     const hasParryBoost = f.parryBoost && f.parryBoost.timer > 0;
 
     // === AI绝技使用：炁满时有概率释放 ===
-    if (f.isUltimateReady() && f.state === 'idle' && d < C.ULTIMATE_RANGE + 30) {
+    if (f.isUltimateReady() && f.state === 'idle' && d < (f.weapon.ultimate.range || C.ULTIMATE_RANGE) + 30) {
       // 难度越高越会用绝技：D1=5% D3=15% D5=30%/思考周期
       const ultChance = 0.05 + (this.difficulty - 1) / 4 * 0.25;
       // 机会窗口：对手处于无法闪避/格挡的状态时大幅提高释放概率
       const vulnStates = ['staggered', 'blockRecovery', 'parryStunned', 'executed'];
       const vulnRecovery = pf.phase === 'recovery' && (pf.state === 'lightAttack' || pf.state === 'heavyAttack');
-      const oppVulnerable = vulnStates.includes(pf.state) || vulnRecovery;
+      const vulnHeavyStartup = pf.state === 'heavyAttack' && pf.phase === 'startup' && pf.phaseTimer > 0.20;
+      const vulnExhausted = pf.isExhausted && pf.stamina <= 0;
+      const vulnLightActive = pf.state === 'lightAttack' && pf.phase === 'active';
+      const oppVulnerable = vulnStates.includes(pf.state) || vulnRecovery
+        || vulnHeavyStartup || vulnExhausted || vulnLightActive;
       // D3+才会读状态抓机会：D3~70%概率利用 D5~95%
       const smartChance = oppVulnerable && this.difficulty >= 3
         ? 0.5 + (this.difficulty - 3) / 2 * 0.25 : 0;
-      if (Math.random() < Math.max(ultChance, smartChance)) {
+      // D4+对手低血量时更积极（收人头）
+      const finishBonus = (this.difficulty >= 4 && pf.hp / pf.maxHp < 0.35) ? 0.25 : 0;
+      if (Math.random() < Math.max(ultChance + finishBonus, smartChance)) {
         cmd.ultimate = true;
         this.aiState = 'recover';
         this.aiTimer = 1.0;

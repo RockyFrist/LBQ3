@@ -1,9 +1,11 @@
 import { Fighter } from './fighter.js';
 import { vec2Normalize } from '../core/utils.js';
+import { WEAPON_DAO, getWeapon } from '../weapons/weapon-defs.js';
 
 export class Player {
-  constructor(x, y, { scale = 1, hpMult = 1 } = {}) {
-    this.fighter = new Fighter(x, y, { color: '#4499ff', team: 0, name: '玩家', scale, hpMult });
+  constructor(x, y, { scale = 1, hpMult = 1, weaponId = 'dao' } = {}) {
+    const weapon = getWeapon(weaponId);
+    this.fighter = new Fighter(x, y, { color: weapon.color || '#4499ff', team: 0, name: '玩家', scale, hpMult, weapon });
   }
 
   getCommands(input) {

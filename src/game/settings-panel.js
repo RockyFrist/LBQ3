@@ -30,18 +30,23 @@ export const settingsPanelMethods = {
     const lw = this.canvas._logicW || this.canvas.width;
     const lh = this.canvas._logicH || this.canvas.height;
     const panelW = 320;
-    const panelH = 200;
+    const panelH = 300;
     const px = (lw - panelW) / 2;
     const py = (lh - panelH) / 2;
     const sliderW = 200;
     const sliderH = 20;
     const sliderX = px + (panelW - sliderW) / 2;
     const zoomSliderY = py + 80;
+    const volumeSliderY = py + 145;
+    const soundToggleY = py + 185;
     return {
       px, py, panelW, panelH,
       sliderX, sliderW, sliderH,
       zoomSliderY,
-      resetBtn: { x: px + panelW / 2 - 50, y: py + 130, w: 100, h: 32 },
+      volumeSliderY,
+      soundToggleY,
+      soundToggleBtn: { x: px + panelW / 2 - 60, y: soundToggleY, w: 120, h: 28 },
+      resetBtn: { x: px + panelW / 2 - 50, y: py + 230, w: 100, h: 32 },
       closeBtn: { x: px + panelW / 2 - 50, y: py + panelH - 40, w: 100, h: 30 },
     };
   },
@@ -70,10 +75,27 @@ export const settingsPanelMethods = {
       return;
     }
 
+    // 音量滑块拖拽
+    if (this.audio && mx >= L.sliderX && mx <= L.sliderX + L.sliderW &&
+        my >= L.volumeSliderY - 5 && my <= L.volumeSliderY + L.sliderH + 5) {
+      const t = (mx - L.sliderX) / L.sliderW;
+      this.audio.volume = t;
+      return;
+    }
+
+    // 音效开关
+    const sb = L.soundToggleBtn;
+    if (this.audio && mx >= sb.x && mx <= sb.x + sb.w && my >= sb.y && my <= sb.y + sb.h) {
+      this.audio.enabled = !this.audio.enabled;
+      this._settingsClickCd = 0.2;
+      return;
+    }
+
     // 恢复默认
     const rb = L.resetBtn;
     if (mx >= rb.x && mx <= rb.x + rb.w && my >= rb.y && my <= rb.y + rb.h) {
       this.camera.zoomExtra = this.camera.zoomExtraDefault;
+      if (this.audio) { this.audio.volume = 0.5; this.audio.enabled = true; }
       this._settingsClickCd = 0.2;
       return;
     }
@@ -137,6 +159,35 @@ export const settingsPanelMethods = {
     const handleX = sliderBg + L.sliderW * t;
     ctx.fillStyle = '#fff';
     ctx.fillRect(handleX - 3, L.zoomSliderY - 2, 6, L.sliderH + 4);
+
+    // ===== 音量滑块 =====
+    if (this.audio) {
+      const volPct = Math.round(this.audio.volume * 100);
+      ctx.fillStyle = '#aaa';
+      ctx.font = '13px "Microsoft YaHei", sans-serif';
+      ctx.fillText(`音效音量: ${volPct}%`, L.px + L.panelW / 2, L.volumeSliderY - 8);
+      ctx.fillStyle = '#333';
+      ctx.fillRect(L.sliderX, L.volumeSliderY, L.sliderW, L.sliderH);
+      const vt = this.audio.volume;
+      ctx.fillStyle = this.audio.enabled ? '#44cc88' : '#666';
+      ctx.fillRect(L.sliderX, L.volumeSliderY, L.sliderW * vt, L.sliderH);
+      ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+      ctx.strokeRect(L.sliderX, L.volumeSliderY, L.sliderW, L.sliderH);
+      const vHandleX = L.sliderX + L.sliderW * vt;
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(vHandleX - 3, L.volumeSliderY - 2, 6, L.sliderH + 4);
+
+      // 音效开关
+      const sb = L.soundToggleBtn;
+      const sbHover = mx >= sb.x && mx <= sb.x + sb.w && my >= sb.y && my <= sb.y + sb.h;
+      ctx.fillStyle = sbHover ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.05)';
+      ctx.fillRect(sb.x, sb.y, sb.w, sb.h);
+      ctx.strokeStyle = this.audio.enabled ? '#44cc88' : '#ff5555';
+      ctx.strokeRect(sb.x, sb.y, sb.w, sb.h);
+      ctx.fillStyle = sbHover ? '#fff' : '#aaa';
+      ctx.font = '13px "Microsoft YaHei", sans-serif';
+      ctx.fillText(this.audio.enabled ? '🔊 音效开启' : '🔇 音效关闭', sb.x + sb.w / 2, sb.y + sb.h / 2 + 5);
+    }
 
     // 恢复默认按钮
     const rb = L.resetBtn;

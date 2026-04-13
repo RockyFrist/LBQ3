@@ -57,11 +57,12 @@ export class UI {
     ctx.save();
     const nameColor = f.team === 0 ? '#88bbff' : '#ff8888';
 
-    // 名字
+    // 名字 + 武器
     ctx.fillStyle = nameColor;
     ctx.font = 'bold 13px "Segoe UI", sans-serif';
     ctx.textAlign = alignRight ? 'right' : 'left';
-    ctx.fillText(f.name, x, y + 12);
+    const dispName = f.weapon ? `${f.name} ${f.weapon.icon}` : f.name;
+    ctx.fillText(dispName, x, y + 12);
 
     // HP文字
     const hpRatio = Math.max(0, f.hp / f.maxHp);
@@ -93,7 +94,7 @@ export class UI {
     let stateText = '';
     let stateColor = '#888';
     switch (f.state) {
-      case 'lightAttack': stateText = `轻击 ${f.comboStep}/3`; stateColor = '#fff'; break;
+      case 'lightAttack': stateText = `轻击 ${f.comboStep}/${f.weapon ? f.weapon.lightAttacks.length : 3}`; stateColor = '#fff'; break;
       case 'heavyAttack': stateText = f.phase === 'startup' ? '蓄力...' : '重击!'; stateColor = '#ff6633'; break;
       case 'blocking': stateText = '招架'; stateColor = '#66aaff'; break;
       case 'dodging': stateText = f.perfectDodged ? '完美闪避!' : '闪避'; stateColor = f.perfectDodged ? '#ffff00' : '#aaa'; break;
@@ -102,7 +103,7 @@ export class UI {
       case 'parryCounter': stateText = '反击!'; stateColor = '#00ddff'; break;
       case 'executing': stateText = '处决!'; stateColor = '#ff0000'; break;
       case 'executed': stateText = '被处决'; stateColor = '#ff0000'; break;
-      case 'ultimate': stateText = '乱刀斩!'; stateColor = '#aaddff'; break;
+      case 'ultimate': stateText = f.weapon ? f.weapon.ultimate.name : '乱刀斩!'; stateColor = '#aaddff'; break;
       default:
         if (f.isExhausted) { stateText = '体力耗尽!'; stateColor = '#ff4444'; }
         else if (f.parryBoost && f.parryBoost.timer > 0) { stateText = '加速!'; stateColor = '#66ffcc'; }

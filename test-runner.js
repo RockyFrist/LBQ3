@@ -5,6 +5,8 @@
  *   --rounds N       轮数 (默认 100)
  *   --diffA  N       蓝方难度 1-5 (默认 5)
  *   --diffB  N       红方难度 1-5 (默认 5)
+ *   --weaponA id     蓝方武器 (默认 dao)
+ *   --weaponB id     红方武器 (默认 dao)
  *   --json           只输出 JSON (方便程序读取)
  *   --detail         输出每轮明细
  *   --log            输出详细事件回放日志（含位置、状态、打空等）
@@ -16,6 +18,7 @@ import { Fighter } from './src/combat/fighter.js';
 import { Enemy } from './src/ai/enemy.js';
 import { CombatSystem } from './src/combat/combat-system.js';
 import { dist, angleBetween } from './src/core/utils.js';
+import { getWeapon } from './src/weapons/weapon-defs.js';
 
 // ---- 命令行参数 ----
 const args = process.argv.slice(2);
@@ -23,9 +26,15 @@ function getArg(name, def) {
   const i = args.indexOf(name);
   return i >= 0 && args[i + 1] != null ? Number(args[i + 1]) : def;
 }
+function getStrArg(name, def) {
+  const i = args.indexOf(name);
+  return i >= 0 && args[i + 1] != null ? args[i + 1] : def;
+}
 const ROUNDS     = getArg('--rounds', 100);
 const DIFF_A     = getArg('--diffA', 5);
 const DIFF_B     = getArg('--diffB', 5);
+const WEAPON_A   = getStrArg('--weaponA', 'dao');
+const WEAPON_B   = getStrArg('--weaponB', 'dao');
 const JSON_ONLY  = args.includes('--json');
 const DETAIL     = args.includes('--detail');
 const LOG_MODE   = args.includes('--log');
@@ -56,17 +65,19 @@ function snapshot(f, label) {
 const SIM_DT = 1 / 60;
 const MAX_TICKS = 60 * 60; // 每轮最多 60 秒
 
-function runRound(diffA, diffB, collectLog) {
+function runRound(diffA, diffB, collectLog, weaponA, weaponB) {
   // 创建角色
+  const wA = getWeapon(weaponA || 'dao');
+  const wB = getWeapon(weaponB || 'dao');
   const fighterA = new Fighter(C.ARENA_W / 2, C.ARENA_H / 2, {
-    color: '#4499ff', team: 0, name: `AI-${diffA}(蓝)`,
+    color: '#4499ff', team: 0, name: `AI-${diffA}(蓝)`, weapon: wA,
   });
-  const enemyCtrl = new Enemy(C.ARENA_W / 2 + 150, C.ARENA_H / 2, diffB);
+  const enemyCtrl = new Enemy(C.ARENA_W / 2 + 150, C.ARENA_H / 2, diffB, { weaponId: weaponB || 'dao' });
   enemyCtrl.fighter.name = `AI-${diffB}(红)`;
   const fighterB = enemyCtrl.fighter;
 
   // 蓝方也用 AI 控制
-  const playerAI = new Enemy(C.ARENA_W / 2, C.ARENA_H / 2, diffA);
+  const playerAI = new Enemy(C.ARENA_W / 2, C.ARENA_H / 2, diffA, { weaponId: weaponA || 'dao' });
   playerAI.fighter = fighterA;
 
   // 启用决策日志
@@ -379,7 +390,7 @@ const allResults = [];
 const t0 = performance.now();
 for (let i = 0; i < ROUNDS; i++) {
   const collectLog = LOG_MODE && (LOG_ROUND < 0 || LOG_ROUND === i + 1);
-  allResults.push(runRound(DIFF_A, DIFF_B, collectLog));
+  allResults.push(runRound(DIFF_A, DIFF_B, collectLog, WEAPON_A, WEAPON_B));
 }
 const elapsed = ((performance.now() - t0) / 1000).toFixed(2);
 
@@ -438,7 +449,7 @@ const ultInterruptA = sum(s => s.ultInterruptA);
 const ultInterruptB = sum(s => s.ultInterruptB);
 
 const summary = {
-  config: { rounds: ROUNDS, diffA: DIFF_A, diffB: DIFF_B, elapsed: `${elapsed}s` },
+  config: { rounds: ROUNDS, diffA: DIFF_A, diffB: DIFF_B, weaponA: WEAPON_A, weaponB: WEAPON_B, elapsed: `${elapsed}s` },
   wins: { A: winsA, B: winsB, draw: draws, rateA: +(winsA / ROUNDS * 100).toFixed(1), rateB: +(winsB / ROUNDS * 100).toFixed(1) },
   avgDuration: +avgDur.toFixed(2),
   hits: {
@@ -609,7 +620,9 @@ if (JSON_ONLY) {
   console.log(JSON.stringify(summary, null, 2));
 } else {
   console.log(`\n${'='.repeat(60)}`);
-  console.log(`  冷兵器战斗系统 · 无头测试  AI-${DIFF_A} vs AI-${DIFF_B}`);
+  const wAName = getWeapon(WEAPON_A).name;
+  const wBName = getWeapon(WEAPON_B).name;
+  console.log(`  冷兵器战斗系统 · 无头测试  AI-${DIFF_A}(${wAName}) vs AI-${DIFF_B}(${wBName})`);
   console.log(`  ${ROUNDS} 轮 · 耗时 ${elapsed}s`);
   console.log(`${'='.repeat(60)}`);
   console.log(`  胜率: 蓝方 ${winsA}胜(${(winsA / ROUNDS * 100).toFixed(1)}%)  红方 ${winsB}胜(${(winsB / ROUNDS * 100).toFixed(1)}%)  平局 ${draws}`);

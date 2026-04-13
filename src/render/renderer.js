@@ -237,26 +237,41 @@ export class Renderer {
 
   _drawWeapon(ctx, f) {
     const r = f.radius;
-    const len = r * 2.0;
+    const wid = f.weapon ? f.weapon.id : 'dao';
     ctx.save();
 
     // 武器角度偏移
     let weaponOffset = 0;
-    // 攻击前摇时武器后拉动画
     if (f.phase === 'startup' && f.attackData &&
         (f.state === 'lightAttack' || f.state === 'heavyAttack' || f.state === 'parryCounter')) {
       const progress = Math.min(1, f.phaseTimer / f.attackData.startup);
       weaponOffset = -Math.PI * 0.3 * (1 - progress * progress);
     }
-    // 格挡架开动画（武器被弹向侧面）
     if (f.parryDeflect > 0) {
       const t = Math.min(1, f.parryDeflect / 0.35);
-      // 先快速弹开再缓慢回正: easeOutQuad
       const ease = t * (2 - t);
       weaponOffset = Math.PI * 0.55 * ease;
     }
     ctx.rotate(f.facing + weaponOffset);
 
+    if (wid === 'daggers') {
+      this._drawDaggers(ctx, r);
+    } else if (wid === 'hammer') {
+      this._drawHammer(ctx, r);
+    } else if (wid === 'spear') {
+      this._drawSpear(ctx, r);
+    } else if (wid === 'shield') {
+      this._drawSwordShield(ctx, r, f);
+    } else {
+      this._drawDaoSword(ctx, r);
+    }
+
+    ctx.restore();
+  }
+
+  /** 刀（默认单手刀剑） */
+  _drawDaoSword(ctx, r) {
+    const len = r * 2.0;
     // 握柄
     ctx.strokeStyle = '#8B6914';
     ctx.lineWidth = 4;
@@ -264,40 +279,151 @@ export class Renderer {
     ctx.moveTo(r * 0.3, 0);
     ctx.lineTo(r * 0.55, 0);
     ctx.stroke();
-
-    // 护手（十字）
+    // 护手
     ctx.strokeStyle = '#aa8844';
     ctx.lineWidth = 2.5;
     ctx.beginPath();
     ctx.moveTo(r * 0.55, -6);
     ctx.lineTo(r * 0.55, 6);
     ctx.stroke();
-
-    // 剑身（渐变+双刃）
-    const bladeStart = r * 0.55;
-    const bladeGrad = ctx.createLinearGradient(bladeStart, 0, len, 0);
-    bladeGrad.addColorStop(0, '#ccc');
-    bladeGrad.addColorStop(0.4, '#eee');
-    bladeGrad.addColorStop(0.8, '#ddd');
-    bladeGrad.addColorStop(1, '#fff');
-    ctx.fillStyle = bladeGrad;
+    // 剑身
+    const bs = r * 0.55;
+    const bg = ctx.createLinearGradient(bs, 0, len, 0);
+    bg.addColorStop(0, '#ccc');
+    bg.addColorStop(0.4, '#eee');
+    bg.addColorStop(0.8, '#ddd');
+    bg.addColorStop(1, '#fff');
+    ctx.fillStyle = bg;
     ctx.beginPath();
-    ctx.moveTo(bladeStart, -2.5);
+    ctx.moveTo(bs, -2.5);
     ctx.lineTo(len - 4, -1.8);
     ctx.lineTo(len, 0);
     ctx.lineTo(len - 4, 1.8);
-    ctx.lineTo(bladeStart, 2.5);
+    ctx.lineTo(bs, 2.5);
     ctx.closePath();
     ctx.fill();
-    // 剑身中线
     ctx.strokeStyle = 'rgba(255,255,255,0.4)';
     ctx.lineWidth = 0.5;
     ctx.beginPath();
-    ctx.moveTo(bladeStart + 2, 0);
+    ctx.moveTo(bs + 2, 0);
     ctx.lineTo(len - 6, 0);
     ctx.stroke();
+  }
 
-    ctx.restore();
+  /** 匕首（双短刃） */
+  _drawDaggers(ctx, r) {
+    const len = r * 1.3;
+    for (const side of [-1, 1]) {
+      ctx.save();
+      ctx.translate(0, side * 3);
+      // 柄
+      ctx.strokeStyle = '#6B4914';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(r * 0.3, 0);
+      ctx.lineTo(r * 0.45, 0);
+      ctx.stroke();
+      // 短刃
+      const bs = r * 0.45;
+      ctx.fillStyle = '#bbb';
+      ctx.beginPath();
+      ctx.moveTo(bs, -1.5);
+      ctx.lineTo(len, 0);
+      ctx.lineTo(bs, 1.5);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    }
+  }
+
+  /** 大锤 */
+  _drawHammer(ctx, r) {
+    const len = r * 1.8;
+    // 长柄
+    ctx.strokeStyle = '#7B5B14';
+    ctx.lineWidth = 5;
+    ctx.beginPath();
+    ctx.moveTo(r * 0.2, 0);
+    ctx.lineTo(len - 8, 0);
+    ctx.stroke();
+    // 锤头
+    const hw = 12, hh = 16;
+    const hx = len - 8;
+    ctx.fillStyle = '#888';
+    ctx.fillRect(hx - 2, -hh / 2, hw, hh);
+    const hg = ctx.createLinearGradient(hx, -hh / 2, hx, hh / 2);
+    hg.addColorStop(0, '#aaa');
+    hg.addColorStop(0.5, '#777');
+    hg.addColorStop(1, '#666');
+    ctx.fillStyle = hg;
+    ctx.fillRect(hx, -hh / 2 + 1, hw - 2, hh - 2);
+  }
+
+  /** 长枪 */
+  _drawSpear(ctx, r) {
+    const len = r * 2.8;
+    // 枪杆
+    ctx.strokeStyle = '#8B6914';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(r * 0.1, 0);
+    ctx.lineTo(len - 10, 0);
+    ctx.stroke();
+    // 枪头
+    const tip = len;
+    const bs = len - 10;
+    ctx.fillStyle = '#ccc';
+    ctx.beginPath();
+    ctx.moveTo(bs, -3);
+    ctx.lineTo(tip, 0);
+    ctx.lineTo(bs, 3);
+    ctx.closePath();
+    ctx.fill();
+    // 红缨
+    ctx.strokeStyle = '#cc3333';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(bs, -4);
+    ctx.lineTo(bs - 5, -6);
+    ctx.moveTo(bs, 0);
+    ctx.lineTo(bs - 5, -2);
+    ctx.moveTo(bs, 4);
+    ctx.lineTo(bs - 5, 2);
+    ctx.stroke();
+  }
+
+  /** 剑盾（短剑+圆盾） */
+  _drawSwordShield(ctx, r, f) {
+    // 短剑
+    const len = r * 1.5;
+    ctx.strokeStyle = '#8B6914';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(r * 0.35, 0);
+    ctx.lineTo(r * 0.50, 0);
+    ctx.stroke();
+    const bs = r * 0.50;
+    ctx.fillStyle = '#ccc';
+    ctx.beginPath();
+    ctx.moveTo(bs, -2);
+    ctx.lineTo(len, 0);
+    ctx.lineTo(bs, 2);
+    ctx.closePath();
+    ctx.fill();
+    // 盾牌（反向旋转回世界坐标系内画圆弧盾）
+    const shieldR = r * 0.7;
+    const shieldDist = r * 0.5;
+    ctx.fillStyle = f.state === 'blocking' ? 'rgba(100,160,255,0.6)' : 'rgba(90,80,60,0.5)';
+    ctx.beginPath();
+    ctx.arc(shieldDist, 0, shieldR, -Math.PI * 0.4, Math.PI * 0.4);
+    ctx.lineTo(shieldDist, 0);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(shieldDist, 0, shieldR, -Math.PI * 0.4, Math.PI * 0.4);
+    ctx.stroke();
   }
 
   drawParticles(particleSystem) {

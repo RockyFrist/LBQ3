@@ -212,10 +212,38 @@ export class CombatSystem {
   }
 
   _applyHit(attacker, target, atkInfo, ang) {
-    target.takeDamage(atkInfo.damage);
-    target.setState('staggered', { duration: C.HIT_STAGGER });
-    const baseKb = atkInfo.type === 'heavy' ? C.HEAVY_HIT_KNOCKBACK : C.HIT_KNOCKBACK;
-    // 体型缩放: 大体型攻击方击退更远，大体型目标更难被击退
+    let dmg = atkInfo.damage;
+    const aw = attacker.weapon;
+
+    // 武器特效: 背刺加成
+    if (aw.specials && aw.specials.includes('backstab')) {
+      const faceDiff = Math.abs(normalizeAngle(ang - target.facing));
+      if (faceDiff < (aw.backstabAngle || Math.PI / 3)) {
+        dmg = Math.floor(dmg * (aw.backstabMult || 1.3));
+      }
+    }
+
+    // 武器特效: 距离加成（长枪甜点）
+    if (aw.specials && aw.specials.includes('rangeBonus')) {
+      const d = dist(attacker, target);
+      const [sweetMin, sweetMax] = aw.rangeBonusSweetSpot || [65, 110];
+      if (d >= sweetMin && d <= sweetMax) {
+        dmg = Math.floor(dmg * (aw.rangeBonusMult || 1.15));
+      } else if (d < (aw.rangeBonusCloseThreshold || 40)) {
+        dmg = Math.floor(dmg * (aw.rangeBonusClosePenalty || 0.75));
+      }
+    }
+
+    // 武器特效: 重击额外硬直
+    const stagger = (atkInfo.type === 'heavy' && attacker.weapon.heavy.hitStagger)
+      ? attacker.weapon.heavy.hitStagger : C.HIT_STAGGER;
+    // 轻攻击自带硬直覆写
+    const lightStagger = atkInfo.hitStagger || stagger;
+
+    target.takeDamage(dmg);
+    target.setState('staggered', { duration: atkInfo.type === 'light' ? lightStagger : stagger });
+    const baseKb = atkInfo.type === 'heavy' ? (attacker.weapon.heavy.knockback || C.HEAVY_HIT_KNOCKBACK) : C.HIT_KNOCKBACK;
+    // 体型缩放
     const scaleRatio = (attacker.scale || 1) / (target.scale || 1);
     target.applyKnockback(ang, baseKb * scaleRatio);
     target.flash('#fff', 0.1);
@@ -227,18 +255,22 @@ export class CombatSystem {
       atkInfo.type === 'heavy' ? C.SHAKE_HEAVY : C.SHAKE_LIGHT,
       C.SHAKE_DURATION
     );
-    this.events.push({ type: 'hit', attacker, target, damage: atkInfo.damage, atkType: atkInfo.type });
+    this.events.push({ type: 'hit', attacker, target, damage: dmg, atkType: atkInfo.type });
   }
 
   // ===================== 轻击 vs 招架 =====================
   _resolveLightVsBlock(attacker, target, atkInfo, ang, mx, my) {
     target.blockHitCount++;
     target.drainStamina(C.LIGHT_VS_BLOCK_STAMINA);
+    // 武器特效: 额外体力消耗
+    const extraDrain = attacker.weapon.vsBlockExtraStaminaDrain || 0;
+    if (extraDrain > 0) target.drainStamina(extraDrain);
     this.particles.blockSpark(mx, my, ang, 5);
     this._shakeIfPlayer(attacker, target, C.SHAKE_LIGHT * 0.5, C.SHAKE_DURATION);
 
-    if (target.blockHitCount >= C.LIGHT_BREAK_HIT) {
-      // 第3下破防
+    const breakHits = target.weapon.breakHits || C.LIGHT_BREAK_HIT;
+    if (target.blockHitCount >= breakHits) {
+      // 破防
       target.setState('staggered', { duration: C.BLOCK_BREAK_STUN });
       target.flash('#ffaa00', 0.15);
       this.events.push({ type: 'blockBreak', attacker, target });
@@ -250,10 +282,13 @@ export class CombatSystem {
   // ===================== 重击/反击 vs 招架（格挡） =====================
   _resolveHeavyVsBlock(attacker, target, atkInfo, ang, mx, my, gameTime) {
     const timeSinceBlock = gameTime - target.blockStartTime;
+    const tw = target.weapon;
+    const preciseWindow = tw.preciseParryWindow != null ? tw.preciseParryWindow : C.PRECISE_PARRY_WINDOW;
+    const semiWindow = tw.semiParryWindow != null ? tw.semiParryWindow : C.SEMI_PARRY_WINDOW;
     let parryLevel;
-    if (timeSinceBlock <= C.PRECISE_PARRY_WINDOW) {
+    if (preciseWindow > 0 && timeSinceBlock <= preciseWindow) {
       parryLevel = 'precise';
-    } else if (timeSinceBlock <= C.SEMI_PARRY_WINDOW) {
+    } else if (timeSinceBlock <= semiWindow) {
       parryLevel = 'semi';
     } else {
       parryLevel = 'nonPrecise';
@@ -421,6 +456,7 @@ export class CombatSystem {
     const range = d.range;
     const arc = d.arc;
     const baseDmg = d.hitDamage;
+    const wu = attacker.weapon.ultimate;
 
     // 收集前方扇形内目标
     const targets = [];
@@ -441,21 +477,23 @@ export class CombatSystem {
     else if (targets.length >= 3) dmgMult = C.ULTIMATE_MULTI_3;
     const baseFinalDmg = Math.floor(baseDmg * dmgMult);
 
+    const blockReduction = wu.blockReduction != null ? wu.blockReduction : C.ULTIMATE_BLOCK_REDUCTION;
+    const knockback = wu.knockback || C.ULTIMATE_KNOCKBACK;
+
     for (const t of targets) {
       const ang = angleBetween(attacker, t);
-      // 格挡减伤：绝技穿透格挡但伤害减半
+      // 格挡减伤
       const blocked = t.isBlocking();
-      const dmg = blocked ? Math.floor(baseFinalDmg * C.ULTIMATE_BLOCK_REDUCTION) : baseFinalDmg;
+      const dmg = blocked ? Math.floor(baseFinalDmg * blockReduction) : baseFinalDmg;
       t.takeDamage(dmg);
       t.flash(blocked ? '#89f' : '#fff', 0.1);
-      // 命中即锁定：标记目标被绝技锁住，无法闪避脱离
+      // 命中即锁定
       t.ultimateLocked = attacker;
       if (isLastHit) {
         t.setState('staggered', { duration: 0.4 });
-        t.applyKnockback(ang, C.ULTIMATE_KNOCKBACK);
-        t.ultimateLocked = null; // 末段击飞后解锁
+        t.applyKnockback(ang, knockback);
+        t.ultimateLocked = null;
       } else {
-        // 硬直覆盖段间隔(0.15s)，确保无法脱离
         t.setState('staggered', { duration: 0.18 });
         t.applyKnockback(ang, 15);
       }
@@ -464,9 +502,7 @@ export class CombatSystem {
 
     if (targets.length > 0) {
       this._shakeIfPlayer(attacker, attacker, isLastHit ? C.SHAKE_HEAVY : C.SHAKE_LIGHT, C.SHAKE_DURATION);
-      // 每段连斩刀光粒子
       this.particles.ultimateSlash(attacker.x, attacker.y, attacker.facing, range, arc, isLastHit);
-      // 每段命中事件（用于逐段特效）
       this.events.push({ type: 'ultimateHit', attacker, targets, damage: baseFinalDmg, isLastHit, hitCount: targets.length });
     }
 
