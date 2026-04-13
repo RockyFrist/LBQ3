@@ -1,6 +1,6 @@
 // ===================== 开始菜单（多页设计） =====================
 import { WEAPON_LIST, WEAPONS, getWeapon } from '../weapons/weapon-defs.js';
-const GAME_VERSION = 'v0.11.2';
+const GAME_VERSION = 'v0.11.6';
 
 export class Menu {
   constructor(canvas, input) {

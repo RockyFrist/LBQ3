@@ -40,6 +40,14 @@ export class Renderer {
     ctx.save();
     ctx.translate(f.x, f.y);
 
+    // 大锤开山跳跃：角色上移+放大表示空中
+    const jumpH = f._ultJumpHeight || 0;
+    if (jumpH > 0) {
+      ctx.translate(0, -jumpH);
+      const jumpScale = 1 + jumpH * 0.008;
+      ctx.scale(jumpScale, jumpScale);
+    }
+
     // 残影
     ctx.save();
     ctx.translate(-f.x, -f.y);

@@ -116,7 +116,7 @@ export class Fighter {
 
     // 炁（绝技能量）
     this.qi = 0;
-    this.qiMax = C.QI_MAX;
+    this.qiMax = this.weapon.qiMax || C.QI_MAX;
     this.ultimateJustActivated = false;
 
     // 朝向锁定（影步等特殊效果）
@@ -128,6 +128,12 @@ export class Fighter {
     // 退出旧状态
     if (this.state === 'blocking') {
       this.staminaRegenPaused = false;
+    }
+    // 退出绝技状态时清理特殊标记
+    if (this.state === 'ultimate') {
+      this._ultJumpHeight = 0;
+      this._ultimateStance = false;
+      this._ultimateStanceTriggered = false;
     }
     // 任何非idle状态转换都清除格挡抑制（已完成首次决策后恢复正常格挡能力）
     if (this.blockSuppressed && s !== 'idle') {
@@ -307,6 +313,9 @@ export class Fighter {
     // 朝向锁定计时
     if (this.facingLocked > 0) this.facingLocked -= dt;
 
+    // 保存朝向供锁定检查
+    const facingBefore = this.facing;
+
     this.updateStamina(dt);
     this.updateExhaustion(dt);
     this.updateAfterimages(dt);
@@ -314,6 +323,9 @@ export class Fighter {
     // 状态分发（先处理状态逻辑，再应用移动）
     const handler = this[`update_${this.state}`];
     if (handler) handler.call(this, dt, commands, gameTime);
+
+    // 影步朝向锁定：阻止目标转身
+    if (this.facingLocked > 0) this.facing = facingBefore;
 
     this.updateMovement(dt, commands);
   }
@@ -605,9 +617,39 @@ export class Fighter {
       this.perfectDodged = 'refunded';
     }
 
+    // 匕首影步：闪避穿透敌人后锁定目标朝向（由combat-system设置shadowStepTarget）
+    if (this.shadowStepTarget && t >= invulnEnd && !this._shadowStepApplied) {
+      this._shadowStepApplied = true;
+      const target = this.shadowStepTarget;
+      if (target.alive) {
+        target.facingLocked = this.weapon.shadowStepFacingLock || 0.30;
+      }
+    }
+
+    // 长枪后撤刺：向后闪避时在无敌帧结束时释放一次戳刺
+    if (this.weapon.specials?.includes('retreatStab') && !this._retreatStabDone) {
+      // 判定是否为后向闪避（闪避方向与朝向超过90°）
+      const dodgeFaceDiff = Math.abs(normalizeAngle(this.dodgeAngle - this.facing));
+      if (dodgeFaceDiff > Math.PI * 0.4 && t >= invulnEnd && t < invulnEnd + 0.08) {
+        this._retreatStabDone = true;
+        this._retreatStabActive = true;
+        this._retreatStabTimer = 0.10;
+      }
+    }
+    // 后撤刺active计时
+    if (this._retreatStabActive) {
+      this._retreatStabTimer -= dt;
+      if (this._retreatStabTimer <= 0) this._retreatStabActive = false;
+    }
+
     if (t >= C.DODGE_DURATION) {
       this.vx = 0;
       this.vy = 0;
+      this.shadowStepTarget = null;
+      this._shadowStepApplied = false;
+      this._retreatStabDone = false;
+      this._retreatStabActive = false;
+      this._retreatStabHit = null;
       this.setState('idle');
     }
   }
@@ -642,11 +684,20 @@ export class Fighter {
   update_ultimate(dt, cmd, gameTime) {
     const d = this.attackData;
     if (!d) { this.setState('idle'); return; }
+    const type = d.type || 'multislash';
+    switch (type) {
+      case 'shadowkill':       this._updateUlt_shadowkill(dt, cmd); break;
+      case 'groundslam':       this._updateUlt_groundslam(dt, cmd); break;
+      case 'absolutedefense':  this._updateUlt_absolutedefense(dt, cmd); break;
+      default:                 this._updateUlt_multislash(dt, cmd); break;
+    }
+  }
 
+  // 通用连斩绝技 (刀·拔刀 / 枪·龙舞)
+  _updateUlt_multislash(dt, cmd) {
+    const d = this.attackData;
     if (this.phase === 'startup') {
-      // 蓄势阶段可被打断（由combat-system处理）
       if (this.phaseTimer >= d.startup) {
-        // 消耗全部炁
         this.qi = 0;
         this.phase = 'active';
         this.phaseTimer = 0;
@@ -655,7 +706,6 @@ export class Fighter {
         this.ultimateJustActivated = true;
       }
     } else if (this.phase === 'active') {
-      // 绝技漂移
       const drift = this.weapon.ultimate.drift != null ? this.weapon.ultimate.drift : C.ULTIMATE_DRIFT;
       this.x += Math.cos(this.facing) * drift * dt;
       this.y += Math.sin(this.facing) * drift * dt;
@@ -666,6 +716,143 @@ export class Fighter {
     } else if (this.phase === 'recovery') {
       this._bufferFromCmd(cmd);
       if (this.phaseTimer >= d.recovery) {
+        this.setState('idle');
+      }
+    }
+  }
+
+  // 匕首·影杀 — 冲刺→连刺→收招（空招延长后摇）
+  _updateUlt_shadowkill(dt, cmd) {
+    const d = this.attackData;
+    const wu = this.weapon.ultimate;
+    if (this.phase === 'startup') {
+      if (this.phaseTimer >= d.startup) {
+        this.qi = 0;
+        this.phase = 'dash';
+        this.phaseTimer = 0;
+        this._ultDashRemain = wu.dashDist || 110;
+        this.ultimateJustActivated = true;
+      }
+    } else if (this.phase === 'dash') {
+      // 快速冲刺，无敌帧
+      const speed = (wu.dashDist || 110) / (wu.dashDuration || 0.15);
+      const move = speed * dt;
+      this.x += Math.cos(this.facing) * move;
+      this.y += Math.sin(this.facing) * move;
+      this._ultDashRemain -= move;
+      if (this.phaseTimer >= (wu.dashDuration || 0.15)) {
+        this.phase = 'active';
+        this.phaseTimer = 0;
+        this.ultimateHitsDone = 0;
+        this.hasHit = new Set();
+      }
+    } else if (this.phase === 'active') {
+      const drift = wu.drift != null ? wu.drift : 60;
+      this.x += Math.cos(this.facing) * drift * dt;
+      this.y += Math.sin(this.facing) * drift * dt;
+      if (this.phaseTimer >= d.active) {
+        this.phase = 'recovery';
+        this.phaseTimer = 0;
+      }
+    } else if (this.phase === 'recovery') {
+      this._bufferFromCmd(cmd);
+      // 空招更长后摇
+      const rec = (this.ultimateHitsDone > 0) ? d.recovery : (wu.missRecovery || 0.55);
+      if (this.phaseTimer >= rec) {
+        this.setState('idle');
+      }
+    }
+  }
+
+  // 大锤·开山 — 跳跃→砸地→收招
+  _updateUlt_groundslam(dt, cmd) {
+    const d = this.attackData;
+    const wu = this.weapon.ultimate;
+    if (this.phase === 'startup') {
+      if (this.phaseTimer >= d.startup) {
+        this.qi = 0;
+        this.phase = 'jump';
+        this.phaseTimer = 0;
+        this._ultJumpHeight = 0;
+        this.ultimateJustActivated = true;
+      }
+    } else if (this.phase === 'jump') {
+      // 跳跃阶段: 模拟高度(用于渲染), 向目标方向快速冲刺
+      const jumpDur = wu.jumpDuration || 0.40;
+      const t = this.phaseTimer / jumpDur;
+      this._ultJumpHeight = Math.sin(t * Math.PI) * 40; // 抛物线高度
+      const jumpSpeed = wu.jumpLunge || 180; // 跳跃突进速度
+      this.x += Math.cos(this.facing) * jumpSpeed * dt;
+      this.y += Math.sin(this.facing) * jumpSpeed * dt;
+      if (this.phaseTimer >= jumpDur) {
+        this._ultJumpHeight = 0;
+        this.phase = 'active';
+        this.phaseTimer = 0;
+        this.ultimateHitsDone = 0;
+        this.hasHit = new Set();
+      }
+    } else if (this.phase === 'active') {
+      // 砸地瞬间，不移动
+      if (this.phaseTimer >= d.active) {
+        this.phase = 'recovery';
+        this.phaseTimer = 0;
+      }
+    } else if (this.phase === 'recovery') {
+      this._bufferFromCmd(cmd);
+      if (this.phaseTimer >= d.recovery) {
+        this._ultJumpHeight = 0;
+        this.setState('idle');
+      }
+    }
+  }
+
+  // 剑盾·绝对防御 — 架势→（被攻击时）反击→收招
+  _updateUlt_absolutedefense(dt, cmd) {
+    const d = this.attackData;
+    const wu = this.weapon.ultimate;
+    if (this.phase === 'startup') {
+      if (this.phaseTimer >= d.startup) {
+        this.qi = 0;
+        this.phase = 'stance';
+        this.phaseTimer = 0;
+        this._ultimateStance = true;
+        this._ultimateStanceTriggered = false;
+        this.ultimateJustActivated = true;
+      }
+    } else if (this.phase === 'stance') {
+      // 架势阶段: 等待被攻击，可小幅转向并缓慢前压
+      if (cmd && cmd.faceAngle !== undefined) this.facing = cmd.faceAngle;
+      // 缓慢向前压迫（给对手压力，增加被攻击概率）
+      const stanceSpeed = wu.stanceApproachSpeed || 60;
+      this.x += Math.cos(this.facing) * stanceSpeed * dt;
+      this.y += Math.sin(this.facing) * stanceSpeed * dt;
+      // 被攻击触发反击（由 combat-system 设置 _ultimateStanceTriggered）
+      if (this._ultimateStanceTriggered) {
+        this.phase = 'active';
+        this.phaseTimer = 0;
+        this.ultimateHitsDone = 0;
+        this.hasHit = new Set();
+        this._ultimateStance = false;
+      }
+      // 架势超时: 返还部分炁
+      const stanceDur = wu.stanceDuration || 1.20;
+      if (this.phaseTimer >= stanceDur) {
+        this._ultimateStance = false;
+        const refund = wu.qiRefundOnMiss || 0.60;
+        this.qi = Math.min(this.qiMax, Math.floor(this.qiMax * refund));
+        this.phase = 'recovery';
+        this.phaseTimer = 0;
+      }
+    } else if (this.phase === 'active') {
+      // 反击一击
+      if (this.phaseTimer >= d.active) {
+        this.phase = 'recovery';
+        this.phaseTimer = 0;
+      }
+    } else if (this.phase === 'recovery') {
+      this._bufferFromCmd(cmd);
+      if (this.phaseTimer >= d.recovery) {
+        this._ultimateStance = false;
         this.setState('idle');
       }
     }
@@ -786,13 +973,19 @@ export class Fighter {
   isInvulnerable() {
     // 被绝技锁定时无法获得无敌帧
     if (this.ultimateLocked) return false;
+    // 匕首影杀冲刺阶段无敌
+    if (this.state === 'ultimate' && this.phase === 'dash') return true;
     const invulnEnd = this.weapon.dodgeInvuln || C.DODGE_INVULN_END;
     return this.state === 'dodging' && this.stateTimer < invulnEnd;
   }
 
   hasHyperArmor() {
-    // 绝技连斩阶段强制霸体
-    if (this.state === 'ultimate') return this.phase !== 'startup';
+    // 绝技连斩/冲刺/跳跃阶段强制霸体（架势阶段例外）
+    if (this.state === 'ultimate') {
+      if (this.phase === 'startup') return false;
+      if (this.phase === 'stance') return false; // 绝对防御架势不带霸体
+      return true; // active, dash, jump, recovery 均有霸体
+    }
     // 体力耗尽时重击失去霸体
     if (this.isExhausted) return false;
     // 武器特有霸体逻辑

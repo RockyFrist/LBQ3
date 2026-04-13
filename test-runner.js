@@ -109,6 +109,16 @@ function runRound(diffA, diffB, collectLog, weaponA, weaponB) {
     ultCompA: 0, ultCompB: 0,
     ultInterruptA: 0, ultInterruptB: 0,
     ultClash: 0,
+    // 武器特效统计
+    retreatStabA: 0, retreatStabB: 0,
+    shadowStepA: 0, shadowStepB: 0,
+    backstabA: 0, backstabB: 0,
+    parryReflectA: 0, parryReflectB: 0,
+    autoCounterA: 0, autoCounterB: 0,
+    staminaDrainA: 0, staminaDrainB: 0,
+    absDefenseA: 0, absDefenseB: 0,
+    hyperPierceA: 0, hyperPierceB: 0,
+    rangeBonusA: 0, rangeBonusB: 0,
     winner: 'draw', hpA: 0, hpB: 0,
   };
 
@@ -283,6 +293,7 @@ function runRound(diffA, diffB, collectLog, weaponA, weaponB) {
           const side = isA ? stats.hitsA : stats.hitsB;
           if (evt.atkType === 'heavy') side.heavy++; else side.light++;
           if (isA) stats.damageA += evt.damage; else stats.damageB += evt.damage;
+          if (evt.pierced) { if (isA) stats.hyperPierceA++; else stats.hyperPierceB++; }
           // 炁获取
           const qiGain = evt.atkType === 'parryCounter' ? C.QI_GAIN_COUNTER_HIT
             : evt.atkType === 'heavy' ? C.QI_GAIN_HEAVY_HIT : C.QI_GAIN_LIGHT_HIT;
@@ -363,8 +374,41 @@ function runRound(diffA, diffB, collectLog, weaponA, weaponB) {
           stats.ultInterruptA++;
           stats.ultInterruptB++;
           break;
+        }        // 武器特效事件
+        case 'retreatStab': {
+          if (evt.attacker === fighterA) stats.retreatStabA++; else stats.retreatStabB++;
+          logEvent(gameTime, 'retreatStab', { who: evt.attacker === fighterA ? 'A' : 'B', damage: evt.damage });
+          break;
         }
-      }
+        case 'shadowStep': {
+          if (evt.attacker === fighterA) stats.shadowStepA++; else stats.shadowStepB++;
+          logEvent(gameTime, 'shadowStep', { who: evt.attacker === fighterA ? 'A' : 'B' });
+          break;
+        }
+        case 'backstab': {
+          if (evt.attacker === fighterA) stats.backstabA++; else stats.backstabB++;
+          logEvent(gameTime, 'backstab', { who: evt.attacker === fighterA ? 'A' : 'B', bonusDmg: evt.bonusDmg });
+          break;
+        }
+        case 'parryReflect': {
+          if (evt.target === fighterA) stats.parryReflectA++; else stats.parryReflectB++;
+          logEvent(gameTime, 'parryReflect', { who: evt.target === fighterA ? 'A' : 'B', damage: evt.damage });
+          break;
+        }
+        case 'autoCounter': {
+          if (evt.target === fighterA) stats.autoCounterA++; else stats.autoCounterB++;
+          logEvent(gameTime, 'autoCounter', { who: evt.target === fighterA ? 'A' : 'B' });
+          break;
+        }
+        case 'staminaDrain': {
+          if (evt.attacker === fighterA) stats.staminaDrainA++; else stats.staminaDrainB++;
+          break;
+        }
+        case 'absDefenseTrigger': {
+          if (evt.target === fighterA) stats.absDefenseA++; else stats.absDefenseB++;
+          logEvent(gameTime, 'absDefenseTrigger', { who: evt.target === fighterA ? 'A' : 'B' });
+          break;
+        }      }
     }
 
     // 胜负
@@ -448,6 +492,9 @@ const ultCompB = sum(s => s.ultCompB);
 const ultInterruptA = sum(s => s.ultInterruptA);
 const ultInterruptB = sum(s => s.ultInterruptB);
 
+// 武器特效汇总
+const specSum = (key) => ({ A: sum(s => s[key + 'A'] || 0), B: sum(s => s[key + 'B'] || 0) });
+
 const summary = {
   config: { rounds: ROUNDS, diffA: DIFF_A, diffB: DIFF_B, weaponA: WEAPON_A, weaponB: WEAPON_B, elapsed: `${elapsed}s` },
   wins: { A: winsA, B: winsB, draw: draws, rateA: +(winsA / ROUNDS * 100).toFixed(1), rateB: +(winsB / ROUNDS * 100).toFixed(1) },
@@ -485,6 +532,16 @@ const summary = {
     B: { used: ultUsedB, hits: ultHitsB, damage: ultDmgB, completed: ultCompB, interrupted: ultInterruptB,
          dodged: ultUsedB - ultCompB - ultInterruptB,
          hitRate: ultUsedB ? +((ultCompB / ultUsedB) * 100).toFixed(1) : 0 },
+  },
+  weaponSpecials: {
+    retreatStab:   specSum('retreatStab'),
+    shadowStep:    specSum('shadowStep'),
+    backstab:      specSum('backstab'),
+    parryReflect:  specSum('parryReflect'),
+    autoCounter:   specSum('autoCounter'),
+    staminaDrain:  specSum('staminaDrain'),
+    absDefense:    specSum('absDefense'),
+    hyperPierce:   specSum('hyperPierce'),
   },
 };
 
@@ -573,6 +630,25 @@ if (LOG_MODE) {
             break;
           case 'roundEnd':
             console.log(`  [${timeStr}s] ${deltaStr} ── 结束 ${evt.winner === 'draw' ? '平局' : evt.winner + '胜'} A:${evt.hpA}HP B:${evt.hpB}HP ──`);
+            break;
+          // 武器特效日志
+          case 'retreatStab':
+            console.log(`  [${timeStr}s] ${deltaStr} 🔱 ${evt.who} 后撤刺命中! ${evt.damage}伤  距离${distStr}`);
+            break;
+          case 'shadowStep':
+            console.log(`  [${timeStr}s] ${deltaStr} 👤 ${evt.who} 影步穿越!  距离${distStr}`);
+            break;
+          case 'backstab':
+            console.log(`  [${timeStr}s] ${deltaStr} 🗡 ${evt.who} 背刺! 额外${evt.bonusDmg}伤  距离${distStr}`);
+            break;
+          case 'parryReflect':
+            console.log(`  [${timeStr}s] ${deltaStr} 🛡 ${evt.who} 格挡反弹${evt.damage}伤!  距离${distStr}`);
+            break;
+          case 'autoCounter':
+            console.log(`  [${timeStr}s] ${deltaStr} ↩ ${evt.who} 自动反击!  距离${distStr}`);
+            break;
+          case 'absDefenseTrigger':
+            console.log(`  [${timeStr}s] ${deltaStr} 🛡 ${evt.who} 绝对防御触发反击!  距离${distStr}`);
             break;
         }
       }

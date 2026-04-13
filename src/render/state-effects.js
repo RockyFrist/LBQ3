@@ -267,15 +267,24 @@ export const stateEffectsMethods = {
 
     // 拔刀绝技特效
     if (f.state === 'ultimate') {
-      // 角色红光外环（全阶段可见，强化存在感）
+      const ultType = f.attackData?.type || 'multislash';
+      // 角色外环（全阶段可见，颜色按类型区分）
       const pulseAll = 0.3 + 0.3 * Math.sin(Date.now() * 0.008);
-      ctx.strokeStyle = `rgba(255,50,20,${f.phase === 'active' ? 0.6 + pulseAll : 0.4 + 0.3 * pulseAll})`;
+      let ringColor;
+      switch (ultType) {
+        case 'shadowkill':       ringColor = [160, 100, 255]; break;
+        case 'groundslam':       ringColor = [255, 120, 30]; break;
+        case 'absolutedefense':  ringColor = [255, 220, 60]; break;
+        default:                 ringColor = [255, 50, 20]; break;
+      }
+      const [rr, rg, rb] = ringColor;
+      ctx.strokeStyle = `rgba(${rr},${rg},${rb},${f.phase === 'active' ? 0.6 + pulseAll : 0.4 + 0.3 * pulseAll})`;
       ctx.lineWidth = f.phase === 'active' ? 5 : f.phase === 'startup' ? 4 : 3;
       ctx.beginPath();
       ctx.arc(0, 0, f.radius + 8, 0, Math.PI * 2);
       ctx.stroke();
-      if (f.phase === 'active' || f.phase === 'startup') {
-        ctx.fillStyle = `rgba(255,40,20,${f.phase === 'active' ? 0.08 + 0.06 * pulseAll : 0.04 + 0.04 * pulseAll})`;
+      if (f.phase === 'active' || f.phase === 'startup' || f.phase === 'stance' || f.phase === 'dash' || f.phase === 'jump') {
+        ctx.fillStyle = `rgba(${rr},${rg},${rb},${f.phase === 'active' ? 0.08 + 0.06 * pulseAll : 0.04 + 0.04 * pulseAll})`;
         ctx.beginPath();
         ctx.arc(0, 0, f.radius + 8, 0, Math.PI * 2);
         ctx.fill();
@@ -291,25 +300,27 @@ export const stateEffectsMethods = {
         // 开始瞬间爆亮（前20%进度额外强化，确保第一时间引起注意）
         const burstAlpha = progress < 0.2 ? 1.0 - progress * 4 : 0; // 瞬间高亮衰减
         // 红色脉冲圈
-        ctx.strokeStyle = `rgba(255,60,30,${Math.min(1, (0.5 + 0.5 * progress) * pulse + burstAlpha * 0.5)})`;
+        ctx.strokeStyle = `rgba(${rr},${rg},${rb},${Math.min(1, (0.5 + 0.5 * progress) * pulse + burstAlpha * 0.5)})`;
         ctx.lineWidth = 2 + 4 * progress + burstAlpha * 3;
+        const ultArc = f.attackData?.arc || C.ULTIMATE_ARC;
         ctx.beginPath();
-        ctx.arc(0, 0, r, -C.ULTIMATE_ARC / 2, C.ULTIMATE_ARC / 2);
+        ctx.arc(0, 0, r, -ultArc / 2, ultArc / 2);
         ctx.stroke();
-        // 红色扇形填充
-        ctx.fillStyle = `rgba(255,40,20,${Math.min(0.5, (0.08 + 0.16 * progress) * pulse + burstAlpha * 0.2)})`;
+        // 扇形填充
+        ctx.fillStyle = `rgba(${rr},${rg},${rb},${Math.min(0.5, (0.08 + 0.16 * progress) * pulse + burstAlpha * 0.2)})`;
         ctx.beginPath();
         ctx.moveTo(0, 0);
-        ctx.arc(0, 0, r, -C.ULTIMATE_ARC / 2, C.ULTIMATE_ARC / 2);
+        ctx.arc(0, 0, r, -ultArc / 2, ultArc / 2);
         ctx.closePath();
         ctx.fill();
-        // 危险扇形范围预警线（半透明红色虚线外框）
-        ctx.strokeStyle = `rgba(255,80,40,${0.25 + 0.25 * progress})`;
+        // 危险扇形范围预警线
+        const ultRange = f.attackData?.range || C.ULTIMATE_RANGE;
+        ctx.strokeStyle = `rgba(${rr},${rg},${rb},${0.25 + 0.25 * progress})`;
         ctx.lineWidth = 1.5;
         ctx.setLineDash([6, 4]);
         ctx.beginPath();
         ctx.moveTo(0, 0);
-        ctx.arc(0, 0, C.ULTIMATE_RANGE, -C.ULTIMATE_ARC / 2, C.ULTIMATE_ARC / 2);
+        ctx.arc(0, 0, ultRange, -ultArc / 2, ultArc / 2);
         ctx.closePath();
         ctx.stroke();
         ctx.setLineDash([]);
@@ -317,8 +328,62 @@ export const stateEffectsMethods = {
         ctx.strokeStyle = `rgba(255,200,180,${0.3 + 0.3 * progress})`;
         ctx.lineWidth = 2;
         ctx.beginPath();
-        ctx.arc(0, 0, f.radius + 3, -C.ULTIMATE_ARC / 3, C.ULTIMATE_ARC / 3);
+        ctx.arc(0, 0, f.radius + 3, -ultArc / 3, ultArc / 3);
         ctx.stroke();
+      } else if (f.phase === 'dash') {
+        // 影杀冲刺: 紫色拖尾
+        const range = f.attackData?.range || 55;
+        ctx.strokeStyle = 'rgba(160,100,255,0.6)';
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.moveTo(-f.radius * 3, -4);
+        ctx.lineTo(range * 0.5, 0);
+        ctx.moveTo(-f.radius * 3, 4);
+        ctx.lineTo(range * 0.5, 0);
+        ctx.stroke();
+        ctx.fillStyle = 'rgba(160,100,255,0.12)';
+        ctx.beginPath();
+        ctx.ellipse(0, 0, range * 0.6, f.radius * 1.5, 0, 0, Math.PI * 2);
+        ctx.fill();
+      } else if (f.phase === 'jump') {
+        // 开山跳跃: 360°落点预警圆(地面阴影扩大)
+        const jumpDur = f.weapon?.ultimate?.jumpDuration || 0.40;
+        const t = f.phaseTimer / jumpDur;
+        const impactR = (f.attackData?.range || 95) * (0.3 + 0.7 * t);
+        ctx.strokeStyle = `rgba(255,80,30,${0.3 + 0.4 * t})`;
+        ctx.lineWidth = 2;
+        ctx.setLineDash([5, 3]);
+        ctx.beginPath();
+        ctx.arc(0, 0, impactR, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.fillStyle = `rgba(255,80,30,${0.05 + 0.1 * t})`;
+        ctx.beginPath();
+        ctx.arc(0, 0, impactR, 0, Math.PI * 2);
+        ctx.fill();
+      } else if (f.phase === 'stance') {
+        // 绝对防御架势: 金色盾形光环
+        const pulse = 0.6 + 0.4 * Math.sin(f.phaseTimer * 8);
+        const shieldR = f.radius + 14;
+        ctx.strokeStyle = `rgba(255,220,60,${0.7 * pulse})`;
+        ctx.lineWidth = 5;
+        ctx.beginPath();
+        ctx.arc(0, 0, shieldR, -Math.PI * 0.55, Math.PI * 0.55);
+        ctx.stroke();
+        ctx.fillStyle = `rgba(255,220,60,${0.12 * pulse})`;
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.arc(0, 0, shieldR, -Math.PI * 0.55, Math.PI * 0.55);
+        ctx.closePath();
+        ctx.fill();
+        // "等待..."文字
+        ctx.save();
+        ctx.rotate(-f.facing); // 取消旋转，文字水平
+        ctx.textAlign = 'center';
+        ctx.font = 'bold 11px "Microsoft YaHei", sans-serif';
+        ctx.fillStyle = `rgba(255,220,60,${0.5 + 0.3 * pulse})`;
+        ctx.fillText('架势中...', 0, f.radius + 50);
+        ctx.restore();
       } else if (f.phase === 'active') {
         // 连斩：前方扇形快速挥刀弧线
         const range = f.attackData ? f.attackData.range : C.ULTIMATE_RANGE;
@@ -330,7 +395,7 @@ export const stateEffectsMethods = {
         const hitIdx = Math.floor(f.phaseTimer / hitInterval);
         const swingDir = hitIdx % 2 === 0 ? 1 : -1;
         const swingAngle = (hitPhase - 0.5) * arc * swingDir;
-        // 红白刀光弧
+        // 刀光弧
         ctx.strokeStyle = `rgba(255,220,200,${0.7 + 0.3 * (1 - hitPhase)})`;
         ctx.lineWidth = 3;
         ctx.beginPath();
@@ -338,8 +403,8 @@ export const stateEffectsMethods = {
         const endA = swingAngle + arc * 0.3;
         ctx.arc(0, 0, range * (0.5 + 0.5 * hitPhase), startA, endA);
         ctx.stroke();
-        // 扇形范围指示（红色半透明）
-        ctx.fillStyle = `rgba(255,60,30,${0.05})`;
+        // 扇形范围指示
+        ctx.fillStyle = `rgba(${rr},${rg},${rb},${0.05})`;
         ctx.beginPath();
         ctx.moveTo(0, 0);
         ctx.arc(0, 0, range, -arc / 2, arc / 2);
@@ -351,6 +416,16 @@ export const stateEffectsMethods = {
         ctx.beginPath();
         ctx.arc(0, 0, f.radius + 5, -arc / 2, arc / 2);
         ctx.stroke();
+        // 开山砸地瞬间: 大范围震波
+        if (ultType === 'groundslam') {
+          const slamProg = f.phaseTimer / (f.attackData?.active || 0.10);
+          const waveR = range * (0.5 + 0.8 * slamProg);
+          ctx.strokeStyle = `rgba(255,120,30,${0.7 * (1 - slamProg)})`;
+          ctx.lineWidth = 4;
+          ctx.beginPath();
+          ctx.arc(0, 0, waveR, 0, Math.PI * 2);
+          ctx.stroke();
+        }
       } else if (f.phase === 'recovery') {
         // 收刀：残余刀痕淡出
         const progress = Math.min(1, f.phaseTimer / C.ULTIMATE_RECOVERY);
@@ -386,11 +461,16 @@ export const stateEffectsMethods = {
       case 'dodging':
         if (f.perfectDodged) { label = '✨完美闪避!'; color = '#ffff00'; }
         break;
-      case 'ultimate':
+      case 'ultimate': {
+        const ultName = f.weapon?.ultimate?.name || '绝技';
         if (f.phase === 'startup') { label = '⚡蓄势'; color = '#ff4422'; }
-        else if (f.phase === 'active') { label = '⚔乱刀斩!'; color = '#ff4422'; }
-        else if (f.phase === 'recovery') { label = '收刀'; color = '#88aacc'; }
+        else if (f.phase === 'dash') { label = `⚔${ultName}·突进!`; color = '#aa88ff'; }
+        else if (f.phase === 'jump') { label = `⚔${ultName}·跳跃!`; color = '#ff6622'; }
+        else if (f.phase === 'stance') { label = `🛡${ultName}!`; color = '#ffdd44'; }
+        else if (f.phase === 'active') { label = `⚔${ultName}!`; color = '#ff4422'; }
+        else if (f.phase === 'recovery') { label = '收招'; color = '#88aacc'; }
         break;
+      }
     }
     if (f.isExhausted && !label) {
       label = '⚠体力耗尽'; color = '#ff4444';

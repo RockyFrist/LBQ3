@@ -61,6 +61,11 @@ export class Enemy {
     this._applyWeaponHints();
   }
 
+  /** 返回带随机抖动的思考冷却（±40%），避免镜像AI同步决策 */
+  _jitteredThinkCD() {
+    return this._cfg.thinkCD * (0.6 + Math.random() * 0.8);
+  }
+
   /**
    * 根据武器 aiHints 调整 AI 配置参数
    * 基准值均为 0.5（刀的默认值），偏离基准即产生差异化行为
@@ -247,22 +252,28 @@ export class Enemy {
 
     // === AI绝技使用：炁满时有概率释放 ===
     if (f.isUltimateReady() && f.state === 'idle' && d < (f.weapon.ultimate.range || C.ULTIMATE_RANGE) + 30) {
-      // 难度越高越会用绝技：D1=5% D3=15% D5=30%/思考周期
-      const ultChance = 0.05 + (this.difficulty - 1) / 4 * 0.25;
       // 机会窗口：对手处于无法闪避/格挡的状态时大幅提高释放概率
       const vulnStates = ['staggered', 'blockRecovery', 'parryStunned', 'executed'];
       const vulnRecovery = pf.phase === 'recovery' && (pf.state === 'lightAttack' || pf.state === 'heavyAttack');
       const vulnHeavyStartup = pf.state === 'heavyAttack' && pf.phase === 'startup' && pf.phaseTimer > 0.20;
       const vulnExhausted = pf.isExhausted && pf.stamina <= 0;
       const vulnLightActive = pf.state === 'lightAttack' && pf.phase === 'active';
+      const vulnBlocking = pf.state === 'blocking'; // 格挡中也算半脆弱（不能闪避）
       const oppVulnerable = vulnStates.includes(pf.state) || vulnRecovery
         || vulnHeavyStartup || vulnExhausted || vulnLightActive;
+      const oppSemiVuln = oppVulnerable || vulnBlocking;
       // D3+才会读状态抓机会：D3~70%概率利用 D5~95%
       const smartChance = oppVulnerable && this.difficulty >= 3
-        ? 0.5 + (this.difficulty - 3) / 2 * 0.25 : 0;
+        ? 0.55 + (this.difficulty - 3) / 2 * 0.20 : 0;
+      // 对手半脆弱（格挡中）也有中等概率释放
+      const semiChance = (vulnBlocking && !oppVulnerable && this.difficulty >= 3)
+        ? 0.30 + (this.difficulty - 3) / 2 * 0.15 : 0;
       // D4+对手低血量时更积极（收人头）
-      const finishBonus = (this.difficulty >= 4 && pf.hp / pf.maxHp < 0.35) ? 0.25 : 0;
-      if (Math.random() < Math.max(ultChance + finishBonus, smartChance)) {
+      const finishBonus = (this.difficulty >= 4 && pf.hp / pf.maxHp < 0.35) ? 0.30 : 0;
+      // 基础概率大幅降低：对手空闲时几乎不盲目释放（D5=8%→主要靠smartChance）
+      const baseChance = oppSemiVuln ? 0 : (0.02 + (this.difficulty - 1) / 4 * 0.06);
+      const finalChance = Math.max(baseChance + finishBonus, smartChance, semiChance);
+      if (Math.random() < finalChance) {
         cmd.ultimate = true;
         this.aiState = 'recover';
         this.aiTimer = 1.0;
@@ -274,10 +285,10 @@ export class Enemy {
     if (pf.state === 'ultimate' && (pf.phase === 'startup' || pf.phase === 'active') && (f.state === 'idle' || f.state === 'staggered')) {
       // startup阶段反应率更高（有预判时间），active阶段靠纯反应
       const isStartup = pf.phase === 'startup';
-      const baseChance = isStartup ? 0.2 : 0.10;
-      const diffScale = isStartup ? 0.6 : 0.45;
+      const baseChance = isStartup ? 0.10 : 0.05;
+      const diffScale = isStartup ? 0.45 : 0.30;
       const reactChance = baseChance + (this.difficulty - 1) / 4 * diffScale;
-      // D1: startup=20%/active=10%  D5: startup=80%/active=55%
+      // D1: startup=10%/active=5%  D5: startup=55%/active=35%
       if (f.state === 'idle' && f.stamina >= C.DODGE_COST && Math.random() < reactChance) {
         cmd.dodge = true;
         // 远离方向闪避（背向+随机偏移，比纯侧向更有效）
@@ -298,15 +309,21 @@ export class Enemy {
       }
     }
     if (justExitedParryStunned) {
-      // AI攻击被格挡后恢复：二次博弈决策（不再一律轻击）
-      // 对手有parryBoost速度优势，AI需要多样化应对
+      // AI攻击被格挡后恢复：二次博弈决策
       this.aiTimer = 0;
       this.attackCooldown = 0;
       this.thinkCD = 0;
       const diffScale = (this.difficulty - 1) / 4; // 0~1
-      const roll = Math.random();
-      // 高难度允许短冷却后格挡（捕获对手反击的重击/格反）
+      // 高难度允许短冷却后格挡
       this.blockCooldown = Math.max(0.3, 1.0 - diffScale * 0.6); // D1=1.0 D5=0.40
+      // 武器插件优先
+      const plugin = f.weapon.aiPlugin;
+      if (plugin?.postParried && plugin.postParried(this, f, pf, d, ang, cmd, cfg)) {
+        this._logDecision(this._gameTime, 'post_parried', 'plugin_' + f.weapon.id, {});
+        return cmd;
+      }
+      // 默认行为（刀等无插件武器）
+      const roll = Math.random();
       if (roll < 0.25 && f.stamina >= C.DODGE_COST) {
         // 侧闪脱离（躲避对手反击，重置中立）
         cmd.dodge = true;
@@ -340,11 +357,17 @@ export class Enemy {
       }
     }
     if (hasParryBoost && !this._wasParryBoosted && f.state === 'idle') {
-      // AI成功格挡获得parryBoost → 多样化利用增益（不再一律轻击）
+      // AI成功格挡获得parryBoost → 多样化利用增益
       this.aiState = 'approach';
       this.aiTimer = 0;
       this.attackCooldown = 0;
       this.thinkCD = 0;
+      // 武器插件优先
+      const plugin = f.weapon.aiPlugin;
+      if (plugin?.postParry && plugin.postParry(this, f, pf, d, ang, cmd, cfg)) {
+        this._logDecision(this._gameTime, 'post_parry', 'plugin_' + f.weapon.id, {});
+        return cmd;
+      }
       const boostRoll = Math.random();
       if (boostRoll < 0.40) {
         // 轻击反击（最常见，利用加速缩短前摇）
@@ -383,6 +406,13 @@ export class Enemy {
     // 高难度AI更善于打破"你打我两下我打你两下"的死循环
     const justExitedStagger = this._prevFighterState === 'staggered' && f.state === 'idle';
     if (justExitedStagger && d < 100) {
+      // 武器插件优先处理硬直恢复决策
+      const plugin = f.weapon.aiPlugin;
+      if (plugin?.staggerReact && plugin.staggerReact(this, f, pf, d, ang, cmd, cfg)) {
+        this._logDecision(this._gameTime, 'stagger_react', 'plugin_' + f.weapon.id, {});
+        this.attackCooldown = 0.15;
+        return cmd;
+      }
       // D1=15% D2=30% D3=45% D4=60% D5=75%
       const cautionChance = 0.15 + (this.difficulty - 1) / 4 * 0.60;
       if (Math.random() < cautionChance) {
@@ -688,7 +718,7 @@ export class Enemy {
       this.comboCount = 1;
       this.aiState = 'recover';
       this.aiTimer = 0.6;
-      this.thinkCD = cfg.thinkCD;
+      this.thinkCD = this._jitteredThinkCD();
       return cmd;
     }
 
@@ -780,7 +810,7 @@ export class Enemy {
           }
         }
       }
-      this.thinkCD = cfg.thinkCD;
+      this.thinkCD = this._jitteredThinkCD();
       return cmd;
     }
 
@@ -794,6 +824,17 @@ export class Enemy {
     // ===== 状态机 =====
     switch (this.aiState) {
       case 'approach': {
+        // 武器插件接近行为覆写
+        const approachPlugin = f.weapon.aiPlugin;
+        if (approachPlugin?.approachOverride && d <= cfg.approachDist + 80 &&
+            approachPlugin.approachOverride(this, f, pf, d, ang, cmd, cfg)) {
+          // 插件已处理移动，但还需检查是否该进入攻击决策
+          if (d <= cfg.approachDist && this.thinkCD <= 0) {
+            this._decide(d);
+            this.thinkCD = this._jitteredThinkCD();
+          }
+          break;
+        }
         if (d > cfg.approachDist) {
           const fwdX = Math.cos(ang);
           const fwdY = Math.sin(ang);
@@ -835,7 +876,7 @@ export class Enemy {
             return cmd;
           }
           this._decide(d);
-          this.thinkCD = cfg.thinkCD;
+          this.thinkCD = this._jitteredThinkCD();
         }
         break;
       }
@@ -1082,9 +1123,9 @@ export class Enemy {
     // 武器距离管理：过近时偏向后退保持最佳交战距离
     const hints = f.weapon.aiHints;
     if (hints?.preferredRange && d < hints.preferredRange[0]) {
-      if (Math.random() < 0.5) {
+      if (Math.random() < 0.30) {
         this.aiState = 'retreat';
-        this.aiTimer = 0.15 + Math.random() * 0.25;
+        this.aiTimer = 0.10 + Math.random() * 0.20;
         return;
       }
     }

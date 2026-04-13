@@ -93,6 +93,40 @@ export class CombatSystem {
         this._applyMagnet(f, fighters, dt);
       }
     }
+
+    // 武器特效: 匕首影步（闪避穿过敌人时锁定目标朝向）
+    // 武器特效: 长枪后撤刺（后向闪避时释放反刺）
+    for (const f of fighters) {
+      if (f.state !== 'dodging' || !f.alive) continue;
+      for (const t of fighters) {
+        if (t === f || t.team === f.team || !t.alive) continue;
+        const d = dist(f, t);
+        // 影步：闪避经过敌人身边时标记
+        if (f.weapon.specials?.includes('shadowStep') && !f.shadowStepTarget &&
+            f.isInvulnerable() && d < f.radius + t.radius + 20) {
+          f.shadowStepTarget = t;
+          this.events.push({ type: 'shadowStep', attacker: f, target: t });
+        }
+        // 后撤刺命中检测
+        if (f._retreatStabActive && !f._retreatStabHit?.has(t)) {
+          const w = f.weapon;
+          const range = w.retreatStabRange || 70;
+          const arc = w.retreatStabArc || Math.PI * 0.19;
+          if (d <= range && isInArc(f.x, f.y, f.facing, t.x, t.y, t.radius, range, arc)) {
+            if (!f._retreatStabHit) f._retreatStabHit = new Set();
+            f._retreatStabHit.add(t);
+            const dmg = w.retreatStabDamage || 6;
+            const ang = angleBetween(f, t);
+            t.takeDamage(dmg);
+            t.setState('staggered', { duration: 0.20 });
+            t.applyKnockback(ang, 15);
+            t.flash('#fff', 0.08);
+            this.particles.sparks((f.x + t.x) / 2, (f.y + t.y) / 2, ang, 4);
+            this.events.push({ type: 'retreatStab', attacker: f, target: t, damage: dmg });
+          }
+        }
+      }
+    }
   }
 
   _resolvePair(a, b, gameTime) {
@@ -221,6 +255,25 @@ export class CombatSystem {
       return;
     }
 
+    // 目标在绝对防御架势——吸收攻击并触发反击
+    if (target.state === 'ultimate' && target._ultimateStance) {
+      const faceDiff = Math.abs(normalizeAngle(angleBetween(target, attacker) - target.facing));
+      if (faceDiff <= Math.PI / 2) {
+        // 正面攻击被架势挡住，触发反击
+        target._ultimateStanceTriggered = true;
+        target.facing = angleBetween(target, attacker); // 面向攻击者
+        attacker.hasHit.add(target);
+        const midX = (attacker.x + target.x) / 2;
+        const midY = (attacker.y + target.y) / 2;
+        target.flash('#ffdd44', 0.15);
+        this.particles.blockSpark(midX, midY, ang + Math.PI, 8);
+        this._shakeIfPlayer(attacker, target, C.SHAKE_HEAVY, C.SHAKE_DURATION);
+        this.events.push({ type: 'absDefenseTrigger', attacker, target });
+        return;
+      }
+      // 背后攻击穿透架势
+    }
+
     // 正常命中
     this._applyHit(attacker, target, atkInfo, ang);
   }
@@ -233,7 +286,9 @@ export class CombatSystem {
     if (aw.specials && aw.specials.includes('backstab')) {
       const faceDiff = Math.abs(normalizeAngle(ang - target.facing));
       if (faceDiff < (aw.backstabAngle || Math.PI / 3)) {
+        const origDmg = dmg;
         dmg = Math.floor(dmg * (aw.backstabMult || 1.3));
+        this.events.push({ type: 'backstab', attacker, target, bonusDmg: dmg - origDmg });
       }
     }
 
@@ -261,6 +316,15 @@ export class CombatSystem {
     const scaleRatio = (attacker.scale || 1) / (target.scale || 1);
     target.applyKnockback(ang, baseKb * scaleRatio);
     target.flash('#fff', 0.1);
+
+    // 武器特效: 重击额外体力消耗（盾击）
+    if (atkInfo.type === 'heavy') {
+      const staminaDrain = attacker.weapon.heavy.staminaDrain || 0;
+      if (staminaDrain > 0) {
+        target.drainStamina(staminaDrain);
+        this.events.push({ type: 'staminaDrain', attacker, target, amount: staminaDrain });
+      }
+    }
 
     const midX = (attacker.x + target.x) / 2;
     const midY = (attacker.y + target.y) / 2;
@@ -389,6 +453,25 @@ export class CombatSystem {
       target.flash('#88ccff', 0.15);
     }
 
+    // 武器特效: 精准弹反伤害反弹（剑盾）
+    const reflectPct = target.weapon.parryReflectPct || 0;
+    if (reflectPct > 0 && parryLevel === 'precise') {
+      const reflectDmg = Math.floor(atkInfo.damage * reflectPct);
+      if (reflectDmg > 0) {
+        attacker.takeDamage(reflectDmg);
+        attacker.flash('#ffff44', 0.12);
+        this.particles.sparks(mx, my, ang, 8);
+        this.events.push({ type: 'parryReflect', attacker, target, damage: reflectDmg });
+      }
+    }
+
+    // 武器特效: 自动反击（长枪精准弹反自动反刺）
+    if (target.weapon.autoCounter && parryLevel === 'precise') {
+      const cResult = C.PARRY_RESULTS.precise;
+      target.setState('parryCounter', { counterStartup: cResult.counterStartup });
+      this.events.push({ type: 'autoCounter', target });
+    }
+
     this.events.push({ type: 'parry', attacker, target, level: parryLevel });
   }
 
@@ -496,11 +579,18 @@ export class CombatSystem {
 
     for (const t of targets) {
       const ang = angleBetween(attacker, t);
+      // 破防绝技（如大锤开山）直接突破格挡
+      const breaksGuard = wu.breaksGuard || false;
       // 格挡减伤
-      const blocked = t.isBlocking();
+      const blocked = t.isBlocking() && !breaksGuard;
       const dmg = blocked ? Math.floor(baseFinalDmg * blockReduction) : baseFinalDmg;
       t.takeDamage(dmg);
       t.flash(blocked ? '#89f' : '#fff', 0.1);
+      // 破防效果：格挡中被命中也全额受伤+额外硬直
+      if (t.isBlocking() && breaksGuard) {
+        t.flash('#ffaa00', 0.15);
+        this.events.push({ type: 'blockBreak', attacker, target: t });
+      }
       // 命中即锁定
       t.ultimateLocked = attacker;
       if (isLastHit) {

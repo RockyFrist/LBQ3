@@ -3,6 +3,7 @@
 // 所有数值设计见 weapon-system.md
 
 import * as C from '../core/constants.js';
+import { DAGGERS_AI, HAMMER_AI, SPEAR_AI, SHIELD_AI } from '../ai/weapon-ai-plugins.js';
 
 // ---- 刀 (Dao) — 均衡型 ----
 export const WEAPON_DAO = {
@@ -153,6 +154,9 @@ export const WEAPON_DAGGERS = {
 
   specials: ['shadowStep', 'backstab'],
 
+  // AI决策插件
+  aiPlugin: DAGGERS_AI,
+
   // 影步参数
   shadowStepFacingLock: 0.30,    // 目标朝向锁定时间
 
@@ -229,6 +233,7 @@ export const WEAPON_HAMMER = {
     type: 'groundslam',
     startup: 0.42,
     jumpDuration: 0.40,
+    jumpLunge: 180,              // 跳跃阶段快速突进
     active: 0.10,
     recovery: 0.55,
     range: 95,
@@ -244,6 +249,11 @@ export const WEAPON_HAMMER = {
   },
 
   specials: ['quakeShield'],
+
+  qiMax: 75,  // 大锤蓄炁快（交换频繁，需要更低阈值才能用绝技）
+
+  // AI决策插件
+  aiPlugin: HAMMER_AI,
 
   aiHints: {
     preferredRange: [50, 72],
@@ -314,12 +324,15 @@ export const WEAPON_SPEAR = {
     hitDamage: 6,
     hitCount: 4,
     knockback: 50,               // 每段击退
-    drift: 0,
+    drift: 80,                   // 旋转中前进追敌
     blockReduction: 0.50,
     name: '龙舞',
   },
 
   specials: ['retreatStab', 'rangeBonus'],
+
+  // AI决策插件
+  aiPlugin: SPEAR_AI,
 
   // 后撤刺参数
   retreatStabDamage: 6,
@@ -334,8 +347,8 @@ export const WEAPON_SPEAR = {
 
   aiHints: {
     preferredRange: [65, 85],
-    aggressiveness: 0.45,
-    dodgeBias: 0.50,
+    aggressiveness: 0.60,
+    dodgeBias: 0.35,
     blockBias: 0.45,
     heavyBias: 0.55,
   },
@@ -412,6 +425,9 @@ export const WEAPON_SHIELD = {
   },
 
   specials: ['shieldWalk', 'parryReflect'],
+
+  // AI决策插件
+  aiPlugin: SHIELD_AI,
 
   aiHints: {
     preferredRange: [40, 58],
