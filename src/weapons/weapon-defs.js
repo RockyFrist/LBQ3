@@ -56,7 +56,7 @@ export const WEAPON_DAO = {
 
   ultimate: {
     type: 'multislash',
-    startup: 0.40,
+    startup: 0.28,
     active: 0.60,
     recovery: 0.35,
     range: 90,
@@ -134,7 +134,7 @@ export const WEAPON_DAGGERS = {
 
   ultimate: {
     type: 'shadowkill',
-    startup: 0.30,
+    startup: 0.22,
     dashDist: 110,
     dashDuration: 0.15,
     active: 0.70,
@@ -227,7 +227,7 @@ export const WEAPON_HAMMER = {
 
   ultimate: {
     type: 'groundslam',
-    startup: 0.55,
+    startup: 0.42,
     jumpDuration: 0.40,
     active: 0.10,
     recovery: 0.55,
@@ -306,7 +306,7 @@ export const WEAPON_SPEAR = {
 
   ultimate: {
     type: 'whirlwind',
-    startup: 0.35,
+    startup: 0.25,
     active: 0.80,
     recovery: 0.45,
     range: 95,

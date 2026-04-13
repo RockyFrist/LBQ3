@@ -933,7 +933,7 @@ export class Game {
         const dx = b.x - a.x;
         const dy = b.y - a.y;
         const d = Math.sqrt(dx * dx + dy * dy);
-        const minD = a.radius + b.radius;
+        const minD = a.radius + b.radius + C.FIGHTER_SEPARATION_GAP;
         if (d < minD && d > 0.1) {
           const overlap = (minD - d) / 2;
           const nx = dx / d, ny = dy / d;

@@ -298,20 +298,85 @@ export class Enemy {
       }
     }
     if (justExitedParryStunned) {
-      // AI攻击被格挡后恢复：清除recover定时器，允许立即行动
-      // 设置blockCooldown防止立刻再举盾
-      this.aiState = 'approach';
+      // AI攻击被格挡后恢复：二次博弈决策（不再一律轻击）
+      // 对手有parryBoost速度优势，AI需要多样化应对
       this.aiTimer = 0;
       this.attackCooldown = 0;
       this.thinkCD = 0;
-      this.blockCooldown = 1.0;
+      const diffScale = (this.difficulty - 1) / 4; // 0~1
+      const roll = Math.random();
+      // 高难度允许短冷却后格挡（捕获对手反击的重击/格反）
+      this.blockCooldown = Math.max(0.3, 1.0 - diffScale * 0.6); // D1=1.0 D5=0.40
+      if (roll < 0.25 && f.stamina >= C.DODGE_COST) {
+        // 侧闪脱离（躲避对手反击，重置中立）
+        cmd.dodge = true;
+        cmd.dodgeAngle = ang + (Math.random() < 0.5 ? Math.PI / 2 : -Math.PI / 2);
+        this.aiState = 'recover';
+        this.aiTimer = 0.4;
+        this._logDecision(this._gameTime, 'post_parried', 'dodge', {});
+        return cmd;
+      } else if (roll < 0.45 && this._heavyCD <= 0) {
+        // 霸体重击交换（吸收对手反击，重击反打）
+        cmd.heavyAttack = true;
+        this.aiState = 'recover';
+        this.aiTimer = 1.2;
+        this._heavyCD = cfg.heavyCooldown || 0;
+        this._logDecision(this._gameTime, 'post_parried', 'heavy_trade', {});
+        return cmd;
+      } else if (roll < 0.60) {
+        // 短暂后退观察（等对手出招再反应）
+        this.aiState = 'retreat';
+        this.aiTimer = 0.15 + Math.random() * 0.20;
+        this._logDecision(this._gameTime, 'post_parried', 'retreat', {});
+      } else {
+        // 轻击拼刀（仍有一定概率，但不再是唯一选项）
+        cmd.lightAttack = true;
+        this.comboTarget = 1;
+        this.comboCount = 1;
+        this.aiState = 'recover';
+        this.aiTimer = 0.5;
+        this._logDecision(this._gameTime, 'post_parried', 'light', {});
+        return cmd;
+      }
     }
     if (hasParryBoost && !this._wasParryBoosted && f.state === 'idle') {
-      // AI成功格挡获得parryBoost → 立即切换到进攻模式利用增益
+      // AI成功格挡获得parryBoost → 多样化利用增益（不再一律轻击）
       this.aiState = 'approach';
       this.aiTimer = 0;
       this.attackCooldown = 0;
       this.thinkCD = 0;
+      const boostRoll = Math.random();
+      if (boostRoll < 0.40) {
+        // 轻击反击（最常见，利用加速缩短前摇）
+        cmd.lightAttack = true;
+        this.comboTarget = Math.min(2, cfg.maxCombo);
+        this.comboCount = 1;
+        this.aiState = 'recover';
+        this.aiTimer = 0.6;
+        this._logDecision(this._gameTime, 'post_parry', 'light', {});
+        return cmd;
+      } else if (boostRoll < 0.65 && this._heavyCD <= 0) {
+        // 加速重击（parryBoost缩短蓄力，对手可能在格挡被弹恢复中）
+        cmd.heavyAttack = true;
+        this.aiState = 'recover';
+        this.aiTimer = 1.2;
+        this._heavyCD = cfg.heavyCooldown || 0;
+        this._logDecision(this._gameTime, 'post_parry', 'heavy', {});
+        return cmd;
+      } else if (boostRoll < 0.80 && cfg.feintChance > 0.1 && f.stamina >= C.FEINT_COST + 1) {
+        // 变招试探（骗对手的防御反应）
+        cmd.lightAttack = true;
+        this.aiState = 'feint_wait';
+        this.attackCooldown = C.AI_MIN_ATTACK_INTERVAL;
+        this._logDecision(this._gameTime, 'post_parry', 'feint_light', {});
+        return cmd;
+      } else {
+        // 短暂等待（消耗对手耐心，观察再决策）
+        this.aiState = 'footsie';
+        this.aiTimer = 0.3 + Math.random() * 0.4;
+        this._footsiePhase = 0;
+        this._logDecision(this._gameTime, 'post_parry', 'wait', {});
+      }
     }
 
     // 被击后防御意识：出硬直后短暂观望，打破AI互相交替砍的循环

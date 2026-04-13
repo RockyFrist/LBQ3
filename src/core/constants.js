@@ -169,7 +169,7 @@ export const QI_GAIN_EXECUTION    = 20;   // 处决
 export const QI_GAIN_TAKEN_LIGHT  = 5;    // 被轻击（约命中50%）
 export const QI_GAIN_TAKEN_HEAVY  = 9;    // 被重击
 export const QI_INTERRUPT_COST    = 0.50;  // 被打断消耗比例
-export const ULTIMATE_STARTUP     = 0.40;  // 蓄势（可被打断，足够反应）
+export const ULTIMATE_STARTUP     = 0.28;  // 蓄势（可被打断，缩短前摇减少被躲概率）
 export const ULTIMATE_ACTIVE      = 0.60;  // 乱刀连斩持续时间
 export const ULTIMATE_RECOVERY    = 0.35;  // 收刀
 export const ULTIMATE_RANGE       = 90;    // 前方攻击距离
@@ -188,3 +188,6 @@ export const ULTIMATE_CLASH_FREEZE   = 0.25;// 绝刀相撞冻结帧
 // ============ AI 节奏控制 ============
 export const AI_MIN_ATTACK_INTERVAL = 0.6;
 export const AI_MAX_IDLE_TIME = 2.5;
+
+// ============ 角色碰撞间距 ============
+export const FIGHTER_SEPARATION_GAP = 12;  // 角色间额外间距（防止脸贴脸看不清出招）
