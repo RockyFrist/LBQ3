@@ -208,6 +208,9 @@ const actionsInit = document.getElementById('room-actions-init');
 
 let netClient = null;
 
+// 本机局域网IP（由Vite服务端注入）
+const _lanIP = (typeof __LAN_IP__ !== 'undefined') ? __LAN_IP__ : '';
+
 function setRoomStatus(text, cls = '') {
   if (roomStatus) {
     roomStatus.textContent = text;
@@ -224,6 +227,10 @@ function resetRoomUI() {
 
 function showRoomOverlay() {
   resetRoomUI();
+  // 默认填入本机局域网IP，方便分享给好友
+  if (roomServer && !roomServer.value.trim()) {
+    roomServer.value = (_lanIP || location.hostname) + ':3000';
+  }
   if (roomOverlay) roomOverlay.classList.remove('hidden');
 }
 
@@ -344,18 +351,24 @@ if (document.getElementById('btn-room-back')) {
   });
 }
 
-// 复制房间号
+// 复制房间号（包含服务器地址，方便分享给好友）
 if (document.getElementById('btn-copy-code')) {
   document.getElementById('btn-copy-code').addEventListener('click', () => {
     const code = roomCodeText ? roomCodeText.textContent : '';
     if (!code) return;
-    navigator.clipboard.writeText(code).then(() => {
+    let addr = roomServer ? roomServer.value.trim() : '';
+    // 分享时把 localhost / 127.0.0.1 替换为局域网IP
+    if (_lanIP && /^(localhost|127\.0\.0\.1)(:\d+)?$/.test(addr)) {
+      addr = addr.replace(/^(localhost|127\.0\.0\.1)/, _lanIP);
+    }
+    const shareText = `【冷兵器对战】联机邀请\n服务器: ${addr}\n房间号: ${code}`;
+    navigator.clipboard.writeText(shareText).then(() => {
       const btn = document.getElementById('btn-copy-code');
       if (btn) { btn.textContent = '✅ 已复制'; setTimeout(() => btn.textContent = '📋 复制', 1500); }
     }).catch(() => {
       // fallback
       const ta = document.createElement('textarea');
-      ta.value = code; document.body.appendChild(ta); ta.select();
+      ta.value = shareText; document.body.appendChild(ta); ta.select();
       document.execCommand('copy'); document.body.removeChild(ta);
     });
   });

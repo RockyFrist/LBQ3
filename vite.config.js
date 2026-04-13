@@ -1,10 +1,28 @@
 import { defineConfig } from 'vite';
 import { WebSocketServer } from 'ws';
 import { createRoomManager } from './server/rooms.js';
+import os from 'os';
+
+// 获取本机局域网IP
+function getLocalIP() {
+  const nets = os.networkInterfaces();
+  for (const name of Object.keys(nets)) {
+    for (const net of nets[name]) {
+      if (net.family === 'IPv4' && !net.internal) return net.address;
+    }
+  }
+  return 'localhost';
+}
+
+const lanIP = getLocalIP();
 
 export default defineConfig({
   base: './',
+  define: {
+    __LAN_IP__: JSON.stringify(lanIP),
+  },
   server: {
+    host: '0.0.0.0',
     open: true
   },
   plugins: [{
