@@ -68,8 +68,9 @@ export const PARRY_CHAIN_DECAY      = 0.4; // 每轮 startup 增加比例
 
 // ============ 轻击 vs 招架 ============
 export const LIGHT_VS_BLOCK_STAMINA = 1;
-export const LIGHT_BREAK_HIT        = 3;         // 第 3 下破防
+export const LIGHT_BREAK_HIT        = 4;         // 第 4 下破防（超过3下连击串、格挡方有喝息窗口）
 export const BLOCK_BREAK_STAGGER    = 0.50;
+export const LIGHT_BLOCK_FREEZE     = 0.10;      // 轻击打格挡时攻击方弹刀停顿
 
 // ============ 闪避 ============
 // 参考荣耀战魂dodge ~600ms, 只狼step ~400ms

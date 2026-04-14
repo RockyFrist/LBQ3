@@ -42,7 +42,7 @@ export const WEAPON_DAO = {
   counterArc: Math.PI * 0.35,
   counterLunge: 30,
   counterDrift: 120,
-  breakHits: 3,
+  breakHits: 4,
   blockStaminaCost: -1,        // -1 = 使用标准 PARRY_RESULTS
   parryReflectPct: 0,
   autoCounter: false,
@@ -120,7 +120,7 @@ export const WEAPON_DAGGERS = {
   counterArc: Math.PI * 0.30,
   counterLunge: 20,
   counterDrift: 100,
-  breakHits: 2,                  // 更容易被破防
+  breakHits: 3,                  // 更容易被破防
   blockStaminaCost: 2,           // 格挡消耗2体力
   parryReflectPct: 0,
   autoCounter: false,
@@ -217,7 +217,7 @@ export const WEAPON_HAMMER = {
   counterArc: Math.PI * 0.40,
   counterLunge: 25,
   counterDrift: 80,
-  breakHits: 3,
+  breakHits: 4,
   blockStaminaCost: -1,
   parryReflectPct: 0,
   autoCounter: false,
@@ -302,7 +302,7 @@ export const WEAPON_SPEAR = {
   counterArc: Math.PI * 0.25,
   counterLunge: 20,
   counterDrift: 100,
-  breakHits: 3,
+  breakHits: 4,
   blockStaminaCost: -1,
   parryReflectPct: 0,
   autoCounter: true,             // 精准弹反自动反刺
@@ -392,7 +392,7 @@ export const WEAPON_SHIELD = {
   counterArc: Math.PI * 0.35,
   counterLunge: 30,
   counterDrift: 120,
-  breakHits: 4,                  // 更难破防
+  breakHits: 5,                  // 更难破防
   blockStaminaCost: 0,           // 格挡不消耗体力
   parryReflectPct: 0.30,        // 精准弹反反弹30%伤害
   autoCounter: false,

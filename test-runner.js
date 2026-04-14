@@ -329,6 +329,10 @@ function runRound(diffA, diffB, collectLog, weaponA, weaponB) {
           stats.clashHeavy++;
           logEvent(gameTime, 'heavyClash', {});
           break;
+        case 'blocked':
+          // 轻击打格挡弹刀停顿（影响战斗节奏）
+          hitFreezeTimer = Math.max(hitFreezeTimer, C.LIGHT_BLOCK_FREEZE);
+          break;
         case 'blockBreak': {
           if (evt.target === fighterA) stats.blockBreakA++;
           else stats.blockBreakB++;

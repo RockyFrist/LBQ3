@@ -81,7 +81,10 @@ export const eventLogMethods = {
       case 'blocked':
         this.ui.addLog(`${evt.target.name} 格挡了攻击 (${evt.hitCount}/${evt.target.weapon.breakHits || C.LIGHT_BREAK_HIT})`);
         if (this.audio) this.audio.playBlock();
-        if (!isTest) this.addFloatingText(evt.target.x, evt.target.y - 25, `格挡 ${evt.hitCount}/${evt.target.weapon.breakHits || C.LIGHT_BREAK_HIT}`, '#88ccff', 13, 0.5, -60);
+        if (!isTest) {
+          this.addFloatingText(evt.target.x, evt.target.y - 25, `格挡 ${evt.hitCount}/${evt.target.weapon.breakHits || C.LIGHT_BREAK_HIT}`, '#88ccff', 13, 0.5, -60);
+          if (playerInvolved) this.applyHitFreeze(C.LIGHT_BLOCK_FREEZE);
+        }
         break;
       case 'blockBreak':
         this.ui.addLog(`${evt.target.name} 防御被破!`);
