@@ -147,10 +147,20 @@ export const sectModeMethods = {
         if (!this.sectFightResult) {
           this.sectFightResult = this._sectSettleFightResult(this.player.fighter?.alive);
         }
-        if (this._victoryTimer > 1.5) {
+        // 女敌人胜利：先显示立绘 2.5s，非女敌人/败北：1.5s 直接结算
+        const resultDelay = (this.sectFightResult?.won && this.sectFightResult?.enemyFemale) ? 2.5 : 1.5;
+        if (this._victoryTimer > resultDelay) {
           this.sectFightShowResult = true;
           this.sect.pendingFightResult = this.sectFightResult;
         }
+      }
+
+      // 立绘揭示阶段：点击 / ESC 可跳过直接进入结算
+      const _inPortrait = this._victoryTimer >= 0 && !this.sectFightShowResult
+        && this.sectFightResult?.won && this.sectFightResult?.enemyFemale;
+      if (_inPortrait && (input.mouseLeftDown || input.pressed('Escape') || input.touchBack)) {
+        this.sectFightShowResult = true;
+        this.sect.pendingFightResult = this.sectFightResult;
       }
       return;
     }
@@ -163,6 +173,24 @@ export const sectModeMethods = {
       if (action) {
         this._sectHandleAction(action);
       }
+    }
+
+    // [DEV] P 键 — 循环切换 3 套立绘测试女敌人胜利展示
+    if (input.pressed('KeyP')) {
+      this._devTestImgId = ((this._devTestImgId || 0) % 3) + 1;
+      this.sectUI._defeatedImgAnim = 0;
+      this.sectWatchingFight = true;
+      this.sectFightShowResult = false;
+      this.sectFightResult = {
+        won: true, isSpar: false,
+        discipleName: '测试弟子',
+        enemyDiff: 3, enemyWeapon: 'dao',
+        enemyFemale: true, enemyImgId: this._devTestImgId,
+        goldGain: 200, fameGain: 10, expGain: 30, injuryGain: 0,
+        levelUp: false, newTrait: null, lootDrop: null,
+      };
+      this._victoryTimer = 0; // 直接进入立绘阶段
+      this.sect.pendingFightResult = null;
     }
   },
 
@@ -627,6 +655,7 @@ export const sectModeMethods = {
       this._rebuildFighterList();
       this._sectSaved = null;
     }
+    this.sectUI._defeatedImgAnim = 0;
     this.sectWatchingFight = false;
     this.sectFightShowResult = false;
     this.sect.pendingFightResult = null;
@@ -648,6 +677,8 @@ export const sectModeMethods = {
       discipleName: d.name,
       enemyDiff: quest.enemyDiff,
       enemyWeapon: quest.enemyWeapon,
+      enemyFemale: quest.enemyFemale || false,
+      enemyImgId: quest.enemyImgId || 1,
       goldGain: 0, fameGain: 0, expGain: 0, injuryGain: 0,
       levelUp: false, newTrait: null, lootDrop: null,
     };
@@ -1140,7 +1171,19 @@ export const sectModeMethods = {
         ctx.fillText(`出征弟子: ${this.sectPendingDisciple.name}  敌方: D${this.sectPendingQuest ? this.sectPendingQuest.enemyDiff : '?'}`, lw / 2, lh - 6);
       }
 
-      // 战斗结束后的结果面板覆盖
+      // 阶段1：战斗进行中 → 居中大图（半透明）
+      if (this._victoryTimer < 0 && this.sectPendingQuest?.enemyFemale) {
+        this.sectUI.drawFightEnemyPortrait(ctx, this.sectPendingQuest, lw, lh, narrow);
+      }
+
+      // 阶段2：胜利后、结算前 → 全屏立绘揭示
+      const _inPortraitRender = this._victoryTimer >= 0 && !this.sectFightShowResult
+        && this.sectFightResult?.won && this.sectFightResult?.enemyFemale;
+      if (_inPortraitRender) {
+        this.sectUI.drawVictoryPortrait(ctx, this.sectFightResult, lw, lh, narrow, this._victoryTimer);
+      }
+
+      // 阶段3：结算面板
       if (this.sectFightShowResult && this.sect.pendingFightResult) {
         this.sectUI.drawFightResult(ctx, lw, lh, this.sect.pendingFightResult, mx, my, narrow);
       }

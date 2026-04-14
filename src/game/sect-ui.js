@@ -81,6 +81,23 @@ export class SectUI {
   constructor() {
     this._buttons = []; // 当前帧可点击区域
     this._scrollY = 0;
+    this._imgCache = new Map(); // 图片缓存（path → HTMLImageElement）
+    this._defeatedImgAnim = 0;  // 战败立绘动画时间戳（0=未启动）
+    // 预加载女敌人立绘（3套 × 正常/战败 = 6张）
+    for (let i = 1; i <= 3; i++) {
+      this._getImg(`/assets/enemies/f_${i}_normal.png`);
+      this._getImg(`/assets/enemies/f_${i}_defeated.png`);
+    }
+  }
+
+  /** 获取/缓存图片（懒加载，首次请求时异步加载） */
+  _getImg(path) {
+    if (!this._imgCache.has(path)) {
+      const img = new Image();
+      img.src = path;
+      this._imgCache.set(path, img);
+    }
+    return this._imgCache.get(path);
   }
 
   /** 收集按钮点击，返回 action 或 null */
@@ -1010,6 +1027,97 @@ export class SectUI {
     this._buttons.push({ ...cancelRect, action: { type: 'cancelSelect' } });
   }
 
+  // ===== 战斗中：女敌人正常立绘（居中大图，半透明叠加底部） =====
+  drawFightEnemyPortrait(ctx, quest, cw, ch, narrow) {
+    if (!quest?.enemyFemale) return;
+    const imgW = narrow ? 110 : 150;
+    const imgH = narrow ? 147 : 200;
+    const x = (cw - imgW) / 2;
+    const y = ch - imgH - 44;
+    const imgKey = `/assets/enemies/f_${quest.enemyImgId}_normal.png`;
+    const img = this._getImg(imgKey);
+
+    ctx.save();
+    ctx.globalAlpha = 0.78;
+    if (img.complete && img.naturalWidth > 0) {
+      ctx.drawImage(img, x, y, imgW, imgH);
+    } else {
+      ctx.fillStyle = '#331122';
+      ctx.fillRect(x, y, imgW, imgH);
+    }
+    // 底部渐变遮罩（融入场景）
+    const grad = ctx.createLinearGradient(0, y + imgH * 0.65, 0, y + imgH);
+    grad.addColorStop(0, 'rgba(0,0,0,0)');
+    grad.addColorStop(1, 'rgba(0,0,0,0.65)');
+    ctx.fillStyle = grad;
+    ctx.fillRect(x, y + imgH * 0.65, imgW, imgH * 0.35);
+    // 底部信息
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = '#ffaacc';
+    ctx.font = `bold ${narrow ? 11 : 13}px ${FONT}`;
+    ctx.textAlign = 'center';
+    ctx.fillText(`D${quest.enemyDiff} · ${WEAPON_NAMES[quest.enemyWeapon] || ''}`, x + imgW / 2, y + imgH + 14);
+    ctx.restore();
+  }
+
+  // ===== 胜利立绘揭示（全屏，2.5s 后进结算，可点击跳过） =====
+  drawVictoryPortrait(ctx, result, cw, ch, narrow, elapsed) {
+    const fadeIn = Math.min(1, elapsed / 0.45);
+    const ease = 1 - Math.pow(1 - fadeIn, 3);
+
+    // 深色遮罩
+    ctx.fillStyle = `rgba(5,2,12,${0.92 * ease})`;
+    ctx.fillRect(0, 0, cw, ch);
+
+    // 立绘尺寸 — 按高度撑满
+    const maxH = ch - (narrow ? 80 : 100);
+    const imgH = Math.min(maxH, narrow ? 280 : 380);
+    const imgW = Math.round(imgH * 0.75); // 3:4 比例
+    const imgX = (cw - imgW) / 2;
+    const imgY = (ch - imgH) / 2 - (narrow ? 10 : 16);
+
+    const scale = 0.88 + 0.12 * ease;
+    const cx2 = imgX + imgW / 2;
+    const cy2 = imgY + imgH / 2;
+
+    const imgKey = `/assets/enemies/f_${result.enemyImgId}_defeated.png`;
+    const img = this._getImg(imgKey);
+
+    ctx.save();
+    ctx.globalAlpha = ease;
+    ctx.translate(cx2, cy2);
+    ctx.scale(scale, scale);
+    ctx.translate(-cx2, -cy2);
+    if (img.complete && img.naturalWidth > 0) {
+      ctx.drawImage(img, imgX, imgY, imgW, imgH);
+    } else {
+      ctx.fillStyle = '#331122';
+      ctx.fillRect(imgX, imgY, imgW, imgH);
+    }
+    ctx.restore();
+
+    // 「战败」大字
+    ctx.save();
+    ctx.globalAlpha = ease;
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#ff88aa';
+    ctx.font = `bold ${narrow ? 28 : 38}px ${FONT}`;
+    ctx.fillText('战败', cw / 2, imgY + imgH + (narrow ? 28 : 36));
+    ctx.restore();
+
+    // 点击跳过提示（1s 后出现，闪烁）
+    if (elapsed > 1.0) {
+      const blink = 0.5 + 0.5 * Math.sin(elapsed * 4);
+      ctx.save();
+      ctx.globalAlpha = Math.min(1, (elapsed - 1.0) / 0.3) * blink * 0.7;
+      ctx.fillStyle = '#aaa';
+      ctx.font = `${narrow ? 11 : 13}px ${FONT}`;
+      ctx.textAlign = 'center';
+      ctx.fillText('点击继续', cw / 2, ch - (narrow ? 18 : 22));
+      ctx.restore();
+    }
+  }
+
   // ===== 战斗结果弹窗 =====
   drawFightResult(ctx, cw, ch, result, mx, my, narrow) {
     this._buttons = this._buttons || [];
@@ -1101,7 +1209,6 @@ export class SectUI {
     this._buttons.push({ ...okRect, action: { type: 'closeFightResult' } });
   }
 
-  // ===== 装备选择弹窗 =====
   drawEquipSelect(ctx, cw, ch, disciple, equipType, inventory, availArmors, mx, my, narrow) {
     this._buttons = this._buttons || [];
     ctx.fillStyle = 'rgba(0,0,0,0.75)';

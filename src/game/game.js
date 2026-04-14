@@ -440,7 +440,7 @@ export class Game {
 
     // 设置面板（所有非测试模式）
     this._settingsClickCd -= dt;
-    if (this.mode !== 'test' && input.pressed('KeyP')) {
+    if (this.mode !== 'test' && this.mode !== 'sect' && input.pressed('KeyP')) {
       if (this.mode === 'training') {
         this.aiPaused = !this.aiPaused;
         this.ui.addLog(this.aiPaused ? 'AI已暂停' : 'AI已恢复');

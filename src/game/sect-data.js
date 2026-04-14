@@ -157,6 +157,8 @@ export function generateQuest(towerLv) {
     enemyDiff: diff,
     enemyWeapon: weaponId,
     reward: { gold, fame, exp },
+    enemyFemale: Math.random() < 0.3,            // 30% 概率为女敌人
+    enemyImgId: Math.floor(Math.random() * 3) + 1, // 1–3 三套立绘随机
     discipleId: null, // 指派的弟子
   };
 }
