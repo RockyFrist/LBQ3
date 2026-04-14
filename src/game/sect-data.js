@@ -3,6 +3,39 @@
 
 import { randomChineseName, randomTitledName } from '../core/names.js';
 
+// ===== 装备品质系统 =====
+export const ITEM_QUALITY = {
+  normal: { id: 'normal', name: '普通', color: '#888888', hpMul: 1.0,  shortName: '' },
+  fine:   { id: 'fine',   name: '精良', color: '#44dd88', hpMul: 1.12, shortName: '精' },
+  rare:   { id: 'rare',   name: '罕见', color: '#7799ff', hpMul: 1.25, shortName: '稀' },
+};
+export const QUALITY_IDS = ['normal', 'fine', 'rare'];
+
+/** 格式化装备显示名 (e.g. "精良·刀" 或 "刀") */
+export function itemLabel(weaponOrArmor, quality) {
+  const q = ITEM_QUALITY[quality];
+  return q && quality !== 'normal' ? `${q.name}·${weaponOrArmor}` : weaponOrArmor;
+}
+
+/** 任务胜利后，随机掉落一件装备（返回 {type,id,quality} 或 null） */
+export function rollLootDrop(quest) {
+  // 基础掉落率 40%，任务越难越高
+  const baseChance = 0.30 + (quest.enemyDiff - 1) * 0.05;
+  if (Math.random() > baseChance) return null;
+
+  // 品质分布：60%普通 / 30%精良 / 10%罕见
+  const r = Math.random();
+  const quality = r < 0.10 ? 'rare' : r < 0.40 ? 'fine' : 'normal';
+
+  // 掉落类型：50%武器 / 50%护甲（护甲必须有 smith 等级 >= 1，因此优先给武器）
+  const type = Math.random() < 0.55 ? 'weapon' : 'armor';
+  const id = type === 'weapon'
+    ? WEAPON_IDS[Math.floor(Math.random() * WEAPON_IDS.length)]
+    : ['light', 'medium', 'heavy'][Math.min(2, Math.floor(Math.random() * 3))];
+
+  return { type, id, quality };
+}
+
 // ===== 特质定义 =====
 export const TRAITS = {
   brave:     { id: 'brave',     name: '勇猛', desc: '攻击更积极', color: '#ff6644', aiMod: { heavyRate: 0.10, blockDurBase: -0.1 } },
@@ -251,7 +284,9 @@ export function createDisciple(opts = {}) {
     stamina: 100,
     injury: 0,
     weaponId,
+    weaponQuality: 'normal',
     armorId: 'none',
+    armorQuality: 'normal',
     color,
     traits,
     wins: 0,
@@ -300,6 +335,7 @@ export function createInitialState() {
     },
     quests: [],           // 当前可选任务（每天刷新）
     activeQuests: [],     // 进行中的任务
+    inventory: [],        // 装备库存 [{type, id, quality}]
     log: [],              // 事件日志（最近30条）
     stats: {
       totalDays: 0,

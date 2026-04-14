@@ -15,7 +15,7 @@ import {
   BUILDINGS, maxDisciples, availableArmors, trainExpMul, healMul,
   dailyIncome, expToLevel, TRAITS, TRAIT_LIST, COMMON_TRAITS,
   WEAPON_IDS, WEAPON_NAMES, ARMOR_NAMES, resetDiscipleIdCounter,
-  checkStoryTrigger,
+  checkStoryTrigger, ITEM_QUALITY, rollLootDrop, itemLabel,
 } from './sect-data.js';
 
 export const sectModeMethods = {
@@ -48,6 +48,12 @@ export const sectModeMethods = {
     // 兼容旧存档（没有storyProgress字段）
     if (!this.sect.storyProgress) this.sect.storyProgress = [];
     if (this.sect.pendingStory === undefined) this.sect.pendingStory = null;
+    if (!this.sect.inventory) this.sect.inventory = [];
+    // 兼容旧弟子数据（没有quality字段）
+    for (const d of this.sect.disciples) {
+      if (!d.weaponQuality) d.weaponQuality = 'normal';
+      if (!d.armorQuality) d.armorQuality = 'normal';
+    }
 
     // 首日生成任务
     if (this.sect.quests.length === 0) {
@@ -205,11 +211,26 @@ export const sectModeMethods = {
         break;
 
       case 'cancelSave':
+        // 从存档界面返回设置界面
+        this.sectPopup = 'settings';
+        break;
+
+      case 'cancelSettings':
         this.sectPopup = null;
         break;
 
       case 'selectArmor':
         this._sectChangeArmor(action.armorId);
+        break;
+
+      case 'cancelEquip':
+        this.sect._armorSelectDisciple = null;
+        this.sectPopup = null;
+        break;
+
+      case 'cancelDismiss':
+        this.sect._dismissTarget = null;
+        this.sectPopup = null;
         break;
 
       case 'storyNext':
@@ -260,6 +281,10 @@ export const sectModeMethods = {
         this.sectSaveMode = 'load';
         break;
 
+      case 'settings':
+        this.sectPopup = 'settings';
+        break;
+
       case 'upgrade':
         this._sectUpgradeBuilding(action.buildingId);
         break;
@@ -269,26 +294,106 @@ export const sectModeMethods = {
         break;
 
       case 'changeArmor': {
-        const d = this.sect.disciples.find(d => d.id === action.discipleId);
-        if (d) {
-          // 循环切换可用护甲
-          const armors = availableArmors(this.sect.buildings.smith);
-          const idx = armors.indexOf(d.armorId);
-          d.armorId = armors[(idx + 1) % armors.length];
-          this._sectAddLog(`${d.name} 换装为 ${ARMOR_NAMES[d.armorId] || d.armorId}`, '#44dd88');
-          this._sectShowToast(`${d.name} → ${ARMOR_NAMES[d.armorId]}`, '#44dd88');
+        // 打开装备选择弹窗（护甲选项）
+        const d2 = this.sect.disciples.find(d => d.id === action.discipleId);
+        if (d2 && !d2.onQuest) {
+          this.sect._armorSelectDisciple = d2;
+          this.sect._equipSelectType = 'armor';
+          this.sectPopup = 'equipSelect';
         }
         break;
       }
 
-      case 'dismiss': {
-        const idx = this.sect.disciples.findIndex(d => d.id === action.discipleId);
-        if (idx >= 0) {
-          const name = this.sect.disciples[idx].name;
-          this.sect.disciples.splice(idx, 1);
-          this._sectAddLog(`${name} 已被逐出门派`, '#ff6644');
-          this.sectSubPage = 'disciples';
+      case 'changeWeapon': {
+        // 打开装备选择弹窗（武器选项）
+        const d3 = this.sect.disciples.find(d => d.id === action.discipleId);
+        if (d3 && !d3.onQuest) {
+          this.sect._armorSelectDisciple = d3;
+          this.sect._equipSelectType = 'weapon';
+          this.sectPopup = 'equipSelect';
         }
+        break;
+      }
+
+      case 'equipItem': {
+        // 从弹窗选择并装备（action.itemType, action.baseId, action.quality, action.inventoryIdx）
+        const d4 = this.sect._armorSelectDisciple;
+        if (!d4) break;
+        const isArmor = action.itemType === 'armor';
+
+        // 如果是从背包装备（有 inventoryIdx >= 0）
+        if (action.inventoryIdx >= 0) {
+          const item = this.sect.inventory[action.inventoryIdx];
+          if (!item) break;
+          // 把旧装备（若非普通）放回背包
+          const oldId = isArmor ? d4.armorId : d4.weaponId;
+          const oldQ  = isArmor ? d4.armorQuality : d4.weaponQuality;
+          if (oldQ !== 'normal' || (isArmor && oldId !== 'none')) {
+            if (oldQ !== 'normal') {
+              this.sect.inventory.push({ type: action.itemType, id: oldId, quality: oldQ });
+            }
+          }
+          // 装备新物品
+          if (isArmor) {
+            d4.armorId = item.id; d4.armorQuality = item.quality;
+          } else {
+            d4.weaponId = item.id; d4.weaponQuality = item.quality;
+          }
+          this.sect.inventory.splice(action.inventoryIdx, 1);
+          const name = isArmor ? ARMOR_NAMES[item.id] : WEAPON_NAMES[item.id];
+          this._sectAddLog(`${d4.name} 装备 ${itemLabel(name, item.quality)}`, ITEM_QUALITY[item.quality]?.color || '#44dd88');
+          this._sectShowToast(`${d4.name} → ${itemLabel(name, item.quality)}`, ITEM_QUALITY[item.quality]?.color || '#44dd88');
+        } else {
+          // 基础（普通）装备切换
+          if (isArmor) {
+            if (d4.armorQuality !== 'normal') {
+              this.sect.inventory.push({ type: 'armor', id: d4.armorId, quality: d4.armorQuality });
+            }
+            d4.armorId = action.baseId; d4.armorQuality = 'normal';
+            this._sectAddLog(`${d4.name} 换装 ${ARMOR_NAMES[action.baseId]}`, '#44dd88');
+          } else {
+            if (d4.weaponQuality !== 'normal') {
+              this.sect.inventory.push({ type: 'weapon', id: d4.weaponId, quality: d4.weaponQuality });
+            }
+            d4.weaponId = action.baseId; d4.weaponQuality = 'normal';
+            this._sectAddLog(`${d4.name} 换用 ${WEAPON_NAMES[action.baseId]}`, '#44dd88');
+          }
+          this._sectShowToast(`换装完成`, '#44dd88');
+        }
+        this.sectPopup = null;
+        this.sect._armorSelectDisciple = null;
+        break;
+      }
+
+      case 'dismiss': {
+        // 打开开除确认弹窗
+        const d5 = this.sect.disciples.find(d => d.id === action.discipleId);
+        if (d5) {
+          this.sect._dismissTarget = d5;
+          this.sectPopup = 'dismissConfirm';
+        }
+        break;
+      }
+
+      case 'confirmDismiss': {
+        const d6 = this.sect._dismissTarget;
+        if (!d6) break;
+        const idx = this.sect.disciples.indexOf(d6);
+        if (idx >= 0) {
+          this.sect.disciples.splice(idx, 1);
+          // 声望影响：等级越高、忠诚越高 → 声望损失越大
+          const fameLoss = Math.max(0, d6.level * 2 + (d6.loyalty > 60 ? 5 : 0) - 4);
+          if (fameLoss > 0) {
+            this.sect.fame = Math.max(0, this.sect.fame - fameLoss);
+            this._sectAddLog(`${d6.name} 被逐出门派，声望-${fameLoss}`, '#ff6644');
+          } else {
+            this._sectAddLog(`${d6.name} 已离开门派`, '#888');
+          }
+          this._sectShowToast(`${d6.name} 离开了门派`, '#ff6644');
+        }
+        this.sect._dismissTarget = null;
+        this.sectPopup = null;
+        this.sectSubPage = 'disciples';
         break;
       }
 
@@ -450,6 +555,14 @@ export const sectModeMethods = {
         fA.hp = fA.maxHp;
       }
     }
+    // 装备品质加成 HP
+    const wQual = ITEM_QUALITY[d.weaponQuality || 'normal']?.hpMul || 1;
+    const aQual = ITEM_QUALITY[d.armorQuality || 'normal']?.hpMul || 1;
+    const qualMul = (wQual + aQual) / 2; // 武器+护甲品质平均
+    if (qualMul > 1) {
+      fA.maxHp = Math.floor(fA.maxHp * qualMul);
+      fA.hp = fA.maxHp;
+    }
     fA.showNameTag = true;
 
     const weaponB = getWeapon(quest.enemyWeapon);
@@ -536,7 +649,7 @@ export const sectModeMethods = {
       enemyDiff: quest.enemyDiff,
       enemyWeapon: quest.enemyWeapon,
       goldGain: 0, fameGain: 0, expGain: 0, injuryGain: 0,
-      levelUp: false, newTrait: null,
+      levelUp: false, newTrait: null, lootDrop: null,
     };
 
     if (won) {
@@ -563,6 +676,15 @@ export const sectModeMethods = {
           d.traits.push(nt.id);
           result.newTrait = nt.id;
         }
+      }
+
+      // 战利品掉落
+      const loot = rollLootDrop(quest);
+      if (loot) {
+        this.sect.inventory.push(loot);
+        result.lootDrop = loot;
+        const itemName = loot.type === 'weapon' ? WEAPON_NAMES[loot.id] : ARMOR_NAMES[loot.id];
+        this._sectAddLog(`🎁 获得战利品：${itemLabel(itemName, loot.quality)}`, ITEM_QUALITY[loot.quality]?.color || '#ffd700');
       }
 
       d.injury = Math.min(100, d.injury + 5 + Math.floor(Math.random() * 10));
@@ -786,14 +908,12 @@ export const sectModeMethods = {
       case 'buyArmor': {
         if (this.sect.gold < choice.params.cost) { this._sectAddLog('银两不足', '#ff6644'); break; }
         this.sect.gold -= choice.params.cost;
-        // 给没甲的弟子一件轻甲
-        const noArmor = this.sect.disciples.find(d => d.armorId === 'none');
-        if (noArmor) {
-          noArmor.armorId = 'light';
-          this._sectAddLog(`🛡 ${noArmor.name} 获得轻甲`, '#44dd88');
-        } else {
-          this._sectAddLog('🛡 购得护甲备用', '#44dd88');
-        }
+        // 随机品质（黑市商人：fine概率更高）
+        const buyQuality = Math.random() < 0.4 ? 'fine' : 'normal';
+        const buyArmorId = ['light', 'medium', 'heavy'][Math.min(2, this.sect.buildings.smith)];
+        this.sect.inventory.push({ type: 'armor', id: buyArmorId, quality: buyQuality });
+        const armorName = itemLabel(ARMOR_NAMES[buyArmorId], buyQuality);
+        this._sectAddLog(`🛡 购得${armorName}，已加入背包`, ITEM_QUALITY[buyQuality].color);
         break;
       }
 
@@ -911,10 +1031,15 @@ export const sectModeMethods = {
         // 兼容旧存档
         if (!this.sect.storyProgress) this.sect.storyProgress = [];
         if (this.sect.pendingStory === undefined) this.sect.pendingStory = null;
+        if (!this.sect.inventory) this.sect.inventory = [];
+        for (const d of this.sect.disciples) {
+          if (!d.weaponQuality) d.weaponQuality = 'normal';
+          if (!d.armorQuality) d.armorQuality = 'normal';
+        }
         this._sectAddLog(`📂 读档成功`, '#44dd88');
       }
     }
-    this.sectPopup = null;
+    this.sectPopup = 'settings';
   },
 
   // ===== 剧情检查 =====
@@ -1038,6 +1163,13 @@ export const sectModeMethods = {
     } else if (this.sectPopup === 'saveSlots') {
       const slots = getSaveSlots();
       this.sectUI.drawSaveSlots(ctx, lw, lh, slots, this.sectSaveMode, mx, my, narrow);
+    } else if (this.sectPopup === 'equipSelect' && this.sect._armorSelectDisciple) {
+      const availArmors = availableArmors(this.sect.buildings.smith);
+      this.sectUI.drawEquipSelect(ctx, lw, lh, this.sect._armorSelectDisciple, this.sect._equipSelectType, this.sect.inventory, availArmors, mx, my, narrow);
+    } else if (this.sectPopup === 'dismissConfirm' && this.sect._dismissTarget) {
+      this.sectUI.drawDismissConfirm(ctx, lw, lh, this.sect._dismissTarget, mx, my, narrow);
+    } else if (this.sectPopup === 'settings') {
+      this.sectUI.drawSettings(ctx, lw, lh, mx, my, narrow);
     }
 
     // 训练动画
