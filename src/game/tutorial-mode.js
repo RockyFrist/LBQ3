@@ -152,8 +152,8 @@ export const tutorialModeMethods = {
   _updateTutorial(dt) {
     const input = this.input;
 
-    // ESC退出
-    if (input.pressed('Escape')) {
+    // ESC / 触屏返回 退出
+    if (input.pressed('Escape') || input.touchBack) {
       if (this.onExit) { this.onExit(); return; }
     }
 
@@ -210,12 +210,19 @@ export const tutorialModeMethods = {
     const step = TUTORIAL_STEPS[this._tutStep];
     const pf = this.player.fighter;
 
-    // 移动检测
+    // 移动检测（键盘 + 触屏摇杆）
     if (step.id === 'move') {
       if (input.held('KeyW') || input.held('ArrowUp'))    this._tutMoveW = true;
       if (input.held('KeyA') || input.held('ArrowLeft'))  this._tutMoveA = true;
       if (input.held('KeyS') || input.held('ArrowDown'))  this._tutMoveS = true;
       if (input.held('KeyD') || input.held('ArrowRight')) this._tutMoveD = true;
+      // 触屏摇杆
+      if (input.touchActive) {
+        if (input.touchMoveY < -0.3) this._tutMoveW = true;
+        if (input.touchMoveX < -0.3) this._tutMoveA = true;
+        if (input.touchMoveY > 0.3)  this._tutMoveS = true;
+        if (input.touchMoveX > 0.3)  this._tutMoveD = true;
+      }
     }
 
     // 战斗事件检测
@@ -411,7 +418,10 @@ export const tutorialModeMethods = {
       ctx.fillText('你已掌握所有基本操作', lw / 2, lh / 2 + 10);
       ctx.font = '14px "Microsoft YaHei", sans-serif';
       ctx.fillStyle = '#888';
-      ctx.fillText('点击左侧步骤重新练习  ·  按 R 全部重来  ·  按 ESC 返回菜单', lw / 2, lh / 2 + 45);
+      const exitHint = this.input.touchActive
+        ? '点击左侧步骤重新练习  ·  按返回键退出'
+        : '点击左侧步骤重新练习  ·  按 R 全部重来  ·  按 ESC 返回菜单';
+      ctx.fillText(exitHint, lw / 2, lh / 2 + 45);
       ctx.textBaseline = 'alphabetic';
       return;
     }
@@ -465,7 +475,20 @@ export const tutorialModeMethods = {
 
     // ---- 提示条：紧贴子任务面板下方 ----
     if (!firstIncomplete) firstIncomplete = step.subs[step.subs.length - 1];
-    const hint = firstIncomplete.hint;
+    let hint = firstIncomplete.hint;
+    // 触屏设备替换为触控提示
+    if (this.input.touchActive) {
+      hint = hint
+        .replace(/按住?\s*W\s*键?/, '摇杆向上').replace(/按\s*W/, '摇杆向上')
+        .replace(/按住?\s*A\s*键?/, '摇杆向左').replace(/按\s*A/, '摇杆向左')
+        .replace(/按住?\s*S\s*键?/, '摇杆向下').replace(/按\s*S/, '摇杆向下')
+        .replace(/按住?\s*D\s*键?/, '摇杆向右').replace(/按\s*D/, '摇杆向右')
+        .replace(/鼠标左键/, '轻击按钮').replace(/鼠标右键/, '重击按钮')
+        .replace(/按\s*Space/, '按防御(防)').replace(/按住\s*Space/, '长按防御(防)')
+        .replace(/Shift\s*\+\s*W\/A\/S\/D/, '按闪避(闪)').replace(/Shift/, '闪避(闪)')
+        .replace(/按\s*F\s/, '按绝技(绝) ').replace(/按\s*F$/, '按绝技(绝)')
+        .replace(/按\s*R\s/, '').replace(/×3/, '×3');
+    }
     const hintY = py + panelH + 6;
     ctx.fillStyle = 'rgba(0,0,0,0.6)';
     ctx.beginPath();

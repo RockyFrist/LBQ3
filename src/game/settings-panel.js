@@ -58,8 +58,8 @@ export const settingsPanelMethods = {
     const mx = input.mouseX;
     const my = input.mouseY;
 
-    // Escape 关闭
-    if (input.pressed('Escape')) {
+    // Escape / 触屏返回 关闭
+    if (input.pressed('Escape') || input.touchBack) {
       this.settingsOpen = false;
       return;
     }

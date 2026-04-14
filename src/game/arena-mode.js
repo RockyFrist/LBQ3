@@ -843,8 +843,8 @@ export const arenaModeMethods = {
     const input = this.input;
     this._arenaClickCd -= dt;
 
-    // ESC 返回菜单
-    if (input.pressed('Escape') && this.onExit) {
+    // ESC / 触屏返回 返回菜单
+    if ((input.pressed('Escape') || input.touchBack) && this.onExit) {
       this.onExit();
       return;
     }

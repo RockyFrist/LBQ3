@@ -390,7 +390,7 @@ export const horseRacingModeMethods = {
     const input = this.input;
     this._hrClickCd -= dt;
 
-    if (input.pressed('Escape') && this.onExit) {
+    if ((input.pressed('Escape') || input.touchBack) && this.onExit) {
       this.onExit();
       return;
     }

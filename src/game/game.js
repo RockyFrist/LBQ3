@@ -405,8 +405,8 @@ export class Game {
     input._worldMouseX = wm.x;
     input._worldMouseY = wm.y;
 
-    // ESC 返回菜单
-    if (input.pressed('Escape') && this.onExit) {
+    // ESC / 触屏返回 返回菜单
+    if ((input.pressed('Escape') || input.touchBack) && this.onExit) {
       this.onExit();
       return;
     }
@@ -417,7 +417,7 @@ export class Game {
         this._testResultReady = true;
         return;
       }
-      if (input.pressed('Escape') || input.pressed('Space') || input.mouseLeftDown) {
+      if (input.pressed('Escape') || input.pressed('Space') || input.mouseLeftDown || input.touchBack) {
         if (this.onExit) this.onExit();
       }
       return;
@@ -1633,8 +1633,8 @@ export class Game {
   _updateOnlineGuest(dt) {
     const input = this.input;
 
-    // ESC 退出
-    if (input.pressed('Escape') && this.onExit) {
+    // ESC / 触屏返回 退出
+    if ((input.pressed('Escape') || input.touchBack) && this.onExit) {
       this.onExit();
       return;
     }

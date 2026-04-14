@@ -8,6 +8,7 @@ import { NetClient } from './net/net-client.js';
 import { AudioManager } from './core/audio.js';
 import * as C from './core/constants.js';
 import { WEAPON_LIST } from './weapons/weapon-defs.js';
+import { isTouchDevice, TouchControls } from './core/touch-input.js';
 
 const canvas = document.getElementById('game-canvas');
 const ctx = canvas.getContext('2d');
@@ -63,10 +64,18 @@ window.addEventListener('resize', resize);
 
 const input = new Input(canvas);
 
+// 移动端触控
+const _isMobile = isTouchDevice();
+let touchControls = null;
+if (_isMobile) {
+  touchControls = new TouchControls(input);
+}
+
 // 应用状态
 let appState = 'menu'; // 'menu' | 'playing'
 let game = null;
 let menu = new Menu(canvas, input);
+menu._isMobile = _isMobile;
 let nnWeights = null; // 武圣权重缓存
 
 // 异步加载 NN 权重
@@ -135,6 +144,13 @@ function setupTrainCallbacks(m) {
   };
 }
 
+/** 判断该模式是否需要玩家操作（需要显示完整触控） */
+function _isPlayerMode(mode) {
+  return mode === 'pvai' || mode === 'wusheng' || mode === 'chainKill'
+      || mode === 'training' || mode === 'jianghu' || mode === 'tutorial'
+      || mode === 'local2p' || mode === 'online_host' || mode === 'online_guest';
+}
+
 function startGame(result) {
   appState = 'playing';
   // 根据模式显示/隐藏右侧快捷键提示，并更新内容
@@ -142,6 +158,15 @@ function startGame(result) {
   if (controlsHelp) {
     controlsHelp.style.display = showControls ? '' : 'none';
     if (showControls) _updateControlsHelp(result.mode);
+  }
+  // 移动端触控显示
+  if (touchControls) {
+    if (_isPlayerMode(result.mode)) {
+      touchControls.show();
+    } else {
+      // 观战/擂台等只需要返回按钮
+      touchControls.showBackOnly();
+    }
   }
   game = new Game(canvas, input, {
     mode: result.mode,
@@ -177,6 +202,7 @@ function returnToMenu() {
     netClient = null;
   }
   menu = new Menu(canvas, input);
+  menu._isMobile = _isMobile;
   // 恢复 NN 加载状态
   if (nnWeights) menu.nnWeightsLoaded = true;
   else if (!nnWeights) menu.nnLoadError = true;
@@ -186,6 +212,8 @@ function returnToMenu() {
   if (helpOverlay) helpOverlay.classList.add('hidden');
   // 确保房间面板关闭
   if (roomOverlay) roomOverlay.classList.add('hidden');
+  // 隐藏触控
+  if (touchControls) touchControls.hide();
 }
 
 /** 根据游戏模式更新右侧快捷键提示内容 */
@@ -525,6 +553,9 @@ let lastTime = 0;
 function loop(timestamp) {
   const dt = Math.min((timestamp - lastTime) / 1000, 1 / 30);
   lastTime = timestamp;
+
+  // 触控轮询（在游戏读取输入之前）
+  if (touchControls) touchControls.poll();
 
   if (appState === 'menu') {
     const dpr = canvas._dpr || 1;

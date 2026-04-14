@@ -62,6 +62,30 @@ export class Player {
     // 绝技
     if (input.pressed('KeyF') || input.pressed('KeyL')) cmd.ultimate = true;
 
+    // ===== 触屏虚拟按键覆盖 =====
+    if (input.touchActive) {
+      // 摇杆: 覆盖移动 + 朝向
+      const tmx = input.touchMoveX;
+      const tmy = input.touchMoveY;
+      if (Math.abs(tmx) > 0.15 || Math.abs(tmy) > 0.15) {
+        cmd.moveX = tmx;
+        cmd.moveY = tmy;
+        if (input.touchHasFace) {
+          cmd.faceAngle = input.touchFaceAngle;
+        }
+      }
+      // 按钮
+      if (input.touchLightDown)  cmd.lightAttack = true;
+      if (input.touchHeavyDown)  cmd.heavyAttack = true;
+      if (input.touchBlockHeld)  cmd.blockHeld = true;
+      if (input.touchDodge) {
+        cmd.dodge = true;
+        // 闪避方向: 有摇杆输入则朝摇杆方向，否则朝当前面朝方向
+        cmd.dodgeAngle = input.touchHasFace ? input.touchFaceAngle : cmd.faceAngle;
+      }
+      if (input.touchUltimate)   cmd.ultimate = true;
+    }
+
     return cmd;
   }
 }

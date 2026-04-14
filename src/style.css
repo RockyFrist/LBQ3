@@ -600,3 +600,209 @@ body {
 #room-nickname:focus {
   border-color: rgba(68, 255, 170, 0.5);
 }
+
+/* ============ 触屏虚拟按键 ============ */
+#touch-controls {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  pointer-events: none;
+  z-index: 90;
+  touch-action: none;
+}
+#touch-controls.touch-hidden { display: none; }
+
+/* ---- 返回按钮 ---- */
+#touch-back-btn {
+  pointer-events: auto;
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  background: rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 8px;
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 14px;
+  padding: 8px 16px;
+  cursor: pointer;
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
+  z-index: 95;
+}
+#touch-back-btn:active {
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+}
+
+/* ---- 摇杆区域 ---- */
+#touch-joy-area {
+  pointer-events: auto;
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 45%;
+  height: 45%;
+  touch-action: none;
+}
+
+#touch-joy-base {
+  position: absolute;
+  width: 110px;
+  height: 110px;
+  margin-left: -55px;
+  margin-top: -55px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+  border: 2px solid rgba(255, 255, 255, 0.15);
+}
+
+#touch-joy-thumb {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 46px;
+  height: 46px;
+  margin-left: -23px;
+  margin-top: -23px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.3);
+  border: 2px solid rgba(255, 255, 255, 0.45);
+  transition: background 0.05s;
+}
+
+/* ---- 操作按钮区域 ---- */
+#touch-btn-area {
+  pointer-events: auto;
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  width: 170px;
+  height: 190px;
+  touch-action: none;
+}
+
+.touch-btn {
+  position: absolute;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  font-weight: bold;
+  color: rgba(255, 255, 255, 0.8);
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
+  transition: background 0.06s, transform 0.06s;
+}
+.touch-btn.active {
+  transform: scale(0.92);
+}
+
+/* 轻击 — 右下主按钮 */
+.tb-light {
+  right: 56px;
+  bottom: 40px;
+  background: rgba(68, 153, 255, 0.35);
+  border: 2px solid rgba(68, 153, 255, 0.6);
+}
+.tb-light.active { background: rgba(68, 153, 255, 0.65); }
+
+/* 重击 — 右上 */
+.tb-heavy {
+  right: 8px;
+  bottom: 100px;
+  background: rgba(255, 136, 68, 0.35);
+  border: 2px solid rgba(255, 136, 68, 0.6);
+}
+.tb-heavy.active { background: rgba(255, 136, 68, 0.65); }
+
+/* 招架 — 左侧 */
+.tb-block {
+  right: 110px;
+  bottom: 100px;
+  background: rgba(136, 204, 255, 0.3);
+  border: 2px solid rgba(136, 204, 255, 0.5);
+}
+.tb-block.active { background: rgba(136, 204, 255, 0.6); }
+
+/* 闪避 — 中下 */
+.tb-dodge {
+  right: 4px;
+  bottom: 40px;
+  width: 48px;
+  height: 48px;
+  font-size: 15px;
+  background: rgba(100, 255, 100, 0.28);
+  border: 2px solid rgba(100, 255, 100, 0.5);
+}
+.tb-dodge.active { background: rgba(100, 255, 100, 0.55); }
+
+/* 绝技 — 左下角 */
+.tb-ult {
+  right: 116px;
+  bottom: 40px;
+  width: 48px;
+  height: 48px;
+  font-size: 15px;
+  background: rgba(255, 255, 68, 0.25);
+  border: 2px solid rgba(255, 255, 68, 0.5);
+}
+.tb-ult.active { background: rgba(255, 255, 68, 0.55); }
+
+/* ============ 手机自适应 ============ */
+@media (max-width: 600px) {
+  /* 隐藏桌面端操作提示 */
+  #controls-help { display: none !important; }
+
+  /* 帮助面板适配 */
+  .help-panel { width: 98vw; max-height: 90vh; }
+  .help-body { padding: 8px 12px; }
+  .help-key { width: 70px; }
+  .help-columns { flex-direction: column; gap: 8px; }
+  .help-header { font-size: 18px; padding: 10px 12px 8px; }
+  .help-tab { padding: 8px 4px; font-size: 12px; }
+  .section-title { font-size: 12px; margin: 8px 0 4px; }
+  .help-item { font-size: 11px; }
+
+  /* 联机面板适配 */
+  .room-panel { width: 96vw; padding: 16px; }
+  .room-header { font-size: 18px; }
+  .room-btn { padding: 6px 14px; font-size: 13px; }
+
+  /* 触控按钮在小屏上缩小 */
+  #touch-btn-area {
+    right: 6px;
+    bottom: 6px;
+    width: 140px;
+    height: 160px;
+  }
+  .touch-btn { width: 48px; height: 48px; font-size: 16px; }
+  .tb-light { right: 48px; bottom: 32px; }
+  .tb-heavy { right: 4px; bottom: 84px; }
+  .tb-block { right: 92px; bottom: 84px; }
+  .tb-dodge { right: 0; bottom: 32px; width: 42px; height: 42px; font-size: 14px; }
+  .tb-ult { right: 96px; bottom: 32px; width: 42px; height: 42px; font-size: 14px; }
+  #touch-joy-area { width: 42%; height: 40%; }
+  #touch-joy-base { width: 90px; height: 90px; margin-left: -45px; margin-top: -45px; }
+  #touch-joy-thumb { width: 38px; height: 38px; margin-left: -19px; margin-top: -19px; }
+}
+
+@media (max-height: 500px) {
+  /* 横屏手机 */
+  #touch-btn-area {
+    right: 8px;
+    bottom: 4px;
+    width: 150px;
+    height: 140px;
+  }
+  .touch-btn { width: 44px; height: 44px; font-size: 15px; }
+  .tb-light { right: 48px; bottom: 28px; }
+  .tb-heavy { right: 4px; bottom: 74px; }
+  .tb-block { right: 92px; bottom: 74px; }
+  .tb-dodge { right: 0; bottom: 28px; width: 40px; height: 40px; font-size: 13px; }
+  .tb-ult { right: 96px; bottom: 28px; width: 40px; height: 40px; font-size: 13px; }
+  #touch-joy-area { width: 35%; height: 55%; }
+}

@@ -1,7 +1,7 @@
 // ===================== 开始菜单（多页设计） =====================
 import { WEAPON_LIST, WEAPONS, getWeapon } from '../weapons/weapon-defs.js';
 import { ARMOR_LIST, getArmor } from '../weapons/armor-defs.js';
-const GAME_VERSION = 'v0.12.9';
+const GAME_VERSION = 'v0.13.0';
 
 // 武器详情面板数据
 const WEAPON_INFO = {
@@ -371,14 +371,15 @@ export class Menu {
     const mx = this.input.mouseX;
     const my = this.input.mouseY;
     const L = this._layoutMain();
+    const isNarrow = cw < 500;
 
     ctx.textAlign = 'center';
     ctx.fillStyle = '#e8e0d0';
-    ctx.font = 'bold 36px "Microsoft YaHei", sans-serif';
-    ctx.fillText('⚔ 冷兵器战斗系统', cw / 2, ch * 0.15);
+    ctx.font = `bold ${isNarrow ? 24 : 36}px "Microsoft YaHei", sans-serif`;
+    ctx.fillText('⚔ 冷兵器战斗系统', cw / 2, ch * (isNarrow ? 0.10 : 0.15));
     ctx.fillStyle = '#555';
-    ctx.font = '14px "Microsoft YaHei", sans-serif';
-    ctx.fillText('Combat System Demo', cw / 2, ch * 0.15 + 32);
+    ctx.font = `${isNarrow ? 11 : 14}px "Microsoft YaHei", sans-serif`;
+    ctx.fillText('Combat System Demo', cw / 2, ch * (isNarrow ? 0.10 : 0.15) + (isNarrow ? 24 : 32));
 
     for (const btn of L.buttons) {
       const hovered = this._hit(mx, my, btn.x, btn.y, btn.w, btn.h);
@@ -388,7 +389,7 @@ export class Menu {
     ctx.fillStyle = '#444';
     ctx.font = '12px "Microsoft YaHei", sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText('选择模式开始 · 按 ESC 可随时返回菜单', cw / 2, ch - 24);
+    ctx.fillText(this._isMobile ? '选择模式开始 · 点击返回按钮可返回菜单' : '选择模式开始 · 按 ESC 可随时返回菜单', cw / 2, ch - 24);
 
     // 版本号（左下角）
     ctx.fillStyle = '#444';
@@ -407,10 +408,12 @@ export class Menu {
     const cw = this.canvas._logicW || this.canvas.width;
     const ch = this.canvas._logicH || this.canvas.height;
     const cx = cw / 2;
-    const btnW = 340;
-    const btnH = 58;
-    const gap = 14;
-    const startY = ch * 0.22;
+    // 手机适配: 窄屏缩小按钮
+    const isNarrow = cw < 500;
+    const btnW = isNarrow ? Math.min(cw - 40, 300) : 340;
+    const btnH = isNarrow ? 48 : 58;
+    const gap = isNarrow ? 10 : 14;
+    const startY = isNarrow ? ch * 0.18 : ch * 0.22;
 
     return {
       buttons: [
@@ -526,15 +529,16 @@ export class Menu {
     const cw = this.canvas._logicW || this.canvas.width;
     const ch = this.canvas._logicH || this.canvas.height;
     const cx = cw / 2;
+    const isNarrow = cw < 500;
     const selectorW = 5 * 42;
-    const btnW = 280;
-    const btnH = 44;
+    const btnW = isNarrow ? Math.min(cw - 40, 260) : 280;
+    const btnH = isNarrow ? 38 : 44;
     // 武器选择器总高: 10(label) + 38(icons) + 44(card) = 92, 间距到下一区块 +14
     // 护甲选择器总高: 10(label) + 38(icons) + 24(card) = 72, 间距到下一区块 +14
 
     if (page === 'pvai') {
       const diffX = cx - selectorW / 2;
-      const diffY = ch * 0.19;
+      const diffY = ch * (isNarrow ? 0.15 : 0.19);
       const weaponW = WEAPON_LIST.length * 52;
       const weaponAx = cx - weaponW / 2;
       const weaponAy = diffY + 68;
@@ -551,6 +555,30 @@ export class Menu {
     }
 
     if (page === 'spectate') {
+      if (isNarrow) {
+        // 窄屏: 上下排列
+        const diffAx = cx - selectorW / 2;
+        const diffAy = ch * 0.14;
+        const weaponW = WEAPON_LIST.length * 52;
+        const weaponAx = cx - weaponW / 2;
+        const weaponAy = diffAy + 48;
+        const armorW = ARMOR_LIST.length * 52;
+        const armorAx = cx - armorW / 2;
+        const armorAy = weaponAy + 80;
+        const diffBy = armorAy + 72;
+        const diffBx = cx - selectorW / 2;
+        const weaponBy = diffBy + 48;
+        const weaponBx = cx - weaponW / 2;
+        const armorBy = weaponBy + 80;
+        const armorBx = cx - armorW / 2;
+        return {
+          diffAx, diffAy, diffBx, diffBy,
+          weaponAx, weaponAy, weaponBx, weaponBy,
+          armorAx, armorAy, armorBx, armorBy,
+          startBtn: { x: cx - btnW / 2, y: armorBy + 72, w: btnW, h: btnH },
+          backBtn:  { x: cx - 60, y: armorBy + 72 + btnH + 10, w: 120, h: 34 },
+        };
+      }
       const diffGap = 50;
       const diffAx = cx - selectorW - diffGap / 2;
       const diffBx = cx + diffGap / 2;
@@ -576,6 +604,36 @@ export class Menu {
     }
 
     // test
+    if (isNarrow) {
+      // 窄屏: 上下排列
+      const diffAx = cx - selectorW / 2;
+      const diffAy = ch * 0.12;
+      const weaponW = WEAPON_LIST.length * 52;
+      const weaponAx = cx - weaponW / 2;
+      const weaponAy = diffAy + 46;
+      const armorW = ARMOR_LIST.length * 52;
+      const armorAx = cx - armorW / 2;
+      const armorAy = weaponAy + 78;
+      const diffBy = armorAy + 68;
+      const diffBx = cx - selectorW / 2;
+      const weaponBy = diffBy + 46;
+      const weaponBx = cx - weaponW / 2;
+      const armorBy = weaponBy + 78;
+      const armorBx = cx - armorW / 2;
+      const roundsY = armorBy + 68;
+      const startBtnY = roundsY + 48;
+      return {
+        diffAx, diffAy, diffBx, diffBy,
+        weaponAx, weaponAy, weaponBx, weaponBy,
+        armorAx, armorAy, armorBx, armorBy,
+        roundsY,
+        roundsMinus: { x: cx - 80, y: roundsY + 4, w: 32, h: 28 },
+        roundsPlus:  { x: cx + 48, y: roundsY + 4, w: 32, h: 28 },
+        visualBtn: { x: cx - btnW / 2, y: startBtnY, w: btnW, h: btnH },
+        dataBtn:   { x: cx - btnW / 2, y: startBtnY + btnH + 10, w: btnW, h: btnH },
+        backBtn:   { x: cx - 60, y: startBtnY + (btnH + 10) * 2 + 6, w: 120, h: 34 },
+      };
+    }
     const diffGap = 50;
     const diffAx = cx - selectorW - diffGap / 2;
     const diffBx = cx + diffGap / 2;
@@ -598,9 +656,6 @@ export class Menu {
       armorAx, armorAy: armorY,
       armorBx, armorBy: armorY,
       roundsY,
-      weaponAx, weaponAy: weaponY,
-      weaponBx, weaponBy: weaponY,
-      roundsY,
       roundsMinus: { x: cx - 80, y: roundsY + 4, w: 32, h: 28 },
       roundsPlus:  { x: cx + 48, y: roundsY + 4, w: 32, h: 28 },
       visualBtn: { x: cx - btnW / 2, y: startBtnY, w: btnW, h: btnH },
@@ -612,16 +667,18 @@ export class Menu {
   // ===================== 公共绘制工具 =====================
   _drawSubHeader(ctx, cw, title, subtitle) {
     const ch = this.canvas._logicH || this.canvas.height;
+    const isNarrow = cw < 500;
     ctx.textAlign = 'center';
     ctx.fillStyle = '#e8e0d0';
-    ctx.font = 'bold 28px "Microsoft YaHei", sans-serif';
-    ctx.fillText(title, cw / 2, ch * 0.14);
+    ctx.font = `bold ${isNarrow ? 20 : 28}px "Microsoft YaHei", sans-serif`;
+    ctx.fillText(title, cw / 2, ch * (isNarrow ? 0.08 : 0.14));
     ctx.fillStyle = '#666';
-    ctx.font = '13px "Microsoft YaHei", sans-serif';
-    ctx.fillText(subtitle, cw / 2, ch * 0.14 + 28);
+    ctx.font = `${isNarrow ? 10 : 13}px "Microsoft YaHei", sans-serif`;
+    ctx.fillText(subtitle, cw / 2, ch * (isNarrow ? 0.08 : 0.14) + (isNarrow ? 20 : 28));
   }
 
   _drawButton(ctx, btn, hovered) {
+    const isNarrow = (this.canvas._logicW || this.canvas.width) < 500;
     ctx.fillStyle = hovered ? 'rgba(255,255,255,0.10)' : 'rgba(255,255,255,0.04)';
     ctx.fillRect(btn.x, btn.y, btn.w, btn.h);
     ctx.strokeStyle = hovered ? btn.accent : 'rgba(255,255,255,0.12)';
@@ -629,13 +686,13 @@ export class Menu {
     ctx.strokeRect(btn.x, btn.y, btn.w, btn.h);
 
     ctx.fillStyle = hovered ? '#fff' : '#ccc';
-    ctx.font = 'bold 20px "Microsoft YaHei", sans-serif';
+    ctx.font = `bold ${isNarrow ? 16 : 20}px "Microsoft YaHei", sans-serif`;
     ctx.textAlign = 'center';
-    ctx.fillText(btn.label, btn.x + btn.w / 2, btn.y + btn.h / 2 - 4);
+    ctx.fillText(btn.label, btn.x + btn.w / 2, btn.y + btn.h / 2 - (isNarrow ? 2 : 4));
 
     ctx.fillStyle = '#666';
-    ctx.font = '12px "Microsoft YaHei", sans-serif';
-    ctx.fillText(btn.desc, btn.x + btn.w / 2, btn.y + btn.h / 2 + 16);
+    ctx.font = `${isNarrow ? 10 : 12}px "Microsoft YaHei", sans-serif`;
+    ctx.fillText(btn.desc, btn.x + btn.w / 2, btn.y + btn.h / 2 + (isNarrow ? 12 : 16));
   }
 
   _drawActionBtn(ctx, rect, label, color, mx, my) {
@@ -1313,9 +1370,16 @@ export class Menu {
     const cw = this.canvas._logicW || this.canvas.width;
     const ch = this.canvas._logicH || this.canvas.height;
     const cx = cw / 2;
-    const cardW = 220, cardH = 48, cardGap = 8, colGap = 12;
-    const catGap = 8, catHeaderH = 22;
-    const gridW = cardW * 2 + colGap;
+    const isNarrow = cw < 500;
+    const cardW = isNarrow ? Math.min(cw - 40, 200) : 220;
+    const cardH = isNarrow ? 42 : 48;
+    const cardGap = isNarrow ? 6 : 8;
+    const colGap = isNarrow ? 8 : 12;
+    const catGap = isNarrow ? 6 : 8;
+    const catHeaderH = isNarrow ? 18 : 22;
+    // 窄屏单列，宽屏双列
+    const cols = isNarrow ? 1 : 2;
+    const gridW = cols === 1 ? cardW : cardW * 2 + colGap;
     const gridX = cx - gridW / 2;
 
     let y = ch * 0.20;
@@ -1349,9 +1413,9 @@ export class Menu {
       y += catHeaderH;
       const modeList = modes[c];
       for (let i = 0; i < modeList.length; i++) {
-        const col = i % 2;
-        const row = Math.floor(i / 2);
-        const singleItem = modeList.length === 1;
+        const col = cols === 1 ? 0 : i % 2;
+        const row = cols === 1 ? i : Math.floor(i / 2);
+        const singleItem = cols === 1 || modeList.length === 1;
         cards.push({
           ...modeList[i],
           x: singleItem ? gridX : gridX + col * (cardW + colGap),
@@ -1360,7 +1424,7 @@ export class Menu {
           h: cardH,
         });
       }
-      const rows = Math.ceil(modeList.length / 2);
+      const rows = cols === 1 ? modeList.length : Math.ceil(modeList.length / 2);
       y += rows * (cardH + cardGap) + catGap;
     }
 

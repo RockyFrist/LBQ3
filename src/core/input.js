@@ -13,6 +13,19 @@ export class Input {
     this.mouseLeftUp = false;
     this.mouseRightUp = false;
 
+    // ===== 触屏状态（由 TouchControls 每帧写入） =====
+    this.touchActive = false;   // 触控面板是否激活
+    this.touchMoveX = 0;        // 摇杆 X (-1~1)
+    this.touchMoveY = 0;        // 摇杆 Y (-1~1)
+    this.touchFaceAngle = 0;    // 摇杆朝向角度
+    this.touchHasFace = false;  // 摇杆有有效方向
+    this.touchLightDown = false;
+    this.touchHeavyDown = false;
+    this.touchBlockHeld = false;
+    this.touchDodge = false;
+    this.touchUltimate = false;
+    this.touchBack = false;
+
     window.addEventListener('keydown', e => {
       if (!this.keys.has(e.code)) this.justDown.add(e.code);
       this.keys.add(e.code);
@@ -37,6 +50,43 @@ export class Input {
       if (e.button === 2) { this.mouseRight = false; this.mouseRightUp = true; }
     });
     canvas.addEventListener('contextmenu', e => e.preventDefault());
+
+    // ===== 触屏 → 鼠标模拟（菜单点击用） =====
+    this._touchMouseId = null;
+    canvas.addEventListener('touchstart', e => {
+      // 触控面板激活时不模拟鼠标（由 TouchControls 处理）
+      if (this.touchActive) { e.preventDefault(); return; }
+      e.preventDefault();
+      const t = e.changedTouches[0];
+      this._touchMouseId = t.identifier;
+      const r = canvas.getBoundingClientRect();
+      this.mouseX = t.clientX - r.left;
+      this.mouseY = t.clientY - r.top;
+      this.mouseLeft = true;
+      this.mouseLeftDown = true;
+    }, { passive: false });
+    canvas.addEventListener('touchmove', e => {
+      if (this.touchActive) { e.preventDefault(); return; }
+      e.preventDefault();
+      for (const t of e.changedTouches) {
+        if (t.identifier === this._touchMouseId) {
+          const r = canvas.getBoundingClientRect();
+          this.mouseX = t.clientX - r.left;
+          this.mouseY = t.clientY - r.top;
+          break;
+        }
+      }
+    }, { passive: false });
+    canvas.addEventListener('touchend', e => {
+      for (const t of e.changedTouches) {
+        if (t.identifier === this._touchMouseId) {
+          this._touchMouseId = null;
+          this.mouseLeft = false;
+          this.mouseLeftUp = true;
+          break;
+        }
+      }
+    }, { passive: false });
   }
 
   held(code) { return this.keys.has(code); }

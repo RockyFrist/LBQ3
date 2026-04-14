@@ -69,7 +69,7 @@ export const jianghuModeMethods = {
     if (this.jianghuPhase === 'defeat' || this.jianghuPhase === 'complete') {
       this.jianghuFadeTimer += dt;
       if (this.jianghuFadeTimer > 1.0 &&
-          (input.pressed('Space') || input.mouseLeftDown || input.pressed('Escape'))) {
+          (input.pressed('Space') || input.mouseLeftDown || input.pressed('Escape') || input.touchBack)) {
         if (this.onExit) this.onExit();
       }
       return;
