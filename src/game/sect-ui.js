@@ -5,6 +5,7 @@ import {
   BUILDINGS, BUILDING_LIST, WEAPON_NAMES, ARMOR_NAMES, TRAITS,
   QUEST_TYPES, maxDisciples, availableArmors, expToLevel,
   ITEM_QUALITY, itemLabel, WEAPON_IDS,
+  FAME_TIERS, getFameTier, SHOP_POOL,
 } from './sect-data.js';
 
 // ===== 颜色常量 =====
@@ -150,6 +151,9 @@ export class SectUI {
       case 'inventory':
         this._drawInventoryPanel(ctx, pad, contentY + 4, cw - pad * 2, contentH - 8, state, mx, my, isNarrow);
         break;
+      case 'shop':
+        this._drawShopPanel(ctx, pad, contentY + 4, cw - pad * 2, contentH - 8, state, mx, my, isNarrow);
+        break;
       case 'log':
         this._drawLogPanel(ctx, pad, contentY + 4, cw - pad * 2, contentH - 8, state, mx, my, isNarrow);
         break;
@@ -184,6 +188,12 @@ export class SectUI {
     ctx.fillStyle = COL_DIM;
     ctx.font = `${narrow ? 10 : 12}px ${FONT}`;
     ctx.fillText(`第${state.day}天 · ${PHASE_NAMES[state.phase] || '晨'}`, 10, narrow ? 36 : 44);
+
+    // 声望阶段标签
+    const fameTier = getFameTier(state.fame);
+    ctx.fillStyle = fameTier.color;
+    ctx.font = `${narrow ? 9 : 11}px ${FONT}`;
+    ctx.fillText(`[${fameTier.label}]`, 10, narrow ? 50 : 60);
 
     // 资源
     ctx.textAlign = 'right';
@@ -229,6 +239,7 @@ export class SectUI {
       { id: 'buildings',  icon: '🏗', label: '建造', minDay: 2 },
       { id: 'quests',     icon: '📜', label: '任务', minDay: 3 },
       { id: 'inventory',  icon: '🎒', label: '背包', minDay: 1 },
+      { id: 'shop',       icon: '🛒', label: '商店', minDay: 2 },
       { id: 'log',        icon: '📋', label: '日志', minDay: 1 },
     ];
     const day = state.day;
@@ -264,6 +275,7 @@ export class SectUI {
       if (t.id === 'quests') badge = (state.quests || []).length;
       if (t.id === 'disciples') badge = state.disciples.filter(d => d.injury > 30 || d.loyalty < 40).length;
       if (t.id === 'inventory') badge = (state.inventory || []).filter(i => i.quality !== 'normal').length;
+      if (t.id === 'shop') badge = (state.shop?.items || []).filter(s => !s.sold).length;
       if (badge > 0 && !active) {
         const bx = x + tabW / 2 + (narrow ? 8 : 10);
         const by2 = barY + (narrow ? 8 : 10);
@@ -900,6 +912,119 @@ export class SectUI {
     }
   }
 
+  // ===== 宗门商店面板 =====
+  _drawShopPanel(ctx, x, y, w, h, state, mx, my, narrow) {
+    let cy = y;
+    ctx.textAlign = 'left';
+    ctx.fillStyle = COL_ACCENT;
+    ctx.font = `bold ${narrow ? 14 : 16}px ${FONT}`;
+    ctx.fillText('🛒 宗门商店', x, cy + 14);
+
+    // 刷新日期提示
+    const shopDay = state.shop?.refreshDay || 0;
+    ctx.fillStyle = COL_DIM;
+    ctx.font = `${narrow ? 9 : 11}px ${FONT}`;
+    ctx.textAlign = 'right';
+    ctx.fillText(`第${shopDay}天刷新`, x + w, cy + 14);
+    ctx.textAlign = 'left';
+    cy += 26;
+
+    // 声望档位说明
+    const fameTier = getFameTier(state.fame);
+    ctx.fillStyle = fameTier.color;
+    ctx.font = `${narrow ? 10 : 12}px ${FONT}`;
+    ctx.fillText(`声望 ${state.fame} [${fameTier.label}] · 更多声望解锁高级商品`, x, cy + 12);
+    cy += 22;
+
+    const items = state.shop?.items || [];
+    if (items.length === 0) {
+      ctx.fillStyle = COL_DIM;
+      ctx.font = `${narrow ? 11 : 13}px ${FONT}`;
+      ctx.textAlign = 'center';
+      ctx.fillText('今日无货，明日再来', x + w / 2, cy + 30);
+      ctx.font = `${narrow ? 9 : 11}px ${FONT}`;
+      ctx.fillText('（进入下一天后刷新商店）', x + w / 2, cy + 52);
+      return;
+    }
+
+    const cardH = narrow ? 70 : 82;
+    const gap = narrow ? 6 : 8;
+
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      if (cy + cardH > y + h + 10) break;
+
+      const canAfford = state.gold >= item.cost;
+      const fameOk = state.fame >= item.fameReq;
+      const buyable = canAfford && fameOk && !item.sold;
+      const disabled = !buyable;
+      const qColor = ITEM_QUALITY[item.quality]?.color || '#fff';
+
+      const hovered = !disabled && hit(mx, my, x, cy, w, cardH);
+      ctx.fillStyle = item.sold ? 'rgba(255,255,255,0.01)' : hovered ? COL_PANEL_HI : COL_PANEL;
+      ctx.fillRect(x, cy, w, cardH);
+      // 品质/类型颜色条
+      ctx.fillStyle = item.sold ? '#333' : (item.type === 'weapon' || item.type === 'armor') ? qColor : '#ffaa44';
+      ctx.fillRect(x, cy, 4, cardH);
+      ctx.strokeStyle = item.sold ? 'rgba(255,255,255,0.03)' : hovered ? qColor : COL_BORDER;
+      ctx.lineWidth = hovered ? 1.5 : 1;
+      ctx.strokeRect(x, cy, w, cardH);
+
+      // 图标 + 名称
+      ctx.textAlign = 'left';
+      ctx.fillStyle = item.sold ? COL_DIM : (item.type === 'weapon' || item.type === 'armor') ? qColor : '#ffdd88';
+      ctx.font = `bold ${narrow ? 13 : 15}px ${FONT}`;
+      ctx.fillText(`${item.icon} ${item.name}`, x + 10, cy + (narrow ? 18 : 22));
+
+      // 已售出标记
+      if (item.sold) {
+        ctx.fillStyle = '#555';
+        ctx.font = `bold ${narrow ? 12 : 14}px ${FONT}`;
+        ctx.textAlign = 'right';
+        ctx.fillText('已售出', x + w - 10, cy + cardH / 2 + 4);
+        cy += cardH + gap;
+        continue;
+      }
+
+      // 效果描述
+      ctx.fillStyle = COL_TEXT;
+      ctx.font = `${narrow ? 9 : 11}px ${FONT}`;
+      ctx.textAlign = 'left';
+      ctx.fillText(item.desc, x + 10, cy + (narrow ? 32 : 38));
+
+      // 声望要求标签
+      if (item.fameReq > 0) {
+        const fameLabel = `需声望≥${item.fameReq}`;
+        ctx.fillStyle = fameOk ? '#44dd88' : '#ff6644';
+        ctx.font = `${narrow ? 9 : 10}px ${FONT}`;
+        ctx.fillText(fameLabel, x + 10, cy + (narrow ? 46 : 54));
+      }
+
+      // 价格
+      ctx.textAlign = 'left';
+      ctx.fillStyle = canAfford ? COL_GOLD : '#ff6644';
+      ctx.font = `bold ${narrow ? 11 : 13}px ${FONT}`;
+      ctx.fillText(`💰 ${item.cost}`, x + 10, cy + (narrow ? 60 : 70));
+
+      // 购买按钮
+      const btnW = narrow ? 60 : 72;
+      const btnH = narrow ? 26 : 30;
+      const rect = { x: x + w - btnW - 8, y: cy + (cardH - btnH) / 2, w: btnW, h: btnH };
+      drawBtn(ctx, rect, '购买', COL_BTN, mx, my, { disabled, fontSize: narrow ? 11 : 13 });
+      if (!disabled) {
+        this._buttons.push({ ...rect, action: { type: 'action', id: 'buyShopItem', itemId: item.id } });
+      }
+
+      cy += cardH + gap;
+    }
+
+    // 底部提示
+    ctx.fillStyle = COL_DIM;
+    ctx.font = `${narrow ? 9 : 10}px ${FONT}`;
+    ctx.textAlign = 'center';
+    ctx.fillText('每天进入下一天后自动刷新商品', x + w / 2, cy + 14);
+  }
+
   // ===== 日志面板 =====
   _drawLogPanel(ctx, x, y, w, h, state, mx, my, narrow) {
     let cy = y;
@@ -1408,6 +1533,73 @@ export class SectUI {
     const closeRect = { x: cw / 2 - 40, y: by4 + 4, w: 80, h: 26 };
     drawBtn(ctx, closeRect, '关闭', COL_DIM, mx, my, { fontSize: 12 });
     this._buttons.push({ ...closeRect, action: { type: 'cancelSettings' } });
+  }
+
+  // ===== 资质秘籍弟子选择弹窗 =====
+  drawTalentSelect(ctx, cw, ch, disciples, mx, my, narrow) {
+    this._buttons = this._buttons || [];
+    ctx.fillStyle = 'rgba(0,0,0,0.75)';
+    ctx.fillRect(0, 0, cw, ch);
+
+    const pw = Math.min(cw - 40, narrow ? 290 : 380);
+    const listH = Math.min(disciples.length * 46 + 100, ch - 80);
+    const px = (cw - pw) / 2;
+    const py = (ch - listH) / 2;
+
+    ctx.fillStyle = '#1a1a2e';
+    ctx.fillRect(px, py, pw, listH);
+    ctx.strokeStyle = '#ffdd00';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(px, py, pw, listH);
+
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#ffdd00';
+    ctx.font = `bold ${narrow ? 15 : 18}px ${FONT}`;
+    ctx.fillText('📜 选择突破弟子', cw / 2, py + (narrow ? 28 : 34));
+
+    ctx.fillStyle = COL_DIM;
+    ctx.font = `${narrow ? 10 : 11}px ${FONT}`;
+    ctx.fillText('将提升该弟子资质上限+1（最高5星）', cw / 2, py + (narrow ? 44 : 54));
+
+    let iy = py + (narrow ? 56 : 68);
+    const rowH = narrow ? 42 : 48;
+
+    if (disciples.length === 0) {
+      ctx.fillStyle = COL_DIM;
+      ctx.font = `${narrow ? 12 : 14}px ${FONT}`;
+      ctx.fillText('无可突破弟子', cw / 2, iy + 24);
+    }
+
+    for (const d of disciples) {
+      if (iy + rowH > py + listH - 50) break;
+      const hovered = hit(mx, my, px + 12, iy, pw - 24, rowH);
+      ctx.fillStyle = hovered ? COL_PANEL_HI : COL_PANEL;
+      ctx.fillRect(px + 12, iy, pw - 24, rowH);
+      ctx.strokeStyle = hovered ? '#ffdd00' : COL_BORDER;
+      ctx.lineWidth = hovered ? 1.5 : 1;
+      ctx.strokeRect(px + 12, iy, pw - 24, rowH);
+
+      ctx.fillStyle = d.color || '#888';
+      ctx.fillRect(px + 12, iy, 4, rowH);
+
+      ctx.textAlign = 'left';
+      ctx.fillStyle = '#eee';
+      ctx.font = `bold ${narrow ? 12 : 14}px ${FONT}`;
+      ctx.fillText(d.name, px + 22, iy + (narrow ? 16 : 18));
+      ctx.fillStyle = COL_DIM;
+      ctx.font = `${narrow ? 10 : 11}px ${FONT}`;
+      ctx.fillText(`Lv${d.level} · 资质 ${starsText(d.talent)} → ${d.talent + 1}星`, px + 22, iy + (narrow ? 30 : 34));
+
+      this._buttons.push({ x: px + 12, y: iy, w: pw - 24, h: rowH,
+        action: { type: 'selectForTalentUp', discipleId: d.id } });
+      iy += rowH + 5;
+    }
+
+    // 取消按钮
+    const cancelY = py + listH - (narrow ? 38 : 44);
+    const cancelRect = { x: cw / 2 - 50, y: cancelY, w: 100, h: narrow ? 28 : 32 };
+    drawBtn(ctx, cancelRect, '取消', COL_DIM, mx, my, { fontSize: narrow ? 12 : 13 });
+    this._buttons.push({ ...cancelRect, action: { type: 'cancelTalentSelect' } });
   }
 
   // ===== 存档选择弹窗 =====

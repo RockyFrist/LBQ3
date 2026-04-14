@@ -16,6 +16,7 @@ import {
   dailyIncome, expToLevel, TRAITS, TRAIT_LIST, COMMON_TRAITS,
   WEAPON_IDS, WEAPON_NAMES, ARMOR_NAMES, resetDiscipleIdCounter,
   checkStoryTrigger, ITEM_QUALITY, rollLootDrop, itemLabel,
+  FAME_TIERS, getFameTier, SHOP_POOL, refreshShopItems,
 } from './sect-data.js';
 
 export const sectModeMethods = {
@@ -49,10 +50,13 @@ export const sectModeMethods = {
     if (!this.sect.storyProgress) this.sect.storyProgress = [];
     if (this.sect.pendingStory === undefined) this.sect.pendingStory = null;
     if (!this.sect.inventory) this.sect.inventory = [];
+    // 兼容旧存档（没有shop字段）
+    if (!this.sect.shop) this.sect.shop = { items: [], refreshDay: 0 };
     // 兼容旧弟子数据（没有quality字段）
     for (const d of this.sect.disciples) {
       if (!d.weaponQuality) d.weaponQuality = 'normal';
       if (!d.armorQuality) d.armorQuality = 'normal';
+      if (d.hpBonus === undefined) d.hpBonus = 0;
     }
 
     // 首日生成任务
@@ -247,6 +251,14 @@ export const sectModeMethods = {
         this.sectPopup = null;
         break;
 
+      case 'selectForTalentUp':
+        this._sectDoAction('selectForTalentUp', action);
+        break;
+
+      case 'cancelTalentSelect':
+        this.sectPopup = null;
+        break;
+
       case 'selectArmor':
         this._sectChangeArmor(action.armorId);
         break;
@@ -381,7 +393,7 @@ export const sectModeMethods = {
             this._sectAddLog(`${d4.name} 换装 ${ARMOR_NAMES[action.baseId]}`, '#44dd88');
           } else {
             if (d4.weaponQuality !== 'normal') {
-              this.sect.inventory.push({ type: 'weapon', id: d4.weaponId, quality: d4.weaponQuality });
+              this.sect.inventory.push({ type: action.itemType, id: d4.weaponId, quality: d4.weaponQuality });
             }
             d4.weaponId = action.baseId; d4.weaponQuality = 'normal';
             this._sectAddLog(`${d4.name} 换用 ${WEAPON_NAMES[action.baseId]}`, '#44dd88');
@@ -428,6 +440,136 @@ export const sectModeMethods = {
       case 'exitSect':
         if (this.onExit) this.onExit();
         break;
+
+      case 'buyShopItem':
+        this._sectBuyShopItem(action.itemId);
+        break;
+
+      case 'selectForTalentUp': {
+        // 资质秘籍：选中弟子后提升资质
+        const d7 = this.sect.disciples.find(d => d.id === action.discipleId);
+        if (d7) {
+          d7.talent = Math.min(5, d7.talent + 1);
+          this._sectAddLog(`📜 ${d7.name} 资质突破！资质提升至${d7.talent}星`, '#ffdd00');
+          this._sectShowToast(`${d7.name} 资质+1！现为${d7.talent}星`, '#ffdd00');
+        }
+        this.sectPopup = null;
+        break;
+      }
+
+      case 'cancelTalentSelect':
+        // 取消资质秘籍选择
+        this.sectPopup = null;
+        break;
+    }
+  },
+
+  // ===== 商店购买 =====
+  _sectBuyShopItem(itemId) {
+    const shopItem = this.sect.shop.items.find(si => si.id === itemId);
+    if (!shopItem || shopItem.sold) return;
+    if (this.sect.gold < shopItem.cost) {
+      this._sectShowToast('銀两不足！', '#ff6644');
+      return;
+    }
+    if (this.sect.fame < shopItem.fameReq) {
+      this._sectShowToast(`需要声望${shopItem.fameReq}才能购买`, '#ff6644');
+      return;
+    }
+
+    this.sect.gold -= shopItem.cost;
+    shopItem.sold = true;
+
+    switch (shopItem.effect || shopItem.type) {
+      case 'weapon':
+      case 'armor': {
+        // 装备类：随机分配具体武器/护甲ID，加入背包
+        let itemTypeId;
+        if (shopItem.type === 'weapon') {
+          itemTypeId = WEAPON_IDS[Math.floor(Math.random() * WEAPON_IDS.length)];
+        } else {
+          const smithLv = this.sect.buildings.smith || 0;
+          const armorPool = ['light', 'medium', 'heavy'].slice(0, Math.max(1, smithLv));
+          itemTypeId = armorPool[Math.floor(Math.random() * armorPool.length)];
+        }
+        this.sect.inventory.push({ type: shopItem.type, id: itemTypeId, quality: shopItem.quality });
+        const nameStr = shopItem.type === 'weapon' ? WEAPON_NAMES[itemTypeId] : ARMOR_NAMES[itemTypeId];
+        this._sectAddLog(`🛍 ${shopItem.name}已购入背包：${itemLabel(nameStr, shopItem.quality)}`, ITEM_QUALITY[shopItem.quality]?.color || '#44dd88');
+        this._sectShowToast(`已购入 ${itemLabel(nameStr, shopItem.quality)}`, ITEM_QUALITY[shopItem.quality]?.color || '#44dd88');
+        break;
+      }
+
+      case 'healAll':
+        for (const d of this.sect.disciples) d.injury = Math.max(0, d.injury - 50);
+        this._sectAddLog('💊 回春丹发放，全员伤势-50', '#44dd88');
+        this._sectShowToast('全员伤势大幅恢复！', '#44dd88');
+        break;
+
+      case 'hpBonus':
+        // 淬体丹：给全员弹力加成记录
+        for (const d of this.sect.disciples) {
+          d.hpBonus = (d.hpBonus || 0) + 0.1;
+        }
+        this._sectAddLog('⚗ 淬体丹发放，全员气血永久+10%', '#44ffcc');
+        this._sectShowToast('全员气血+10%！', '#44ffcc');
+        break;
+
+      case 'talentUp':
+        // 打开资质秘籍选择弟子弹窗
+        {
+          const eligible = this.sect.disciples.filter(d => d.talent < 5);
+          if (eligible.length === 0) {
+            this._sectAddLog('所有弟子资质已顶级，秘籍浪费了', '#ff6644');
+            this._sectShowToast('无可提升的弟子', '#ff6644');
+            // 退款
+            this.sect.gold += shopItem.cost;
+            shopItem.sold = false;
+          } else {
+            this.sectPopup = 'talentSelect';
+          }
+        }
+        break;
+
+      case 'recruitElite':
+        {
+          if (this.sect.disciples.length >= maxDisciples(this.sect.buildings.barracks)) {
+            this._sectAddLog('弟子已满编，招募令失效', '#ff6644');
+            this._sectShowToast('弟子已满！', '#ff6644');
+            this.sect.gold += shopItem.cost;
+            shopItem.sold = false;
+          } else {
+            const talent = 4 + (Math.random() < 0.3 ? 1 : 0); // 4星 or 5星
+            const d = createDisciple({ talent, loyalty: 70 + Math.floor(Math.random() * 20), joinDay: this.sect.day });
+            this.sect.disciples.push(d);
+            this._sectAddLog(`📋 ${d.name}(资质${talent}星)应招募令加入！`, '#ffdd00');
+            this._sectShowToast(`${d.name} 加入门派！`, '#ffdd00');
+          }
+        }
+        break;
+
+      case 'traitAll':
+        {
+          let count = 0;
+          for (const d of this.sect.disciples) {
+            if (d.traits.length < 3) {
+              const pool = COMMON_TRAITS.filter(t => !d.traits.includes(t.id));
+              if (pool.length > 0) {
+                const t = pool[Math.floor(Math.random() * pool.length)];
+                d.traits.push(t.id);
+                count++;
+                this._sectAddLog(`📖 ${d.name}领悟「${TRAITS[t.id]?.name || t.id}」`, '#ffaa44');
+              }
+            }
+          }
+          if (count > 0) {
+            this._sectShowToast(`${count}人领悟新特质！`, '#ffaa44');
+          } else {
+            this._sectAddLog('弟子特质已满', '#ff6644');
+            this.sect.gold += shopItem.cost;
+            shopItem.sold = false;
+          }
+        }
+        break;
     }
   },
 
@@ -435,7 +577,7 @@ export const sectModeMethods = {
   _sectDoTrainAll() {
     const mul = trainExpMul(this.sect.buildings.dojo);
     const libLv = this.sect.buildings.library;
-    const expGain = Math.floor(12 * mul);
+    const expGain = Math.floor(15 * mul); // 全体训练经验
     let trained = 0;
     let skipped = 0;
     const details = [];
@@ -485,7 +627,7 @@ export const sectModeMethods = {
       return;
     }
     const mul = trainExpMul(this.sect.buildings.dojo);
-    const expGain = Math.floor(18 * mul);
+    const expGain = Math.floor(22 * mul); // 个人专训经验
     const oldLv = d.level;
     this._sectGainExp(d, expGain);
     d.stamina -= 20;
@@ -531,6 +673,12 @@ export const sectModeMethods = {
     for (let i = 0; i < count; i++) {
       this.sect.quests.push(generateQuest(towerLv));
     }
+  },
+
+  _sectRefreshShop() {
+    if (!this.sect.shop) this.sect.shop = { items: [], refreshDay: 0 };
+    this.sect.shop.items = refreshShopItems(this.sect);
+    this.sect.shop.refreshDay = this.sect.day;
   },
 
   _sectShowDiscipleSelect(questIndex) {
@@ -589,6 +737,11 @@ export const sectModeMethods = {
     const qualMul = (wQual + aQual) / 2; // 武器+护甲品质平均
     if (qualMul > 1) {
       fA.maxHp = Math.floor(fA.maxHp * qualMul);
+      fA.hp = fA.maxHp;
+    }
+    // 淬体丹 hpBonus 永久加成
+    if (d.hpBonus > 0) {
+      fA.maxHp = Math.floor(fA.maxHp * (1 + d.hpBonus));
       fA.hp = fA.maxHp;
     }
     fA.showNameTag = true;
@@ -802,11 +955,11 @@ export const sectModeMethods = {
     // 恢复弟子状态
     const hMul = healMul(this.sect.buildings.clinic);
     for (const d of this.sect.disciples) {
-      // 体力恢复
-      d.stamina = Math.min(100, d.stamina + 30);
+      // 体力恢复（+35/天）
+      d.stamina = Math.min(100, d.stamina + 35);
       // 受伤恢复
       if (d.injury > 0) {
-        d.injury = Math.max(0, d.injury - Math.floor(12 * hMul));
+        d.injury = Math.max(0, d.injury - Math.floor(15 * hMul));
       }
       // 忠诚缓慢回升
       if (d.loyalty < 60) d.loyalty += 1;
@@ -814,6 +967,9 @@ export const sectModeMethods = {
 
     // 刷新任务
     this._sectRefreshQuests();
+
+    // 刷新宗门商店（每天）
+    this._sectRefreshShop();
 
     // 随机事件（60%概率）
     if (Math.random() < 0.6) {
@@ -1063,9 +1219,11 @@ export const sectModeMethods = {
         if (!this.sect.storyProgress) this.sect.storyProgress = [];
         if (this.sect.pendingStory === undefined) this.sect.pendingStory = null;
         if (!this.sect.inventory) this.sect.inventory = [];
+        if (!this.sect.shop) this.sect.shop = { items: [], refreshDay: 0 };
         for (const d of this.sect.disciples) {
           if (!d.weaponQuality) d.weaponQuality = 'normal';
           if (!d.armorQuality) d.armorQuality = 'normal';
+          if (d.hpBonus === undefined) d.hpBonus = 0;
         }
         this._sectAddLog(`📂 读档成功`, '#44dd88');
       }
@@ -1213,6 +1371,9 @@ export const sectModeMethods = {
       this.sectUI.drawDismissConfirm(ctx, lw, lh, this.sect._dismissTarget, mx, my, narrow);
     } else if (this.sectPopup === 'settings') {
       this.sectUI.drawSettings(ctx, lw, lh, mx, my, narrow);
+    } else if (this.sectPopup === 'talentSelect') {
+      const eligible = this.sect.disciples.filter(d => d.talent < 5);
+      this.sectUI.drawTalentSelect(ctx, lw, lh, eligible, mx, my, narrow);
     }
 
     // 训练动画

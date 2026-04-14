@@ -109,7 +109,7 @@ export function availableArmors(smithLv) {
 
 /** 每日被动收入 */
 export function dailyIncome(bankLv) {
-  return bankLv * 80;
+  return bankLv === 0 ? 0 : 50 + bankLv * 80; // Lv1=130, Lv2=210, Lv3=290
 }
 
 /** 训练经验倍率 */
@@ -298,9 +298,9 @@ export function createDisciple(opts = {}) {
   };
 }
 
-/** 弟子升级所需经验 */
+/** 弟子升级所需经验 (心流节奏：每级约2-3天自然升一级) */
 export function expToLevel(currentLevel) {
-  return [0, 40, 100, 200, 400][currentLevel - 1] || 999;
+  return [0, 60, 150, 300, 600][currentLevel - 1] || 999;
 }
 
 /** 宗门名称池 */
@@ -338,6 +338,7 @@ export function createInitialState() {
     quests: [],           // 当前可选任务（每天刷新）
     activeQuests: [],     // 进行中的任务
     inventory: [],        // 装备库存 [{type, id, quality}]
+    shop: { items: [], refreshDay: 0 }, // 宗门商店 {items:[{...poolItem,sold}], refreshDay}
     log: [],              // 事件日志（最近30条）
     stats: {
       totalDays: 0,
@@ -351,6 +352,78 @@ export function createInitialState() {
     storyProgress: [],  // 已触发的剧情ID列表
     pendingStory: null, // 当前待显示的剧情
   };
+}
+
+// ===== 声望阶段系统 =====
+export const FAME_TIERS = [
+  { fame: 0,   label: '无名小卒', color: '#888888' },
+  { fame: 20,  label: '初出茅庐', color: '#44dd88' },
+  { fame: 50,  label: '江湖知名', color: '#4499ff' },
+  { fame: 100, label: '一方豪强', color: '#ffaa44' },
+  { fame: 150, label: '威震武林', color: '#ffdd00' },
+  { fame: 250, label: '武林盟主', color: '#ff88ff' },
+];
+export function getFameTier(fame) {
+  let tier = FAME_TIERS[0];
+  for (const t of FAME_TIERS) {
+    if (fame >= t.fame) tier = t;
+    else break;
+  }
+  return tier;
+}
+
+// ===== 宗门商店商品池 =====
+export const SHOP_POOL = [
+  { id: 'shop_fine_weapon',  name: '精良兵器',  icon: '⚔',  type: 'weapon',     quality: 'fine',   cost: 800,  fameReq: 0,   desc: '精锻武器，提升弟子战力' },
+  { id: 'shop_rare_weapon',  name: '罕见宝刃',  icon: '⚔',  type: 'weapon',     quality: 'rare',   cost: 2500, fameReq: 50,  desc: '极品利器，威力惊人' },
+  { id: 'shop_fine_armor',   name: '精良护甲',  icon: '🛡',  type: 'armor',      quality: 'fine',   cost: 600,  fameReq: 0,   desc: '坚固护甲，减少受伤' },
+  { id: 'shop_rare_armor',   name: '罕见宝甲',  icon: '🛡',  type: 'armor',      quality: 'rare',   cost: 2000, fameReq: 80,  desc: '传世宝甲，防御无双' },
+  { id: 'elixir_heal',       name: '回春丹',    icon: '💊',  type: 'consumable', effect: 'healAll', cost: 400,  fameReq: 0,   desc: '全员伤势-50点' },
+  { id: 'elixir_body',       name: '淬体丹',    icon: '⚗',  type: 'consumable', effect: 'hpBonus', cost: 600,  fameReq: 20,  desc: '弟子气血永久+10%' },
+  { id: 'talent_scroll',     name: '资质秘籍',  icon: '📜',  type: 'consumable', effect: 'talentUp',cost: 5000, fameReq: 60,  desc: '突破弟子资质上限+1' },
+  { id: 'recruit_order',     name: '招募令',    icon: '📋',  type: 'consumable', effect: 'recruitElite', cost: 3000, fameReq: 100, desc: '立即招募资质4+弟子' },
+  { id: 'martial_tome',      name: '武林秘典',  icon: '📖',  type: 'consumable', effect: 'traitAll',cost: 8000, fameReq: 150, desc: '所有弟子获得一个特质' },
+];
+
+/**
+ * 每日刷新商店：按声望门槛过滤，随机选3件（不重复）
+ * 装备类各选一种武器 + 一种护甲（随机品质），其余随机补够3件
+ */
+export function refreshShopItems(state) {
+  const fame = state.fame;
+  // 过滤掉未解锁的商品
+  const available = SHOP_POOL.filter(p => fame >= p.fameReq);
+  if (available.length === 0) return [];
+
+  // 分组：武器/护甲/消耗品
+  const weapons   = available.filter(p => p.type === 'weapon');
+  const armors    = available.filter(p => p.type === 'armor');
+  const consumables = available.filter(p => p.type === 'consumable');
+
+  const picks = [];
+  const used  = new Set();
+
+  function pickRandom(pool) {
+    const pool2 = pool.filter(p => !used.has(p.id));
+    if (!pool2.length) return null;
+    const item = pool2[Math.floor(Math.random() * pool2.length)];
+    used.add(item.id);
+    return { ...item, sold: false };
+  }
+
+  // 保证：1件武器类 + 1件护甲类（如果有的话）
+  if (weapons.length > 0) picks.push(pickRandom(weapons));
+  if (armors.length > 0)  picks.push(pickRandom(armors));
+
+  // 剩余名额从全池中随机补
+  const remaining = [...weapons, ...armors, ...consumables];
+  while (picks.length < 3) {
+    const item = pickRandom(remaining);
+    if (!item) break;
+    picks.push(item);
+  }
+
+  return picks.filter(Boolean);
 }
 
 // ===== 剧情/故事系统 =====
