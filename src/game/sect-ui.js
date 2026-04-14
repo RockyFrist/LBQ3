@@ -7,6 +7,7 @@ import {
   ITEM_QUALITY, itemLabel, WEAPON_IDS,
   FAME_TIERS, getFameTier, SHOP_POOL,
   PERSONALITY_TYPES,
+  TRAINING_MODES, TRAINING_MODE_ORDER, LEADER_BONUSES,
 } from './sect-data.js';
 
 // ===== 颜色常量 =====
@@ -331,12 +332,16 @@ export class SectUI {
     const hasFought = state.stats.totalFights > 0; // 有过战斗
 
     const actions = [];
-    // 训练按钮（显示可参与人数和消耗）
-    const trainable = state.disciples.filter(d => !d.onQuest && d.injury <= 50 && d.stamina >= 15).length;
-    const trainLabel = trainable > 0
-      ? `🗡 全体训练 (${trainable}人,-15体)`
-      : `🗡 全体训练 (无人可练)`;
-    actions.push({ label: trainLabel, action: { type: 'action', id: 'train' }, color: '#4499ff', disabled: trainable === 0 });
+    // 训练档位概览
+    const modeCounts = { rest: 0, normal: 0, intense: 0, extreme: 0 };
+    for (const d of state.disciples) {
+      if (!d.onQuest) modeCounts[d.trainingMode || 'normal']++;
+    }
+    const modeLabel = TRAINING_MODE_ORDER
+      .filter(m => modeCounts[m] > 0)
+      .map(m => `${TRAINING_MODES[m].icon}${modeCounts[m]}`)
+      .join(' ') || '无弟子';
+    actions.push({ label: `⚔ 全体强化 (${modeLabel})`, action: { type: 'action', id: 'batchMode', mode: 'intense' }, color: '#4499ff' });
     actions.push({ label: '🌙 进入下一天', action: { type: 'action', id: 'nextDay' }, color: COL_ACCENT });
     // 第2天起解锁建造
     if (day >= 2) {
@@ -373,7 +378,7 @@ export class SectUI {
 
     const dList = state.disciples.slice(0, 5);
     for (const d of dList) {
-      this._drawDiscipleMini(ctx, x, cy, w, d, narrow);
+      this._drawDiscipleMini(ctx, x, cy, w, d, narrow, state);
       cy += narrow ? 32 : 38;
     }
     if (state.disciples.length > 5) {
@@ -405,7 +410,7 @@ export class SectUI {
   }
 
   // ===== 弟子迷你卡片 =====
-  _drawDiscipleMini(ctx, x, y, w, d, narrow) {
+  _drawDiscipleMini(ctx, x, y, w, d, narrow, state) {
     const h = narrow ? 28 : 34;
     ctx.fillStyle = COL_PANEL;
     ctx.fillRect(x, y, w, h);
@@ -414,10 +419,13 @@ export class SectUI {
     ctx.fillStyle = d.color || '#888';
     ctx.fillRect(x, y, 3, h);
 
+    // 领头星标
+    const isLeader = state && state.leaderId === d.id;
+
     ctx.textAlign = 'left';
     ctx.fillStyle = COL_TEXT;
     ctx.font = `bold ${narrow ? 11 : 13}px ${FONT}`;
-    const nameStr = `${d.name}`;
+    const nameStr = `${isLeader ? '⭐' : ''}${d.name}`;
     ctx.fillText(nameStr, x + 8, y + (narrow ? 12 : 14));
     // 个性图标
     const _pMini = PERSONALITY_TYPES[d.personality];
@@ -426,6 +434,16 @@ export class SectUI {
       ctx.fillStyle = _pMini.color;
       ctx.font = `${narrow ? 9 : 10}px ${FONT}`;
       ctx.fillText(_pMini.icon, x + 8 + _nw + 3, y + (narrow ? 12 : 14));
+    }
+
+    // 训练档位图标
+    const tMode = TRAINING_MODES[d.trainingMode || 'normal'];
+    if (tMode) {
+      ctx.textAlign = 'right';
+      ctx.fillStyle = '#aaa';
+      ctx.font = `${narrow ? 9 : 10}px ${FONT}`;
+      ctx.fillText(tMode.icon + tMode.name, x + w - 6, y + (narrow ? 12 : 14));
+      ctx.textAlign = 'left';
     }
 
     ctx.fillStyle = COL_DIM;
@@ -659,17 +677,62 @@ export class SectUI {
     }
     cy += 28;
 
+    // 训练档位选择（4个横排切换按钮）
+    ctx.fillStyle = COL_DIM;
+    ctx.font = `bold ${narrow ? 11 : 12}px ${FONT}`;
+    ctx.fillText('训练档位:', x, cy + 12);
+    cy += 18;
+    const modeW = Math.floor((w - 9) / 4);
+    const modeH = narrow ? 28 : 32;
+    const currentMode = d.trainingMode || 'normal';
+    for (let i = 0; i < TRAINING_MODE_ORDER.length; i++) {
+      const mId = TRAINING_MODE_ORDER[i];
+      const mode = TRAINING_MODES[mId];
+      const bx = x + i * (modeW + 3);
+      const selected = currentMode === mId;
+      const rect = { x: bx, y: cy, w: modeW, h: modeH };
+      const color = selected ? '#ffcc44' : '#555';
+      drawBtn(ctx, rect, `${mode.icon}${mode.name}`, color, mx, my, { fontSize: narrow ? 10 : 11 });
+      if (!d.onQuest) this._buttons.push({ ...rect, action: { type: 'action', id: 'setTrainingMode', discipleId: d.id, mode: mId } });
+    }
+    // 档位说明
+    const curMode = TRAINING_MODES[currentMode];
+    cy += modeH + 4;
+    ctx.fillStyle = '#999';
+    ctx.font = `${narrow ? 9 : 10}px ${FONT}`;
+    ctx.fillText(`${curMode.desc} · 体力${curMode.stamina >= 0 ? '+' : ''}${curMode.stamina} 经验+${curMode.exp}${curMode.risk > 0 ? ` 受伤${Math.round(curMode.risk * 100)}%` : ''}`, x, cy + 10);
+    cy += 16;
+
+    // 领头弟子按钮
+    const isLeader = state.leaderId === d.id;
+    const leaderH = narrow ? 28 : 32;
+    const leaderRect = { x, y: cy, w, h: leaderH };
+    const leaderLabel = isLeader ? '⭐ 取消领头' : '⭐ 设为领头';
+    const leaderColor = isLeader ? '#ffcc44' : '#777';
+    drawBtn(ctx, leaderRect, leaderLabel, leaderColor, mx, my, { fontSize: narrow ? 11 : 12 });
+    if (!d.onQuest) this._buttons.push({ ...leaderRect, action: { type: 'action', id: 'setLeader', discipleId: d.id } });
+    if (isLeader) {
+      const bonus = LEADER_BONUSES[d.personality];
+      if (bonus) {
+        cy += leaderH + 2;
+        ctx.fillStyle = '#aa88ff';
+        ctx.font = `${narrow ? 9 : 10}px ${FONT}`;
+        ctx.fillText(`领头效果: ${bonus.name} — ${bonus.desc}`, x, cy + 10);
+        cy += 14;
+      }
+    }
+    cy += leaderH + 8;
+
     // 操作按钮（2行2列）
     const btnH = narrow ? 34 : 38;
     const btnGap = 6;
     const btnW2 = (w - btnGap) / 2;
     const ops = [
-      { label: `专训 -20体${d.stamina < 100 ? `(${d.stamina})` : ''}`, action: { type: 'action', id: 'trainOne', discipleId: d.id }, color: COL_BTN,
-        disabled: d.onQuest || d.stamina < 20 || d.level >= d.talent },
       { label: '⚔ 换武器', action: { type: 'action', id: 'changeWeapon', discipleId: d.id }, color: '#44aaff',
         disabled: d.onQuest },
       { label: '🛡 换护甲', action: { type: 'action', id: 'changeArmor', discipleId: d.id }, color: '#44dd88',
         disabled: d.onQuest },
+      { label: '🌙 全体休养', action: { type: 'action', id: 'batchMode', mode: 'rest' }, color: '#88aacc' },
       { label: '开除', action: { type: 'action', id: 'dismiss', discipleId: d.id }, color: COL_DANGER },
     ];
     for (let i = 0; i < ops.length; i++) {
@@ -1180,6 +1243,67 @@ export class SectUI {
     const cancelRect = { x: px + pw / 2 - 50, y: cy + 8, w: 100, h: 28 };
     drawBtn(ctx, cancelRect, '取消', COL_DIM, mx, my, { fontSize: 12 });
     this._buttons.push({ ...cancelRect, action: { type: 'cancelSelect' } });
+  }
+
+  // ===== 事件战斗弟子选择弹窗 =====
+  drawEventFightSelect(ctx, cw, ch, disciples, eventFight, mx, my, narrow) {
+    this._buttons = this._buttons || [];
+    ctx.fillStyle = 'rgba(0,0,0,0.7)';
+    ctx.fillRect(0, 0, cw, ch);
+
+    const pw = Math.min(cw - 30, narrow ? 280 : 360);
+    const listH = Math.min(disciples.length * 40 + 110, ch - 100);
+    const px = (cw - pw) / 2;
+    const py = (ch - listH) / 2;
+
+    ctx.fillStyle = '#1a1a2e';
+    ctx.fillRect(px, py, pw, listH);
+    ctx.strokeStyle = '#ff6644';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(px, py, pw, listH);
+
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#ff6644';
+    ctx.font = `bold ${narrow ? 14 : 16}px ${FONT}`;
+    const title = eventFight ? `${eventFight.icon || '⚔'} ${eventFight.name} · 选择应战弟子` : '选择应战弟子';
+    ctx.fillText(title, cw / 2, py + (narrow ? 22 : 28));
+
+    if (eventFight) {
+      ctx.fillStyle = COL_DIM;
+      ctx.font = `${narrow ? 10 : 12}px ${FONT}`;
+      ctx.fillText(`敌方难度 D${eventFight.diff}`, cw / 2, py + (narrow ? 38 : 46));
+    }
+
+    let cy = py + (narrow ? 46 : 56);
+    for (const d of disciples) {
+      const rowH = 34;
+      const hovered = hit(mx, my, px + 10, cy, pw - 20, rowH);
+      ctx.fillStyle = hovered ? COL_PANEL_HI : COL_PANEL;
+      ctx.fillRect(px + 10, cy, pw - 20, rowH);
+
+      ctx.textAlign = 'left';
+      ctx.fillStyle = '#eee';
+      ctx.font = `${narrow ? 11 : 13}px ${FONT}`;
+      ctx.fillText(`${d.name} Lv${d.level} ${WEAPON_NAMES[d.weaponId]}`, px + 18, cy + 14);
+      ctx.fillStyle = COL_DIM;
+      ctx.font = `${narrow ? 9 : 10}px ${FONT}`;
+      ctx.fillText(`${starsText(d.talent)} 体${d.stamina}%`, px + 18, cy + 28);
+
+      this._buttons.push({ x: px + 10, y: cy, w: pw - 20, h: rowH, action: { type: 'selectForEventFight', discipleId: d.id } });
+      cy += rowH + 4;
+    }
+
+    if (disciples.length === 0) {
+      ctx.fillStyle = COL_DIM;
+      ctx.textAlign = 'center';
+      ctx.font = `${narrow ? 12 : 14}px ${FONT}`;
+      ctx.fillText('无可用弟子', cw / 2, cy + 20);
+      cy += 40;
+    }
+
+    const cancelRect = { x: px + pw / 2 - 50, y: cy + 8, w: 100, h: 28 };
+    drawBtn(ctx, cancelRect, '放弃', COL_DIM, mx, my, { fontSize: 12 });
+    this._buttons.push({ ...cancelRect, action: { type: 'cancelEventFight' } });
   }
 
   // ===== 战斗中：女敌人正常立绘（居中大图，半透明叠加底部） =====

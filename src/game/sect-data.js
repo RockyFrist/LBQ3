@@ -240,8 +240,8 @@ export function rollEvent(state) {
   if (!state.disciples.some(d => d.loyalty < 50)) {
     pool = pool.filter(e => e.id !== 'betrayal');
   }
-  // 弟子顿悟需要有弟子
-  if (state.disciples.length === 0) {
+  // 弟子顿悟需要有可突破的弟子（等级未达资质上限）
+  if (!state.disciples.some(d => d.level < d.talent)) {
     pool = pool.filter(e => e.id !== 'breakthrough');
   }
   const totalWeight = pool.reduce((s, e) => s + e.weight, 0);
@@ -296,6 +296,7 @@ export function createDisciple(opts = {}) {
     losses: 0,
     joinDay: opts.joinDay || 1,
     onQuest: false, // 是否在执行任务
+    trainingMode: 'normal', // 训练档位: rest|normal|intense|extreme
   };
 }
 
@@ -353,7 +354,7 @@ export function createInitialState() {
       shopBuys: 0,
     },
     achievements: [],  // 已解锁成就ID列表
-    trainedToday: 0,     // 当天已进行全体训练次数（每天重置）
+    leaderId: null,      // 领头弟子ID
     pendingEvent: null,  // 当前待处理事件
     pendingFightResult: null, // 战斗观看结果
     storyProgress: [],  // 已触发的剧情ID列表
@@ -585,6 +586,25 @@ export function randomPersonality() {
   return keys[Math.floor(Math.random() * keys.length)];
 }
 
+
+// ===== 训练档位系统 =====
+export const TRAINING_MODES = {
+  rest:    { id: 'rest',    name: '休养', icon: '🌙', stamina: 50,  exp: 0,  risk: 0,    loyaltyMod: 0,  desc: '养精蓄锐，恢复体力' },
+  normal:  { id: 'normal',  name: '日常', icon: '📖', stamina: 10,  exp: 12, risk: 0,    loyaltyMod: 0,  desc: '日常修炼，稳步提升' },
+  intense: { id: 'intense', name: '强化', icon: '⚔',  stamina: -20, exp: 25, risk: 0,    loyaltyMod: 0,  desc: '加强训练，消耗体力' },
+  extreme: { id: 'extreme', name: '极限', icon: '🔥', stamina: -45, exp: 40, risk: 0.10, loyaltyMod: -1, desc: '拼命苦练，有受伤风险' },
+};
+export const TRAINING_MODE_ORDER = ['rest', 'normal', 'intense', 'extreme'];
+
+// ===== 领头弟子加成 =====
+export const LEADER_BONUSES = {
+  hotblood: { name: '热血鼓舞', desc: '全队经验+10%，受伤风险+5%', teamExpMul: 0.10, teamRiskAdd: 0.05 },
+  calm:     { name: '沉稳统率', desc: '全队受伤风险减半',          teamRiskMul: 0.5 },
+  tsundere: { name: '不甘示弱', desc: '忠诚低于领头的弟子经验+15%', condExpMul: 0.15 },
+  cunning:  { name: '暗中谋划', desc: '训练获得特质概率+10%',      traitChanceAdd: 0.10 },
+  airhead:  { name: '天然感染', desc: '全员忠诚每日+1',            teamLoyalty: 1 },
+  diligent: { name: '以身作则', desc: '全队体力消耗-5',            teamStaminaSave: 5 },
+};
 
 // 台词库已迁移至 sect-dialogues.js，此处重导出保持向后兼容
 export { pickTrainLine, pickGroupSpeakers, TRAIN_DIALOGUES } from './sect-dialogues.js';
