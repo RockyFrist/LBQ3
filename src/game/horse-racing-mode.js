@@ -158,9 +158,9 @@ export class HorseRacingMode {
     this.commentary = '';
     this.commentFade = 0;
 
-    // 难度递增
-    const baseDiff = Math.min(5, 1 + this.stage);
-    const maxDiff = Math.min(5, 2 + this.stage);
+    // 难度递增（最低3级起步）
+    const baseDiff = Math.min(5, Math.max(3, 1 + this.stage));
+    const maxDiff = Math.min(5, Math.max(3, 2 + this.stage));
 
     const names = generateUniqueNames(this.teamSize * 2, true);
 

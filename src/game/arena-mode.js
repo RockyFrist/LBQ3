@@ -320,9 +320,9 @@ export class ArenaMode {
     this.currentComment = '';
     this.gameTime = 0;
 
-    // 随轮次逐渐提升难度和变化
-    const baseMinDiff = Math.min(5, 1 + Math.floor(this.round / 4));
-    const baseMaxDiff = Math.min(5, 2 + Math.floor(this.round / 3));
+    // 随轮次逐渐提升难度和变化（最低3级起步）
+    const baseMinDiff = Math.min(5, Math.max(3, 1 + Math.floor(this.round / 4)));
+    const baseMaxDiff = Math.min(5, Math.max(3, 2 + Math.floor(this.round / 3)));
 
     // 决定比赛类型
     if (this.round <= 3) {
