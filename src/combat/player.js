@@ -1,11 +1,13 @@
 import { Fighter } from './fighter.js';
 import { vec2Normalize } from '../core/utils.js';
 import { WEAPON_DAO, getWeapon } from '../weapons/weapon-defs.js';
+import { getArmor } from '../weapons/armor-defs.js';
 
 export class Player {
-  constructor(x, y, { scale = 1, hpMult = 1, weaponId = 'dao' } = {}) {
+  constructor(x, y, { scale = 1, hpMult = 1, weaponId = 'dao', armorId = 'none' } = {}) {
     const weapon = getWeapon(weaponId);
-    this.fighter = new Fighter(x, y, { color: weapon.color || '#4499ff', team: 0, name: '玩家', scale, hpMult, weapon });
+    const armor = getArmor(armorId);
+    this.fighter = new Fighter(x, y, { color: weapon.color || '#4499ff', team: 0, name: '玩家', scale, hpMult, weapon, armor });
     this.isLocal2P = false; // 本地双人模式时 P1 不使用方向键（留给P2）
   }
 

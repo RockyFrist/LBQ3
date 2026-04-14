@@ -1,6 +1,7 @@
 // ===================== 开始菜单（多页设计） =====================
 import { WEAPON_LIST, WEAPONS, getWeapon } from '../weapons/weapon-defs.js';
-const GAME_VERSION = 'v0.12.0';
+import { ARMOR_LIST, getArmor } from '../weapons/armor-defs.js';
+const GAME_VERSION = 'v0.12.3';
 
 export class Menu {
   constructor(canvas, input) {
@@ -9,7 +10,7 @@ export class Menu {
     this.input = input;
 
     this.page = 'main'; // 'main' | 'pvai' | 'spectate' | 'test' | 'wusheng' | 'jianghu' | 'training' | 'entertainment' | 'chainKill' | 'local2p'
-    this.pvaiDiff = 3;
+    this.pvaiDiff = 5;
     this.nnWeightsLoaded = false;
     this.nnLoadError = null;
     this.diffA = 5;
@@ -20,6 +21,10 @@ export class Menu {
     // 武器选择
     this.weaponA = 'dao';  // 玩家/左方武器
     this.weaponB = 'dao';  // 敌人/右方武器
+
+    // 护甲选择
+    this.armorA = 'none';  // 玩家/左方护甲
+    this.armorB = 'none';  // 敌人/右方护甲
 
     this._hoverBtn = null;
     this._clickCooldown = 0;
@@ -94,11 +99,20 @@ export class Menu {
 
   _updatePvai(mx, my) {
     const L = this._layoutSub('pvai');
-    // 难度选择
+    // 难度选择 (1-5)
     for (let i = 0; i < 5; i++) {
       const bx = L.diffX + i * 42;
       if (this._hit(mx, my, bx, L.diffY, 36, 30)) {
         this.pvaiDiff = i + 1;
+        this._clickCooldown = 0.12;
+        return;
+      }
+    }
+    // 神级难度按钮
+    {
+      const bx = L.diffX + 5 * 42 + 8;
+      if (this._hit(mx, my, bx, L.diffY, 36, 30)) {
+        this.pvaiDiff = 99;
         this._clickCooldown = 0.12;
         return;
       }
@@ -112,9 +126,18 @@ export class Menu {
         return;
       }
     }
+    // 玩家护甲选择
+    for (let i = 0; i < ARMOR_LIST.length; i++) {
+      const bx = L.armorAx + i * 52;
+      if (this._hit(mx, my, bx, L.armorAy, 46, 38)) {
+        this.armorA = ARMOR_LIST[i].id;
+        this._clickCooldown = 0.12;
+        return;
+      }
+    }
     // 开始按钮
     if (this._hit(mx, my, L.startBtn.x, L.startBtn.y, L.startBtn.w, L.startBtn.h)) {
-      this.result = { mode: 'pvai', diffA: 1, diffB: this.pvaiDiff, weaponA: this.weaponA, weaponB: 'dao', rounds: 0, simOnly: false };
+      this.result = { mode: 'pvai', diffA: 1, diffB: this.pvaiDiff, weaponA: this.weaponA, weaponB: 'dao', armorA: this.armorA, armorB: 'none', rounds: 0, simOnly: false };
       this._clickCooldown = 0.3;
       return;
     }
@@ -136,11 +159,29 @@ export class Menu {
         return;
       }
     }
+    // 神级难度 A
+    {
+      const bx = L.diffAx + 5 * 42 + 8;
+      if (this._hit(mx, my, bx, L.diffAy, 36, 30)) {
+        this.diffA = 99;
+        this._clickCooldown = 0.12;
+        return;
+      }
+    }
     // 难度 B
     for (let i = 0; i < 5; i++) {
       const bx = L.diffBx + i * 42;
       if (this._hit(mx, my, bx, L.diffBy, 36, 30)) {
         this.diffB = i + 1;
+        this._clickCooldown = 0.12;
+        return;
+      }
+    }
+    // 神级难度 B
+    {
+      const bx = L.diffBx + 5 * 42 + 8;
+      if (this._hit(mx, my, bx, L.diffBy, 36, 30)) {
+        this.diffB = 99;
         this._clickCooldown = 0.12;
         return;
       }
@@ -154,6 +195,15 @@ export class Menu {
         return;
       }
     }
+    // 护甲 A
+    for (let i = 0; i < ARMOR_LIST.length; i++) {
+      const bx = L.armorAx + i * 52;
+      if (this._hit(mx, my, bx, L.armorAy, 46, 38)) {
+        this.armorA = ARMOR_LIST[i].id;
+        this._clickCooldown = 0.12;
+        return;
+      }
+    }
     // 武器 B
     for (let i = 0; i < WEAPON_LIST.length; i++) {
       const bx = L.weaponBx + i * 52;
@@ -163,9 +213,18 @@ export class Menu {
         return;
       }
     }
+    // 护甲 B
+    for (let i = 0; i < ARMOR_LIST.length; i++) {
+      const bx = L.armorBx + i * 52;
+      if (this._hit(mx, my, bx, L.armorBy, 46, 38)) {
+        this.armorB = ARMOR_LIST[i].id;
+        this._clickCooldown = 0.12;
+        return;
+      }
+    }
     // 开始
     if (this._hit(mx, my, L.startBtn.x, L.startBtn.y, L.startBtn.w, L.startBtn.h)) {
-      this.result = { mode: 'spectate', diffA: this.diffA, diffB: this.diffB, weaponA: this.weaponA, weaponB: this.weaponB, rounds: 0, simOnly: false };
+      this.result = { mode: 'spectate', diffA: this.diffA, diffB: this.diffB, weaponA: this.weaponA, weaponB: this.weaponB, armorA: this.armorA, armorB: this.armorB, rounds: 0, simOnly: false };
       this._clickCooldown = 0.3;
       return;
     }
@@ -205,11 +264,29 @@ export class Menu {
         return;
       }
     }
+    // 护甲 A
+    for (let i = 0; i < ARMOR_LIST.length; i++) {
+      const bx = L.armorAx + i * 52;
+      if (this._hit(mx, my, bx, L.armorAy, 46, 38)) {
+        this.armorA = ARMOR_LIST[i].id;
+        this._clickCooldown = 0.12;
+        return;
+      }
+    }
     // 武器 B
     for (let i = 0; i < WEAPON_LIST.length; i++) {
       const bx = L.weaponBx + i * 52;
       if (this._hit(mx, my, bx, L.weaponBy, 46, 38)) {
         this.weaponB = WEAPON_LIST[i].id;
+        this._clickCooldown = 0.12;
+        return;
+      }
+    }
+    // 护甲 B
+    for (let i = 0; i < ARMOR_LIST.length; i++) {
+      const bx = L.armorBx + i * 52;
+      if (this._hit(mx, my, bx, L.armorBy, 46, 38)) {
+        this.armorB = ARMOR_LIST[i].id;
         this._clickCooldown = 0.12;
         return;
       }
@@ -227,13 +304,13 @@ export class Menu {
     }
     // 视觉测试
     if (this._hit(mx, my, L.visualBtn.x, L.visualBtn.y, L.visualBtn.w, L.visualBtn.h)) {
-      this.result = { mode: 'test', diffA: this.diffA, diffB: this.diffB, rounds: this.testRounds, simOnly: false, weaponA: this.weaponA, weaponB: this.weaponB };
+      this.result = { mode: 'test', diffA: this.diffA, diffB: this.diffB, rounds: this.testRounds, simOnly: false, weaponA: this.weaponA, weaponB: this.weaponB, armorA: this.armorA, armorB: this.armorB };
       this._clickCooldown = 0.3;
       return;
     }
     // 纯数据测试
     if (this._hit(mx, my, L.dataBtn.x, L.dataBtn.y, L.dataBtn.w, L.dataBtn.h)) {
-      this.result = { mode: 'test', diffA: this.diffA, diffB: this.diffB, rounds: this.testRounds, simOnly: true, weaponA: this.weaponA, weaponB: this.weaponB };
+      this.result = { mode: 'test', diffA: this.diffA, diffB: this.diffB, rounds: this.testRounds, simOnly: true, weaponA: this.weaponA, weaponB: this.weaponB, armorA: this.armorA, armorB: this.armorB };
       this._clickCooldown = 0.3;
       return;
     }
@@ -353,8 +430,9 @@ export class Menu {
     const L = this._layoutSub('pvai');
 
     this._drawSubHeader(ctx, cw, '⚔ 对战模式', '选择武器和敌人AI难度');
-    this._drawDiffSelector(ctx, L.diffX, L.diffY, '敌人难度', this.pvaiDiff, '#ff4444', mx, my);
+    this._drawDiffSelector(ctx, L.diffX, L.diffY, '敌人难度', this.pvaiDiff, '#ff4444', mx, my, true);
     this._drawWeaponSelector(ctx, L.weaponAx, L.weaponAy, '你的武器', this.weaponA, mx, my);
+    this._drawArmorSelector(ctx, L.armorAx, L.armorAy, '你的护甲', this.armorA, mx, my);
     this._drawActionBtn(ctx, L.startBtn, '开始对战', '#4499ff', mx, my);
     this._drawActionBtn(ctx, L.backBtn, '← 返回', '#666', mx, my);
 
@@ -373,10 +451,12 @@ export class Menu {
     const L = this._layoutSub('spectate');
 
     this._drawSubHeader(ctx, cw, '🦗 斗蛐蛐', '选择双方武器和AI难度，观看对决');
-    this._drawDiffSelector(ctx, L.diffAx, L.diffAy, '左方难度', this.diffA, '#4499ff', mx, my);
+    this._drawDiffSelector(ctx, L.diffAx, L.diffAy, '左方难度', this.diffA, '#4499ff', mx, my, true);
     this._drawWeaponSelector(ctx, L.weaponAx, L.weaponAy, '左方武器', this.weaponA, mx, my);
-    this._drawDiffSelector(ctx, L.diffBx, L.diffBy, '右方难度', this.diffB, '#ff4444', mx, my);
+    this._drawArmorSelector(ctx, L.armorAx, L.armorAy, '左方护甲', this.armorA, mx, my);
+    this._drawDiffSelector(ctx, L.diffBx, L.diffBy, '右方难度', this.diffB, '#ff4444', mx, my, true);
     this._drawWeaponSelector(ctx, L.weaponBx, L.weaponBy, '右方武器', this.weaponB, mx, my);
+    this._drawArmorSelector(ctx, L.armorBx, L.armorBy, '右方护甲', this.armorB, mx, my);
     this._drawActionBtn(ctx, L.startBtn, '开始观战', '#ffaa33', mx, my);
     this._drawActionBtn(ctx, L.backBtn, '← 返回', '#666', mx, my);
   }
@@ -393,8 +473,10 @@ export class Menu {
     this._drawSubHeader(ctx, cw, '📊 自动测试', '配置参数后选择测试方式');
     this._drawDiffSelector(ctx, L.diffAx, L.diffAy, '左方难度', this.diffA, '#4499ff', mx, my);
     this._drawWeaponSelector(ctx, L.weaponAx, L.weaponAy, '左方武器', this.weaponA, mx, my);
+    this._drawArmorSelector(ctx, L.armorAx, L.armorAy, '左方护甲', this.armorA, mx, my);
     this._drawDiffSelector(ctx, L.diffBx, L.diffBy, '右方难度', this.diffB, '#ff4444', mx, my);
     this._drawWeaponSelector(ctx, L.weaponBx, L.weaponBy, '右方武器', this.weaponB, mx, my);
+    this._drawArmorSelector(ctx, L.armorBx, L.armorBy, '右方护甲', this.armorB, mx, my);
 
     // 轮数控制
     const ry = L.roundsY;
@@ -430,15 +512,19 @@ export class Menu {
 
     if (page === 'pvai') {
       const diffX = cx - selectorW / 2;
-      const diffY = ch * 0.30;
+      const diffY = ch * 0.25;
       const weaponW = WEAPON_LIST.length * 52;
       const weaponAx = cx - weaponW / 2;
       const weaponAy = diffY + 65;
+      const armorW = ARMOR_LIST.length * 52;
+      const armorAx = cx - armorW / 2;
+      const armorAy = weaponAy + 55;
       return {
         diffX, diffY,
         weaponAx, weaponAy,
-        startBtn: { x: cx - btnW / 2, y: weaponAy + 100, w: btnW, h: btnH },
-        backBtn:  { x: cx - 60, y: weaponAy + 160, w: 120, h: 34 },
+        armorAx, armorAy,
+        startBtn: { x: cx - btnW / 2, y: armorAy + 70, w: btnW, h: btnH },
+        backBtn:  { x: cx - 60, y: armorAy + 130, w: 120, h: 34 },
       };
     }
 
@@ -446,18 +532,24 @@ export class Menu {
       const diffGap = 50;
       const diffAx = cx - selectorW - diffGap / 2;
       const diffBx = cx + diffGap / 2;
-      const diffY = ch * 0.26;
+      const diffY = ch * 0.22;
       const weaponW = WEAPON_LIST.length * 52;
       const weaponAx = cx - weaponW - 10;
       const weaponBx = cx + 10;
       const weaponY = diffY + 60;
+      const armorW = ARMOR_LIST.length * 52;
+      const armorAx = cx - armorW - 10;
+      const armorBx = cx + 10;
+      const armorY = weaponY + 55;
       return {
         diffAx, diffAy: diffY,
         diffBx, diffBy: diffY,
         weaponAx, weaponAy: weaponY,
         weaponBx, weaponBy: weaponY,
-        startBtn: { x: cx - btnW / 2, y: weaponY + 110, w: btnW, h: btnH },
-        backBtn:  { x: cx - 60, y: weaponY + 170, w: 120, h: 34 },
+        armorAx, armorAy: armorY,
+        armorBx, armorBy: armorY,
+        startBtn: { x: cx - btnW / 2, y: armorY + 80, w: btnW, h: btnH },
+        backBtn:  { x: cx - 60, y: armorY + 140, w: 120, h: 34 },
       };
     }
 
@@ -465,16 +557,25 @@ export class Menu {
     const diffGap = 50;
     const diffAx = cx - selectorW - diffGap / 2;
     const diffBx = cx + diffGap / 2;
-    const diffY = ch * 0.22;
+    const diffY = ch * 0.18;
     const weaponW = WEAPON_LIST.length * 52;
     const weaponAx = cx - weaponW - 10;
     const weaponBx = cx + 10;
     const weaponY = diffY + 60;
-    const roundsY = weaponY + 60;
+    const armorW = ARMOR_LIST.length * 52;
+    const armorAx = cx - armorW - 10;
+    const armorBx = cx + 10;
+    const armorY = weaponY + 55;
+    const roundsY = armorY + 55;
     const startBtnY = roundsY + 52;
     return {
       diffAx, diffAy: diffY,
       diffBx, diffBy: diffY,
+      weaponAx, weaponAy: weaponY,
+      weaponBx, weaponBy: weaponY,
+      armorAx, armorAy: armorY,
+      armorBx, armorBy: armorY,
+      roundsY,
       weaponAx, weaponAy: weaponY,
       weaponBx, weaponBy: weaponY,
       roundsY,
@@ -542,14 +643,15 @@ export class Menu {
     ctx.fillText(label, rect.x + rect.w / 2, rect.y + rect.h / 2 + 6);
   }
 
-  _drawDiffSelector(ctx, x, y, label, value, accentColor, mx, my) {
+  _drawDiffSelector(ctx, x, y, label, value, accentColor, mx, my, showGodTier) {
     const names = ['新手', '普通', '熟练', '困难', '大师'];
     const colors = ['#66cc66', '#cccc66', '#ff9933', '#ff5555', '#ff2222'];
 
     ctx.fillStyle = accentColor;
     ctx.font = 'bold 14px "Microsoft YaHei", sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText(label, x + 5 * 42 / 2 - 3, y - 10);
+    const totalW = showGodTier ? 5 * 42 + 8 + 36 : 5 * 42;
+    ctx.fillText(label, x + totalW / 2 - 3, y - 10);
 
     for (let i = 0; i < 5; i++) {
       const bx = x + i * 42;
@@ -568,10 +670,34 @@ export class Menu {
       ctx.fillText(i + 1, bx + 18, y + 20);
     }
 
-    ctx.fillStyle = colors[value - 1];
-    ctx.font = '12px "Microsoft YaHei", sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText(names[value - 1], x + 5 * 42 / 2 - 3, y + 46);
+    // 神级难度按钮
+    if (showGodTier) {
+      const bx = x + 5 * 42 + 8;
+      const selected = value === 99;
+      const hovered = mx >= bx && mx <= bx + 36 && my >= y && my <= y + 30;
+      ctx.fillStyle = selected ? '#ff00ff' : hovered ? 'rgba(255,0,255,0.15)' : 'rgba(255,255,255,0.05)';
+      ctx.fillRect(bx, y, 36, 30);
+      ctx.strokeStyle = selected ? '#fff' : hovered ? 'rgba(255,0,255,0.5)' : 'rgba(255,255,255,0.12)';
+      ctx.lineWidth = selected ? 2 : 1;
+      ctx.strokeRect(bx, y, 36, 30);
+      ctx.fillStyle = selected ? '#fff' : '#cc66cc';
+      ctx.font = 'bold 14px "Microsoft YaHei", sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('神', bx + 18, y + 21);
+    }
+
+    const nameIdx = value === 99 ? -1 : value - 1;
+    if (nameIdx >= 0) {
+      ctx.fillStyle = colors[nameIdx];
+      ctx.font = '12px "Microsoft YaHei", sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(names[nameIdx], x + totalW / 2 - 3, y + 46);
+    } else {
+      ctx.fillStyle = '#ff00ff';
+      ctx.font = '12px "Microsoft YaHei", sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('神级', x + totalW / 2 - 3, y + 46);
+    }
   }
 
   _drawWeaponSelector(ctx, x, y, label, selectedId, mx, my) {
@@ -601,6 +727,36 @@ export class Menu {
       ctx.fillStyle = selected ? '#fff' : '#777';
       ctx.font = '10px "Microsoft YaHei", sans-serif';
       ctx.fillText(w.name, bx + 23, y + 33);
+    }
+  }
+
+  _drawArmorSelector(ctx, x, y, label, selectedId, mx, my) {
+    ctx.fillStyle = '#888';
+    ctx.font = 'bold 13px "Microsoft YaHei", sans-serif';
+    ctx.textAlign = 'center';
+    const totalW = ARMOR_LIST.length * 52;
+    ctx.fillText(label, x + totalW / 2 - 3, y - 10);
+
+    for (let i = 0; i < ARMOR_LIST.length; i++) {
+      const a = ARMOR_LIST[i];
+      const bx = x + i * 52;
+      const selected = a.id === selectedId;
+      const hovered = mx >= bx && mx <= bx + 46 && my >= y && my <= y + 38;
+
+      ctx.fillStyle = selected ? (a.armorColor || '#556') : hovered ? 'rgba(255,255,255,0.10)' : 'rgba(255,255,255,0.05)';
+      ctx.fillRect(bx, y, 46, 38);
+      ctx.strokeStyle = selected ? '#fff' : hovered ? 'rgba(255,255,255,0.4)' : 'rgba(255,255,255,0.12)';
+      ctx.lineWidth = selected ? 2 : 1;
+      ctx.strokeRect(bx, y, 46, 38);
+
+      ctx.fillStyle = selected ? '#fff' : '#999';
+      ctx.font = '16px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(a.icon, bx + 23, y + 18);
+
+      ctx.fillStyle = selected ? '#fff' : '#777';
+      ctx.font = '10px "Microsoft YaHei", sans-serif';
+      ctx.fillText(a.name, bx + 23, y + 33);
     }
   }
 

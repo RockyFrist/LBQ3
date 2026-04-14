@@ -156,6 +156,14 @@ export class Renderer {
     // 状态特效
     this._drawStateEffect(ctx, f);
 
+    // ---- 头顶名字标签 ----
+    if (f.showNameTag && f.name) {
+      ctx.fillStyle = 'rgba(255,255,255,0.75)';
+      ctx.font = 'bold 11px "Microsoft YaHei", sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(f.name, 0, -(f.radius + 14));
+    }
+
     ctx.restore();
   }
 

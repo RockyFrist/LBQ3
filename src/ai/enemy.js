@@ -4,11 +4,13 @@ import * as C from '../core/constants.js';
 import { buildAIConfig } from './ai-config.js';
 import { planMethods } from './ai-plans.js';
 import { getWeapon } from '../weapons/weapon-defs.js';
+import { getArmor } from '../weapons/armor-defs.js';
 
 export class Enemy {
-  constructor(x, y, difficulty = 2, { scale = 1, hpMult = 1, color = '#ff4444', name = '敌人', weaponId = 'dao' } = {}) {
+  constructor(x, y, difficulty = 2, { scale = 1, hpMult = 1, color = '#ff4444', name = '敌人', weaponId = 'dao', armorId = 'none' } = {}) {
     const weapon = getWeapon(weaponId);
-    this.fighter = new Fighter(x, y, { color: color || weapon.color, team: 1, name, scale, hpMult, weapon });
+    const armor = getArmor(armorId);
+    this.fighter = new Fighter(x, y, { color: color || weapon.color, team: 1, name, scale, hpMult, weapon, armor });
     this.difficulty = difficulty;
     this.aiState = 'approach';
     this.aiTimer = 0;
@@ -43,6 +45,9 @@ export class Enemy {
     this._lastAngleToOpp = 0;
     this._circlingThreshold = 1.8; // 绕圈超过1.8秒强制出手
 
+    // 绝技闪避限制：每次对手绝技只判定一次
+    this._ultReacted = false;
+
     // HTN 计划系统（多步策略链）
     this._plan = [];
     this._planIdx = 0;
@@ -60,7 +65,9 @@ export class Enemy {
     // difficulty 1=新手  2=普通  3=熟练  4=困难  5=大师
     //           6=拼刀训练  7=格挡乒乓训练
     this._cfg = buildAIConfig(difficulty);
-    this.trainingMode = difficulty >= 6 ? difficulty : 0;
+    this.trainingMode = (difficulty >= 6 && difficulty <= 7) ? difficulty : 0;
+    // 神级AI(99)有效难度=5，用于公式中的 (difficulty-1)/4 缩放计算
+    this._effDiff = Math.min(difficulty, 5);
 
     // 武器AI特化：将 weapon.aiHints 融入基础难度配置
     this._applyWeaponHints();
@@ -120,7 +127,7 @@ export class Enemy {
 
     // maxComboBonus → 武器特化连击加成，按难度缩放（D3=0, D4=一半, D5=全量）
     if (hints.maxComboBonus) {
-      cfg.maxCombo += Math.floor(hints.maxComboBonus * Math.max(0, this.difficulty - 2) / 3);
+      cfg.maxCombo += Math.floor(hints.maxComboBonus * Math.max(0, this._effDiff - 2) / 3);
     }
   }
 
@@ -265,8 +272,10 @@ export class Enemy {
 
     this.thinkCD -= dt;
     this.aiTimer -= dt;
-    this.attackCooldown -= dt;
-    if (this.blockCooldown > 0) this.blockCooldown -= dt;
+    // 神级AI攻击和格挡冷却衰减更快，保持进攻压迫力
+    const cdMult = this.difficulty === 99 ? 2.0 : 1.0;
+    this.attackCooldown -= dt * cdMult;
+    if (this.blockCooldown > 0) this.blockCooldown -= dt * cdMult;
     if (this._heavyCD > 0) this._heavyCD -= dt;
     this._trackPlayer(pf);
 
@@ -296,14 +305,14 @@ export class Enemy {
       const oppSemiVuln = oppVulnerable || vulnBlocking;
       // D3+才会读状态抓机会：D3~70%概率利用 D5~95%
       const smartChance = oppVulnerable && this.difficulty >= 3
-        ? 0.55 + (this.difficulty - 3) / 2 * 0.20 : 0;
+        ? 0.55 + (this._effDiff - 3) / 2 * 0.20 : 0;
       // 对手半脆弱（格挡中）也有中等概率释放
       const semiChance = (vulnBlocking && !oppVulnerable && this.difficulty >= 3)
-        ? 0.30 + (this.difficulty - 3) / 2 * 0.15 : 0;
+        ? 0.30 + (this._effDiff - 3) / 2 * 0.15 : 0;
       // D4+对手低血量时更积极（收人头）
       const finishBonus = (this.difficulty >= 4 && pf.hp / pf.maxHp < 0.35) ? 0.30 : 0;
       // 基础概率大幅降低：对手空闲时几乎不盲目释放（D5=8%→主要靠smartChance）
-      const baseChance = oppSemiVuln ? 0 : (0.02 + (this.difficulty - 1) / 4 * 0.06);
+      const baseChance = oppSemiVuln ? 0 : (0.02 + (this._effDiff - 1) / 4 * 0.06);
       const finalChance = Math.max(baseChance + finishBonus, smartChance, semiChance);
       if (Math.random() < finalChance) {
         cmd.ultimate = true;
@@ -314,40 +323,46 @@ export class Enemy {
     }
 
     // === 反应对手绝技：startup或active阶段侧向闪避脱离 ===
+    // 使用 _ultReacted 标记，每次对手绝技只判定一次（避免每帧掷骰导致低难度也高概率闪避）
     if (pf.state === 'ultimate' && (pf.phase === 'startup' || pf.phase === 'active') && (f.state === 'idle' || f.state === 'staggered')) {
-      // startup阶段反应率更高（有预判时间），active阶段靠纯反应
-      const isStartup = pf.phase === 'startup';
-      const baseChance = isStartup ? 0.10 : 0.05;
-      const diffScale = isStartup ? 0.45 : 0.30;
-      const reactChance = baseChance + (this.difficulty - 1) / 4 * diffScale;
-      // D1: startup=10%/active=5%  D5: startup=55%/active=35%
-      if (f.state === 'idle' && f.stamina >= C.DODGE_COST && Math.random() < reactChance) {
-        cmd.dodge = true;
-        // 远离方向闪避（背向+随机偏移，比纯侧向更有效）
-        const away = ang + Math.PI;
-        const jitter = (Math.random() - 0.5) * Math.PI * 0.6;
-        cmd.dodgeAngle = away + jitter;
-        this.aiState = 'recover';
-        this.aiTimer = isStartup ? 0.5 : 0.3;
-        return cmd;
-      }
-      // stagger中也尝试脱离（出硬直瞬间闪避）
-      if (f.state === 'staggered' && !this._staggerReacted) {
-        this._staggerReacted = true;
-        // 出硬直后立即闪避脱离的意图（stagger结束后buffer一个dodge）
-        if (f.stamina >= C.DODGE_COST && Math.random() < reactChance * 0.6) {
-          f.bufferInput?.('dodge', { angle: ang + Math.PI + (Math.random() - 0.5) * 1.0 });
+      if (!this._ultReacted) {
+        this._ultReacted = true;
+        // startup阶段反应率更高（有预判时间），active阶段靠纯反应
+        const isStartup = pf.phase === 'startup';
+        const baseChance = isStartup ? 0.08 : 0.04;
+        const diffScale = isStartup ? 0.52 : 0.36;
+        const reactChance = baseChance + (this._effDiff - 1) / 4 * diffScale;
+        // D1: startup=8%/active=4%  D5: startup=60%/active=40%
+        if (f.state === 'idle' && f.stamina >= C.DODGE_COST && Math.random() < reactChance) {
+          cmd.dodge = true;
+          // 远离方向闪避（背向+随机偏移，比纯侧向更有效）
+          const away = ang + Math.PI;
+          const jitter = (Math.random() - 0.5) * Math.PI * 0.6;
+          cmd.dodgeAngle = away + jitter;
+          this.aiState = 'recover';
+          this.aiTimer = isStartup ? 0.5 : 0.3;
+          return cmd;
+        }
+        // stagger中也尝试脱离（出硬直瞬间闪避）
+        if (f.state === 'staggered' && !this._staggerReacted) {
+          this._staggerReacted = true;
+          if (f.stamina >= C.DODGE_COST && Math.random() < reactChance * 0.6) {
+            f.bufferInput?.('dodge', { angle: ang + Math.PI + (Math.random() - 0.5) * 1.0 });
+          }
         }
       }
+    } else {
+      // 对手不在绝技状态时重置标记
+      this._ultReacted = false;
     }
     if (justExitedParryStunned) {
       // AI攻击被格挡后恢复：二次博弈决策
       this.aiTimer = 0;
       this.attackCooldown = 0;
       this.thinkCD = 0;
-      const diffScale = (this.difficulty - 1) / 4; // 0~1
-      // 高难度允许短冷却后格挡
-      this.blockCooldown = Math.max(0.3, 1.0 - diffScale * 0.6); // D1=1.0 D5=0.40
+      const diffScale = (this._effDiff - 1) / 4; // 0~1
+      // 高难度允许短冷却后格挡；D99近乎无冷却
+      this.blockCooldown = this.difficulty === 99 ? 0.10 : Math.max(0.3, 1.0 - diffScale * 0.6);
       // 武器插件优先
       const plugin = f.weapon.aiPlugin;
       if (plugin?.postParried && plugin.postParried(this, f, pf, d, ang, cmd, cfg)) {
@@ -398,6 +413,24 @@ export class Enemy {
       const plugin = f.weapon.aiPlugin;
       if (plugin?.postParry && plugin.postParry(this, f, pf, d, ang, cmd, cfg)) {
         this._logDecision(this._gameTime, 'post_parry', 'plugin_' + f.weapon.id, {});
+        return cmd;
+      }
+      // 神级AI：格反后必重击（最大化伤害）
+      if (this.difficulty === 99) {
+        if (this._heavyCD <= 0) {
+          cmd.heavyAttack = true;
+          this.aiState = 'recover';
+          this.aiTimer = 1.2;
+          this._heavyCD = cfg.heavyCooldown || 0;
+        } else {
+          cmd.lightAttack = true;
+          this.comboTarget = Math.min(3, cfg.maxCombo);
+          this.comboCount = 1;
+          this.aiState = 'recover';
+          this.aiTimer = 0.6;
+        }
+        this.attackCooldown = C.AI_MIN_ATTACK_INTERVAL;
+        this._logDecision(this._gameTime, 'post_parry', 'god_punish', {});
         return cmd;
       }
       const boostRoll = Math.random();
@@ -658,7 +691,7 @@ export class Enemy {
           this._logDecision(this._gameTime, 'stagger_react', 'block', { dist: +d.toFixed(0), opState: pf.state, opPhase: pf.phase });
         } else if (incomingLight) {
           // 轻击来袭 → 闪避或霸体交换
-          const diffScaleD = (this.difficulty - 1) / 4;
+          const diffScaleD = (this._effDiff - 1) / 4;
           if (Math.random() < cfg.dodgeChance * 1.5 && f.stamina >= C.DODGE_COST) {
             cmd.dodge = true;
             cmd.dodgeAngle = ang + (Math.random() < 0.5 ? Math.PI / 2 : -Math.PI / 2);
@@ -678,7 +711,7 @@ export class Enemy {
           // else: 接受命中后自然恢复（不白白浪费体力举盾）
         } else if (!incomingLight && !incomingHeavy && f.stateTimer > f.staggerDuration * 0.4) {
           // 对手还没出招 → 主动博弈
-          const diffScaleG = (this.difficulty - 1) / 4;
+          const diffScaleG = (this._effDiff - 1) / 4;
           const guessChance = diffScaleG * 0.65; // D3=0.33 D4=0.49 D5=0.65
           if (Math.random() < guessChance) {
             const guess = Math.random();
@@ -802,7 +835,7 @@ export class Enemy {
     if (playerThreat && d < 120 && this.thinkCD <= 0 && !aiCommitted) {
       const r = Math.random();
       // 根据对手当前攻击类型 + 自身难度智能选择反应
-      const diffScaleR = (this.difficulty - 1) / 4; // 0(D1) ~ 1(D5)
+      const diffScaleR = (this._effDiff - 1) / 4; // 0(D1) ~ 1(D5)
       const isHeavyThreat = pf.state === 'heavyAttack';
 
       // 高难度AI能区分轻/重攻击并采取最优反应（二次方缩放拉开识别精度）
@@ -811,7 +844,7 @@ export class Enemy {
       if (isHeavyThreat && Math.random() < identifyChance) {
         // === 识别重击 → 交换/格挡/闪避（高难度偏进攻，保持节奏） ===
         // D4+ 有概率选择霸体重击交换（牺牲防御换攻击节奏）
-        const tradeOverBlock = this.difficulty >= 4 ? 0.20 + (this.difficulty - 4) * 0.30 : 0; // D4=20% D5=50%
+        const tradeOverBlock = this.difficulty >= 4 ? 0.20 + (this._effDiff - 4) * 0.30 : 0; // D4=20% D5=50%
         if (this._heavyCD <= 0 && Math.random() < tradeOverBlock) {
           cmd.heavyAttack = true;
           this.aiState = 'recover';
@@ -890,9 +923,13 @@ export class Enemy {
           }
         }
       }
-      // 反应冷却：难度越高恢复越快（D1=0.22s D3=0.16s D5=0.10s）
-      const reactionFloor = 0.10 + (5 - this.difficulty) * 0.03;
-      this.thinkCD = Math.max(this._jitteredThinkCD(), reactionFloor);
+      // 反应冷却：难度越高恢复越快（D1=0.22s D3=0.16s D5=0.10s）D99=即时
+      if (this.difficulty === 99) {
+        this.thinkCD = 0.02; // 神级AI几乎无反应间隔
+      } else {
+        const reactionFloor = 0.10 + (5 - this._effDiff) * 0.03;
+        this.thinkCD = Math.max(this._jitteredThinkCD(), reactionFloor);
+      }
       return cmd;
     }
 
@@ -911,7 +948,8 @@ export class Enemy {
         if (approachPlugin?.approachOverride && d <= cfg.approachDist + 80 &&
             approachPlugin.approachOverride(this, f, pf, d, ang, cmd, cfg)) {
           // 插件已处理移动，但还需检查是否该进入攻击决策
-          if (d <= cfg.approachDist && this.thinkCD <= 0) {
+          // 使用 approachDist+20 作为阈值，避免插件侧步范围内无法触发决策（匕首死区）
+          if (d <= cfg.approachDist + 20 && this.thinkCD <= 0) {
             this._decide(d);
             this.thinkCD = this._jitteredThinkCD();
           }
@@ -1086,7 +1124,7 @@ export class Enemy {
         } else if (pf.phase === 'active') {
           // 玩家释放重击！根据难度混合应对
           const rr = Math.random();
-          const diffReadScale = (this.difficulty - 1) / 4; // 0~1
+          const diffReadScale = (this._effDiff - 1) / 4; // 0~1
           const blockRate = 0.30 + diffReadScale * 0.35; // D1=30%, D5=65%
           if (rr < blockRate && this.blockCooldown <= 0) {
             cmd.blockHeld = true;
@@ -1166,7 +1204,7 @@ export class Enemy {
         const perpX = -fwdY * this._strafeDir;
         const perpY = fwdX * this._strafeDir;
         const targetDist = cfg.approachDist;
-        const footsieStrafe = 0.15 + (this.difficulty - 1) * 0.06; // D3=0.27 D5=0.39
+        const footsieStrafe = 0.15 + (this._effDiff - 1) * 0.06; // D3=0.27 D5=0.39
         if (this._footsiePhase === 0) {
           // 前探：走进攻击范围
           cmd.moveX = fwdX * 0.6 + perpX * footsieStrafe;

@@ -22,6 +22,7 @@ export class Fighter {
     this.color = color;
     this.team = team;
     this.name = name;
+    this.showNameTag = false; // 擂台/赛马等模式在角色头顶显示名字
     this.scale = scale;
     this.radius = C.FIGHTER_RADIUS * scale;
 

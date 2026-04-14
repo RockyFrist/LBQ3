@@ -135,6 +135,8 @@ export class HorseRacingMode {
 
     this.enemies = [eA, eB];
     this.fighters = [eA.fighter, eB.fighter];
+    // 赛马模式显示名字标签
+    for (const f of this.fighters) f.showNameTag = true;
   }
 
   tickFight(dt) {

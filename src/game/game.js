@@ -45,7 +45,9 @@ export class Game {
     this.difficulty = opts.diffB || 2;
     this.playerWeaponId = opts.weaponA || 'dao';
     this.enemyWeaponId = opts.weaponB || 'dao';
-    this.player = new Player(C.ARENA_W / 2, C.ARENA_H / 2, { weaponId: this.playerWeaponId });
+    this.playerArmorId = opts.armorA || 'none';
+    this.enemyArmorId = opts.armorB || 'none';
+    this.player = new Player(C.ARENA_W / 2, C.ARENA_H / 2, { weaponId: this.playerWeaponId, armorId: this.playerArmorId });
     this.enemies = [];
     this.allFighters = [];
 
@@ -53,9 +55,9 @@ export class Game {
     this.playerAI = null;
     if (this.mode === 'spectate' || this.mode === 'test') {
       const diffA = opts.diffA || 3;
-      this.playerAI = new Enemy(C.ARENA_W / 2, C.ARENA_H / 2, diffA, { weaponId: this.playerWeaponId });
+      this.playerAI = new Enemy(C.ARENA_W / 2, C.ARENA_H / 2, diffA, { weaponId: this.playerWeaponId, armorId: this.playerArmorId });
       this.playerAI.fighter = this.player.fighter; // 复用player的fighter
-      this.playerAI.fighter.name = `AI-${diffA}(蓝)`;
+      this.playerAI.fighter.name = diffA === 99 ? `神级AI(蓝)` : `AI-${diffA}(蓝)`;
       this.playerAI.fighter.color = '#4499ff';
     }
 
@@ -201,9 +203,9 @@ export class Game {
       return;
     }
 
-    const enemy = new Enemy(ex, ey, this.difficulty, { weaponId: this.enemyWeaponId });
+    const enemy = new Enemy(ex, ey, this.difficulty, { weaponId: this.enemyWeaponId, armorId: this.enemyArmorId });
     if (this.mode === 'spectate' || this.mode === 'test') {
-      enemy.fighter.name = `AI-${this.difficulty}(红)`;
+      enemy.fighter.name = this.difficulty === 99 ? `神级AI(红)` : `AI-${this.difficulty}(红)`;
     } else {
       enemy.fighter.name = `敌人${this.enemies.length + 1}`;
     }
@@ -239,7 +241,7 @@ export class Game {
 
   reset() {
     this._victoryTimer = -1;
-    this.player = new Player(C.ARENA_W / 2, C.ARENA_H / 2, { weaponId: this.playerWeaponId });
+    this.player = new Player(C.ARENA_W / 2, C.ARENA_H / 2, { weaponId: this.playerWeaponId, armorId: this.playerArmorId });
     if (this.playerAI && this.playerAI.isNN) {
       // 武圣观战: 重新设置 NN 代理
       this.playerAI = { fighter: this.player.fighter, isNN: true };
@@ -249,9 +251,9 @@ export class Game {
       this._nnLastAction = 0;
     } else if (this.playerAI) {
       const diffA = this.playerAI.difficulty;
-      this.playerAI = new Enemy(C.ARENA_W / 2, C.ARENA_H / 2, diffA, { weaponId: this.playerWeaponId });
+      this.playerAI = new Enemy(C.ARENA_W / 2, C.ARENA_H / 2, diffA, { weaponId: this.playerWeaponId, armorId: this.playerArmorId });
       this.playerAI.fighter = this.player.fighter;
-      this.playerAI.fighter.name = `AI-${diffA}(蓝)`;
+      this.playerAI.fighter.name = diffA === 99 ? `神级AI(蓝)` : `AI-${diffA}(蓝)`;
       this.playerAI.fighter.color = '#4499ff';
     }
     if (this.mode === 'wusheng') {

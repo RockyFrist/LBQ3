@@ -328,6 +328,8 @@ export class ArenaMode {
     }
 
     this.allFighters = this.fighters;
+    // 擂台模式显示名字标签
+    for (const f of this.fighters) f.showNameTag = true;
     this._addComment(pick(
       this.matchType === 'teamfight' ? COMMENTARY.teamFightStart :
       this.matchType === 'brawl' ? COMMENTARY.brawlStart :
