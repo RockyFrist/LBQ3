@@ -6,6 +6,7 @@ import {
   QUEST_TYPES, maxDisciples, availableArmors, expToLevel,
   ITEM_QUALITY, itemLabel, WEAPON_IDS,
   FAME_TIERS, getFameTier, SHOP_POOL,
+  PERSONALITY_TYPES,
 } from './sect-data.js';
 
 // ===== 颜色常量 =====
@@ -418,6 +419,14 @@ export class SectUI {
     ctx.font = `bold ${narrow ? 11 : 13}px ${FONT}`;
     const nameStr = `${d.name}`;
     ctx.fillText(nameStr, x + 8, y + (narrow ? 12 : 14));
+    // 个性图标
+    const _pMini = PERSONALITY_TYPES[d.personality];
+    if (_pMini) {
+      const _nw = ctx.measureText(nameStr).width;
+      ctx.fillStyle = _pMini.color;
+      ctx.font = `${narrow ? 9 : 10}px ${FONT}`;
+      ctx.fillText(_pMini.icon, x + 8 + _nw + 3, y + (narrow ? 12 : 14));
+    }
 
     ctx.fillStyle = COL_DIM;
     ctx.font = `${narrow ? 9 : 11}px ${FONT}`;
@@ -582,6 +591,14 @@ export class SectUI {
     const wLabel = itemLabel(WEAPON_NAMES[d.weaponId] || '?', d.weaponQuality || 'normal');
     const aLabel = itemLabel(ARMOR_NAMES[d.armorId] || '无甲', d.armorQuality || 'normal');
     ctx.fillText(`${starsText(d.talent)} · Lv${d.level}`, x + 14, cy + (narrow ? 42 : 52));
+    // 个性标签
+    const _pDet = PERSONALITY_TYPES[d.personality];
+    if (_pDet) {
+      const _sw = ctx.measureText(`${starsText(d.talent)} · Lv${d.level}`).width;
+      ctx.fillStyle = _pDet.color;
+      ctx.font = `bold ${narrow ? 10 : 12}px ${FONT}`;
+      ctx.fillText(`  ${_pDet.icon}${_pDet.name}`, x + 14 + _sw, cy + (narrow ? 42 : 52));
+    }
     ctx.fillStyle = wQCol;
     ctx.fillText(`⚔ ${wLabel}`, x + 14, cy + (narrow ? 54 : 64));
     ctx.fillStyle = aQCol;
@@ -1602,6 +1619,67 @@ export class SectUI {
     this._buttons.push({ ...cancelRect, action: { type: 'cancelTalentSelect' } });
   }
 
+  // ===== 成就弹窗 =====
+  drawAchievementPopup(ctx, cw, ch, ach, mx, my, narrow) {
+    this._buttons = this._buttons || [];
+    ctx.fillStyle = 'rgba(0,0,0,0.72)';
+    ctx.fillRect(0, 0, cw, ch);
+
+    const pw = Math.min(cw - 40, narrow ? 280 : 360);
+    const ph = narrow ? 200 : 230;
+    const px = (cw - pw) / 2;
+    const py = (ch - ph) / 2;
+
+    // 背景
+    ctx.fillStyle = '#12101e';
+    ctx.beginPath(); ctx.roundRect(px, py, pw, ph, 12); ctx.fill();
+    // 金色边框（双层光晕）
+    ctx.shadowColor = ach.color;
+    ctx.shadowBlur = 18;
+    ctx.strokeStyle = ach.color;
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.roundRect(px, py, pw, ph, 12); ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    // 顶部 "成就解锁！"
+    ctx.textAlign = 'center';
+    ctx.fillStyle = ach.color;
+    ctx.font = `bold ${narrow ? 11 : 13}px ${FONT}`;
+    ctx.fillText('🏆 成就解锁！', cw / 2, py + (narrow ? 26 : 30));
+
+    // 大图标
+    ctx.font = `${narrow ? 36 : 44}px ${FONT}`;
+    ctx.fillStyle = '#fff';
+    ctx.fillText(ach.icon, cw / 2, py + (narrow ? 72 : 86));
+
+    // 成就名
+    ctx.font = `bold ${narrow ? 18 : 22}px ${FONT}`;
+    ctx.fillStyle = '#fff';
+    ctx.fillText(ach.name, cw / 2, py + (narrow ? 100 : 118));
+
+    // 描述
+    ctx.font = `${narrow ? 11 : 13}px ${FONT}`;
+    ctx.fillStyle = '#aaa';
+    ctx.fillText(ach.desc, cw / 2, py + (narrow ? 118 : 140));
+
+    // 奖励
+    const rewardParts = [];
+    if (ach.reward?.gold) rewardParts.push(`+${ach.reward.gold}💰银两`);
+    if (ach.reward?.fame) rewardParts.push(`+${ach.reward.fame}🏆声望`);
+    if (rewardParts.length > 0) {
+      ctx.font = `bold ${narrow ? 12 : 14}px ${FONT}`;
+      ctx.fillStyle = '#ffdd44';
+      ctx.fillText(`奖励：${rewardParts.join(' ')}`, cw / 2, py + (narrow ? 138 : 163));
+    }
+
+    // 确认按钮
+    const bw = narrow ? 100 : 120;
+    const bh = narrow ? 28 : 34;
+    const btnRect = { x: cw / 2 - bw / 2, y: py + ph - (narrow ? 42 : 50), w: bw, h: bh };
+    drawBtn(ctx, btnRect, '太棒了！', ach.color, mx, my, { fontSize: narrow ? 13 : 15 });
+    this._buttons.push({ ...btnRect, action: { type: 'closeAchievement' } });
+  }
+
   // ===== 存档选择弹窗 =====
   drawSaveSlots(ctx, cw, ch, slots, mode, mx, my, narrow) {
     this._buttons = this._buttons || [];
@@ -1663,16 +1741,229 @@ export class SectUI {
     this._buttons.push({ ...cancelRect, action: { type: 'cancelSave' } });
   }
 
-  // ===== 训练全体动画(快速) =====
-  drawTrainAnim(ctx, cw, ch, progress, narrow) {
-    ctx.fillStyle = 'rgba(0,0,0,0.5)';
+  // ===== 训练动画（完整版：弟子入场 → 体力条动画 → 台词气泡 → 点击继续）=====
+  drawTrainAnim(ctx, cw, ch, progress, narrow, animData, waitForClick) {
+    if (!animData) return;
+    const fs = narrow ? 11 : 13;
+    const now = Date.now();
+
+    // 半透明遮罩
+    const overlayAlpha = Math.min(0.88, progress * 3);
+    ctx.fillStyle = `rgba(4,4,18,${overlayAlpha})`;
     ctx.fillRect(0, 0, cw, ch);
+
+    // 标题
+    const titleAlpha = Math.min(1, progress * 5);
+    ctx.globalAlpha = titleAlpha;
     ctx.textAlign = 'center';
-    ctx.fillStyle = COL_ACCENT;
+    const isSingle = animData.type === 'single';
+    const singleName = isSingle ? animData.disciples[0]?.disciple?.name || '' : '';
+    const titleText  = isSingle ? `⚔ ${singleName} 专项修炼` : '⚔ 全体训练';
+    ctx.fillStyle = '#4499ff';
     ctx.font = `bold ${narrow ? 18 : 24}px ${FONT}`;
-    ctx.fillText('🗡 训练中...', cw / 2, ch / 2 - 20);
-    const barW = Math.min(cw - 60, 250);
-    drawBar(ctx, (cw - barW) / 2, ch / 2, barW, 12, progress, COL_BTN);
+    ctx.fillText(titleText, cw / 2, narrow ? 44 : 54);
+    ctx.globalAlpha = 1;
+
+    const disciples = animData.disciples || [];
+    const count = disciples.length;
+
+    // 弟子布局（环绕中心）
+    const cx = cw / 2;
+    const cy = ch * (isSingle ? 0.42 : 0.44);
+    const radius = Math.min(cw * 0.36, ch * 0.26, isSingle ? 0 : 120);
+    const dotR   = narrow ? (isSingle ? 30 : 20) : (isSingle ? 36 : 24);
+
+    for (let i = 0; i < count; i++) {
+      const { disciple: d, oldStamina, newStamina, expGain } = disciples[i];
+
+      // 弟子位置（单人居中，多人散开）
+      let dx, dy;
+      if (count === 1) {
+        dx = cx; dy = cy;
+      } else {
+        const spreadAngle = Math.PI * 1.5;
+        const startA = -Math.PI / 2 - spreadAngle / 2;
+        const step   = count > 1 ? spreadAngle / (count - 1) : 0;
+        const a = startA + i * step;
+        dx = cx + Math.cos(a) * radius;
+        dy = cy + Math.sin(a) * radius * 0.55;
+      }
+
+      // 入场动画（向上弹入）
+      const appearT = Math.max(0, Math.min(1, progress * 5 - i * 0.35));
+      const bounceOff = appearT < 1 ? Math.sin(appearT * Math.PI) * 18 : 0;
+      const ay = dy - bounceOff;
+      ctx.globalAlpha = appearT;
+
+      // 脉冲光环（训练中）
+      if (progress > 0.25 && progress < 0.9) {
+        const pulseT = ((now * 0.003 + i * 1.3) % 1);
+        const pulseR = dotR + 4 + pulseT * 12;
+        const pulseAlpha = (1 - pulseT) * 0.4;
+        ctx.globalAlpha = appearT * pulseAlpha;
+        ctx.strokeStyle = d.color || '#4499ff';
+        ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(dx, ay, pulseR, 0, Math.PI * 2); ctx.stroke();
+        ctx.globalAlpha = appearT;
+      }
+
+      // 阴影
+      ctx.fillStyle = 'rgba(0,0,0,0.3)';
+      ctx.beginPath();
+      ctx.ellipse(dx, ay + dotR + 4, dotR * 0.9, dotR * 0.3, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 弟子圆形
+      ctx.fillStyle = d.color || '#4499ff';
+      ctx.beginPath(); ctx.arc(dx, ay, dotR, 0, Math.PI * 2); ctx.fill();
+
+      // 武器图标（居中小字）
+      ctx.textAlign = 'center';
+      ctx.fillStyle = 'rgba(255,255,255,0.8)';
+      ctx.font = `${narrow ? 13 : 16}px ${FONT}`;
+      const weaponEmojis = { dao: '⚔', daggers: '🗡', hammer: '🔨', spear: '🏹', shield: '🛡' };
+      ctx.fillText(weaponEmojis[d.weaponId] || '⚔', dx, ay + (narrow ? 5 : 6));
+
+      // 名称
+      ctx.fillStyle = '#eee';
+      ctx.font = `bold ${fs}px ${FONT}`;
+      ctx.fillText(d.name, dx, ay + dotR + (narrow ? 14 : 16));
+
+      // 个性标签
+      const pType = PERSONALITY_TYPES[d.personality];
+      if (pType) {
+        ctx.fillStyle = pType.color;
+        ctx.font = `${narrow ? 9 : 10}px ${FONT}`;
+        ctx.fillText(`${pType.icon}${pType.name}`, dx, ay + dotR + (narrow ? 25 : 28));
+      }
+
+      // 体力条（动画：从 oldStamina 到 newStamina）
+      const drainProgress = Math.max(0, Math.min(1, (progress - 0.35) / 0.45));
+      const currentSta = oldStamina - (oldStamina - newStamina) * drainProgress;
+      const barW = narrow ? 48 : 58;
+      const barH = narrow ? 5 : 6;
+      const barX = dx - barW / 2;
+      const barY = ay + dotR + (narrow ? 33 : 38);
+      ctx.fillStyle = 'rgba(255,255,255,0.08)';
+      ctx.fillRect(barX, barY, barW, barH);
+      ctx.fillStyle = currentSta > 40 ? '#ffcc44' : '#ff8844';
+      ctx.fillRect(barX, barY, barW * (currentSta / 100), barH);
+      ctx.fillStyle = 'rgba(255,255,255,0.15)';
+      ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(barX, barY, barW, barH);
+
+      // 体力耗费数字（动画后出现）
+      if (drainProgress > 0.5) {
+        const costAlpha = Math.min(1, (drainProgress - 0.5) * 4);
+        ctx.globalAlpha = appearT * costAlpha;
+        ctx.fillStyle = '#ff8844';
+        ctx.font = `${narrow ? 9 : 10}px ${FONT}`;
+        ctx.fillText(`-${oldStamina - newStamina}体`, dx + barW / 2 + (narrow ? 6 : 8), barY + (narrow ? 4 : 5));
+        // 经验数字
+        ctx.fillStyle = '#4499ff';
+        ctx.fillText(`+${expGain}exp`, dx - barW / 2 - (narrow ? 2 : 4), barY + (narrow ? 4 : 5));
+        ctx.globalAlpha = appearT;
+      }
+
+      ctx.globalAlpha = 1;
+    }
+
+    // ===== 台词气泡 =====
+    const speakers = animData.speakers || [];
+    for (const sp of speakers) {
+      if (progress < sp.showAt) continue;
+      const bubbleAlpha = Math.min(1, (progress - sp.showAt) / 0.12);
+      if (bubbleAlpha <= 0) continue;
+
+      // 找到该弟子位置
+      const didx = disciples.findIndex(item => item.disciple.id === sp.disciple.id);
+      let bx = cx, by = cy;
+      if (didx >= 0) {
+        const dd = disciples[didx];
+        const { disciple: d2 } = dd;
+        if (count === 1) { bx = cx; by = cy; }
+        else {
+          const spreadAngle = Math.PI * 1.5;
+          const startA = -Math.PI / 2 - spreadAngle / 2;
+          const step   = count > 1 ? spreadAngle / (count - 1) : 0;
+          const a = startA + didx * step;
+          bx = cx + Math.cos(a) * radius;
+          by = cy + Math.sin(a) * radius * 0.55;
+        }
+      }
+      const bubbleY = by - dotR - (narrow ? 56 : 68);
+      const maxBW = Math.min(cw - 40, narrow ? 200 : 260);
+      ctx.font = `${narrow ? 11 : 13}px ${FONT}`;
+      const textW = ctx.measureText(sp.line).width;
+      const bw = Math.min(maxBW, textW + (narrow ? 24 : 32));
+      const bh = narrow ? 28 : 34;
+      const bubX = Math.max(8, Math.min(cw - bw - 8, bx - bw / 2));
+      const bubY = Math.max(60, bubbleY);
+
+      ctx.globalAlpha = bubbleAlpha;
+      // 背景
+      ctx.fillStyle = 'rgba(20,20,40,0.92)';
+      ctx.beginPath();
+      const br = 8;
+      ctx.roundRect(bubX, bubY, bw, bh, br);
+      ctx.fill();
+      // 边框（个性颜色）
+      const pCol = PERSONALITY_TYPES[sp.disciple.personality]?.color || '#4499ff';
+      ctx.strokeStyle = pCol;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.roundRect(bubX, bubY, bw, bh, br); ctx.stroke();
+      // 小三角指向弟子
+      const tipX = Math.max(bubX + 14, Math.min(bubX + bw - 14, bx));
+      ctx.fillStyle = pCol;
+      ctx.beginPath();
+      ctx.moveTo(tipX - 5, bubY + bh);
+      ctx.lineTo(tipX + 5, bubY + bh);
+      ctx.lineTo(tipX, bubY + bh + 7);
+      ctx.closePath(); ctx.fill();
+      // 文字（超长则截断+省略号）
+      ctx.fillStyle = '#eee';
+      ctx.font = `${narrow ? 11 : 13}px ${FONT}`;
+      ctx.textAlign = 'center';
+      let line = sp.line;
+      if (ctx.measureText(line).width > bw - (narrow ? 16 : 24)) {
+        while (ctx.measureText(line + '…').width > bw - (narrow ? 16 : 24) && line.length > 0) line = line.slice(0, -1);
+        line += '…';
+      }
+      ctx.fillText(line, bubX + bw / 2, bubY + bh / 2 + 5);
+      ctx.globalAlpha = 1;
+    }
+
+    // 进度条（底部简洁）
+    if (!waitForClick) {
+      const barTW = Math.min(cw - 60, 220);
+      const barTX = (cw - barTW) / 2;
+      const barTY = ch - (narrow ? 52 : 60);
+      ctx.fillStyle = 'rgba(255,255,255,0.06)';
+      ctx.fillRect(barTX, barTY, barTW, narrow ? 4 : 5);
+      ctx.fillStyle = '#4499ff';
+      ctx.fillRect(barTX, barTY, barTW * Math.min(1, progress / 0.95), narrow ? 4 : 5);
+    }
+
+    // 点击继续提示（闪烁）
+    if (waitForClick) {
+      const flash = 0.5 + 0.5 * Math.sin(now * 0.0045);
+      ctx.globalAlpha = flash;
+      ctx.textAlign = 'center';
+      ctx.fillStyle = COL_ACCENT;
+      ctx.font = `bold ${narrow ? 13 : 15}px ${FONT}`;
+      ctx.fillText('「 点击任意处继续 」', cw / 2, ch - (narrow ? 36 : 44));
+      // 训练结果预览
+      ctx.globalAlpha = flash * 0.7;
+      ctx.fillStyle = '#88aaff';
+      ctx.font = `${narrow ? 10 : 11}px ${FONT}`;
+      const totalExp = disciples.reduce((s, dd) => s + (dd.expGain || 0), 0);
+      const preview = isSingle
+        ? `${disciples[0]?.disciple?.name || ''} 专修 +${disciples[0]?.expGain || 0}exp -20体`
+        : `${disciples.length}人训练完成 · 合计+${totalExp}exp`;
+      ctx.fillText(preview, cw / 2, ch - (narrow ? 20 : 26));
+      ctx.globalAlpha = 1;
+    }
   }
 
   // ===== 剧情弹窗 =====

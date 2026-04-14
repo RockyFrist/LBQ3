@@ -17,7 +17,9 @@ import {
   WEAPON_IDS, WEAPON_NAMES, ARMOR_NAMES, resetDiscipleIdCounter,
   checkStoryTrigger, ITEM_QUALITY, rollLootDrop, itemLabel,
   FAME_TIERS, getFameTier, SHOP_POOL, refreshShopItems,
+  PERSONALITY_TYPES, pickTrainLine, pickGroupSpeakers,
 } from './sect-data.js';
+import { checkNewAchievements, getAchievement } from './sect-achievements.js';
 
 export const sectModeMethods = {
 
@@ -44,6 +46,14 @@ export const sectModeMethods = {
     // Toast通知系统
     this.sectToast = null; // { text, color, timer }
 
+    // 训练动画数据
+    this.sectTrainAnimData = null;   // { type, disciplines, speakers }
+    this.sectTrainAnimWait = false;  // 等待点击继续
+
+    // 成就系统
+    this.sectAchievementQueue = [];  // 待展示的成就ID队列
+    this.sectAchievementCurrent = null; // 当前展示的成就ID
+
     // 剧情系统
     this.sectStoryPageIdx = 0;
     // 兼容旧存档（没有storyProgress字段）
@@ -57,7 +67,14 @@ export const sectModeMethods = {
       if (!d.weaponQuality) d.weaponQuality = 'normal';
       if (!d.armorQuality) d.armorQuality = 'normal';
       if (d.hpBonus === undefined) d.hpBonus = 0;
+      if (!d.personality) d.personality = Object.keys(PERSONALITY_TYPES)[Math.floor(Math.random() * 6)];
     }
+    // 兼容旧存档（没有achievements字段）
+    if (!this.sect.achievements) this.sect.achievements = [];
+    if (!this.sect.stats.totalTrains) this.sect.stats.totalTrains = 0;
+    if (!this.sect.stats.totalQuests) this.sect.stats.totalQuests = 0;
+    if (this.sect.stats.talentScrollsUsed === undefined) this.sect.stats.talentScrollsUsed = 0;
+    if (!this.sect.stats.shopBuys) this.sect.stats.shopBuys = 0;
 
     // 首日生成任务
     if (this.sect.quests.length === 0) {
@@ -107,12 +124,25 @@ export const sectModeMethods = {
       return;
     }
 
-    // 训练动画快速播放
+    // 训练动画：新状态机
     if (this.sectTrainAnim > 0) {
-      this.sectTrainAnim += dt * 4; // 0.25秒完成
-      if (this.sectTrainAnim >= 1) {
+      // 进度推进 (2秒完成 0→0.95)
+      if (!this.sectTrainAnimWait) {
+        this.sectTrainAnim = Math.min(0.95, this.sectTrainAnim + dt * 0.48);
+        if (this.sectTrainAnim >= 0.95) this.sectTrainAnimWait = true;
+      }
+      // 检测：点击、空格、Enter 确认执行训练
+      if (this.sectTrainAnimWait &&
+          (input.mouseLeftDown || input.pressed('Space') || input.pressed('Enter') || input.pressed('KeyZ'))) {
+        const ad = this.sectTrainAnimData;
+        if (ad?.type === 'group') {
+          this._sectDoTrainAll();
+        } else if (ad?.type === 'single' && ad.disciples[0]) {
+          this._sectTrainDisciple(ad.disciples[0].disciple);
+        }
         this.sectTrainAnim = 0;
-        this._sectDoTrainAll();
+        this.sectTrainAnimWait = false;
+        this.sectTrainAnimData = null;
       }
       return;
     }
@@ -121,6 +151,12 @@ export const sectModeMethods = {
     if (this.sectToast) {
       this.sectToast.timer -= dt;
       if (this.sectToast.timer <= 0) this.sectToast = null;
+    }
+
+    // 成就队列：无其他弹窗时弹出
+    if (!this.sectPopup && !this.sectTrainAnim && this.sectAchievementQueue.length > 0) {
+      this.sectAchievementCurrent = this.sectAchievementQueue.shift();
+      this.sectPopup = 'achievement';
     }
 
     // 战斗观看模式：直接走正常 _tick
@@ -232,6 +268,11 @@ export const sectModeMethods = {
         this.sectSelectedQuestIdx = -1;
         break;
 
+      case 'closeAchievement':
+        this.sectAchievementCurrent = null;
+        this.sectPopup = null;
+        break;
+
       case 'closeFightResult':
         this.sect.pendingFightResult = null;
         this.sectPopup = null;
@@ -292,14 +333,51 @@ export const sectModeMethods = {
 
   _sectDoAction(id, action) {
     switch (id) {
-      case 'train':
-        // 全体训练
+      case 'train': {
+        // 全体训练——先构建动画数据，动画结束后才真正执行
+        const trainable = this.sect.disciples.filter(d => !d.onQuest && d.injury <= 50 && d.stamina >= 15);
+        if (trainable.length === 0) {
+          this._sectShowToast('无可训练的弟子！', '#ff6644');
+          break;
+        }
+        const mul = trainExpMul(this.sect.buildings.dojo);
+        const expPrev = Math.floor(15 * mul);
+        this.sectTrainAnimData = {
+          type: 'group',
+          disciples: trainable.map(d => ({
+            disciple: d,
+            oldStamina: d.stamina,
+            newStamina: Math.max(0, d.stamina - 15),
+            expGain: expPrev,
+          })),
+          speakers: pickGroupSpeakers(trainable, Math.min(4, trainable.length)),
+        };
+        this.sectTrainAnimWait = false;
         this.sectTrainAnim = 0.01; // 开始动画
         break;
+      }
 
       case 'trainOne': {
         const d = this.sect.disciples.find(d => d.id === action.discipleId);
-        if (d) this._sectTrainDisciple(d);
+        if (!d) break;
+        if (d.onQuest || d.stamina < 20) {
+          this._sectShowToast(d.stamina < 20 ? '体力不足！' : '该弟子正在任务中', '#ff6644');
+          break;
+        }
+        if (d.level >= d.talent) {
+          this._sectShowToast(`${d.name}已达资质上限`, '#ff6644');
+          break;
+        }
+        const mul2 = trainExpMul(this.sect.buildings.dojo);
+        const expGain2 = Math.floor(22 * mul2);
+        this.sectTrainAnimData = {
+          type: 'single',
+          disciples: [{ disciple: d, oldStamina: d.stamina, newStamina: d.stamina - 20, expGain: expGain2 }],
+          speakers: [{ disciple: d, line: pickTrainLine(d, 'intense'), showAt: 0.3 },
+                     { disciple: d, line: pickTrainLine(d, 'normal'),   showAt: 0.65 }],
+        };
+        this.sectTrainAnimWait = false;
+        this.sectTrainAnim = 0.01;
         break;
       }
 
@@ -450,8 +528,10 @@ export const sectModeMethods = {
         const d7 = this.sect.disciples.find(d => d.id === action.discipleId);
         if (d7) {
           d7.talent = Math.min(5, d7.talent + 1);
+          this.sect.stats.talentScrollsUsed++;
           this._sectAddLog(`📜 ${d7.name} 资质突破！资质提升至${d7.talent}星`, '#ffdd00');
           this._sectShowToast(`${d7.name} 资质+1！现为${d7.talent}星`, '#ffdd00');
+          this._sectCheckAchievements();
         }
         this.sectPopup = null;
         break;
@@ -479,6 +559,7 @@ export const sectModeMethods = {
 
     this.sect.gold -= shopItem.cost;
     shopItem.sold = true;
+    this.sect.stats.shopBuys++;
 
     switch (shopItem.effect || shopItem.type) {
       case 'weapon':
@@ -571,6 +652,7 @@ export const sectModeMethods = {
         }
         break;
     }
+    this._sectCheckAchievements();
   },
 
   // ===== 训练 =====
@@ -604,11 +686,13 @@ export const sectModeMethods = {
       details.push(info);
     }
     if (trained > 0) {
+      this.sect.stats.totalTrains++;
       this._sectAddLog(`🗡 训练完成(${trained}人参与, -15体力, +${expGain}exp)`, '#4499ff');
       for (const info of details) {
         this._sectAddLog(`  · ${info}`, '#88aadd');
       }
       this._sectShowToast(`训练完成！${trained}人+${expGain}exp`, '#4499ff');
+      this._sectCheckAchievements();
     } else {
       this._sectAddLog('训练失败：无可训练弟子', '#ff6644');
       this._sectShowToast('无可训练的弟子！', '#ff6644');
@@ -663,6 +747,7 @@ export const sectModeMethods = {
     this.sect.gold -= cost;
     this.sect.buildings[buildingId] = lv + 1;
     this._sectAddLog(`${bld.icon} ${bld.name} 升级到 Lv${lv + 1}`, '#44dd88');
+    this._sectCheckAchievements();
   },
 
   // ===== 任务 =====
@@ -836,6 +921,7 @@ export const sectModeMethods = {
       levelUp: false, newTrait: null, lootDrop: null,
     };
 
+    this.sect.stats.totalQuests++;
     if (won) {
       d.wins++;
       this.sect.stats.totalWins++;
@@ -888,6 +974,7 @@ export const sectModeMethods = {
 
     this.sectPendingQuest = null;
     this.sectPendingDisciple = null;
+    this._sectCheckAchievements();
     return result;
   },
 
@@ -1015,6 +1102,7 @@ export const sectModeMethods = {
     if (!this.sectPopup) {
       this._sectCheckStory();
     }
+    this._sectCheckAchievements();
   },
 
   // ===== 事件选择处理 =====
@@ -1224,11 +1312,27 @@ export const sectModeMethods = {
           if (!d.weaponQuality) d.weaponQuality = 'normal';
           if (!d.armorQuality) d.armorQuality = 'normal';
           if (d.hpBonus === undefined) d.hpBonus = 0;
+          if (!d.personality) d.personality = Object.keys(PERSONALITY_TYPES)[Math.floor(Math.random() * 6)];
         }
         this._sectAddLog(`📂 读档成功`, '#44dd88');
       }
     }
     this.sectPopup = 'settings';
+  },
+
+  // ===== 成就检查 =====
+  _sectCheckAchievements() {
+    const newly = checkNewAchievements(this.sect);
+    for (const id of newly) {
+      const ach = getAchievement(id);
+      if (!ach) continue;
+      this.sect.achievements.push(id);
+      // 发放奖励
+      if (ach.reward?.gold)  { this.sect.gold  += ach.reward.gold;  this.sect.stats.totalGold += ach.reward.gold; }
+      if (ach.reward?.fame)  { this.sect.fame  += ach.reward.fame;  this.sect.stats.highestFame = Math.max(this.sect.stats.highestFame, this.sect.fame); }
+      this.sectAchievementQueue.push(id);
+      this._sectAddLog(`🏆 解锁成就「${ach.name}」${ach.reward?.gold ? `+${ach.reward.gold}💰` : ''}${ach.reward?.fame ? `+${ach.reward.fame}🏆` : ''}`, ach.color);
+    }
   },
 
   // ===== 剧情检查 =====
@@ -1374,11 +1478,14 @@ export const sectModeMethods = {
     } else if (this.sectPopup === 'talentSelect') {
       const eligible = this.sect.disciples.filter(d => d.talent < 5);
       this.sectUI.drawTalentSelect(ctx, lw, lh, eligible, mx, my, narrow);
+    } else if (this.sectPopup === 'achievement' && this.sectAchievementCurrent) {
+      const ach = getAchievement(this.sectAchievementCurrent);
+      if (ach) this.sectUI.drawAchievementPopup(ctx, lw, lh, ach, mx, my, narrow);
     }
 
     // 训练动画
     if (this.sectTrainAnim > 0) {
-      this.sectUI.drawTrainAnim(ctx, lw, lh, this.sectTrainAnim, narrow);
+      this.sectUI.drawTrainAnim(ctx, lw, lh, this.sectTrainAnim, narrow, this.sectTrainAnimData, this.sectTrainAnimWait);
     }
 
     // Toast通知（屏幕上方浮动提示）
