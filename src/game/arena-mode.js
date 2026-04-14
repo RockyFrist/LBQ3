@@ -343,6 +343,7 @@ export class ArenaMode {
     this.milestones = [1000, 2000, 3000, 5000, 8000];
     this.milestonesReached = [];
     this.ratings = [
+      { grade: 'S+', gold: 8000, prediction: true, label: '赌神', color: '#ff44ff' },
       { grade: 'S', gold: 8000, label: '赌圣', color: '#ffcc44' },
       { grade: 'A', gold: 5000, label: '赌侠', color: '#44ff44' },
       { grade: 'B', gold: 3000, label: '赌徒', color: '#4488ff' },
@@ -405,6 +406,15 @@ export class ArenaMode {
 
     // === 开幕定时器 ===
     this._openingTimer = 0;
+
+    // === 门票费（按轮次收取）===
+    this.entryFees = { 2: 200, 4: 500, 5: 1000 };
+    this.totalFeesPaid = 0;
+
+    // === 冠军预测 ===
+    this.predictedChampion = null;
+    this.predictionCorrect = false;
+    this.predictionBonus = 0;
 
     // === 初始化赛事 ===
     this._initTournament();
@@ -1031,6 +1041,18 @@ export class ArenaMode {
       this.phase = 'champion';
       return;
     }
+    // === 门票费 ===
+    const fee = this.entryFees[this.tournamentRound] || 0;
+    if (fee > 0) {
+      if (this.gold < fee) {
+        this._addComment(`买不起${ROUND_NAMES[this.tournamentRound]}的门票（需${fee}金），被逐出会场！`);
+        this.phase = 'gameover';
+        return;
+      }
+      this.gold -= fee;
+      this.totalFeesPaid += fee;
+      this._addComment(`缴纳${ROUND_NAMES[this.tournamentRound]}门票 -${fee}金`);
+    }
     const alive = this.pool.filter(c => !c.eliminated);
     if (alive.length === 1) {
       this._crowningChampion(alive[0]);
@@ -1057,6 +1079,14 @@ export class ArenaMode {
     this.winner = { name: contestant.displayName };
     contestant.fullName = `武林盟主 · ${contestant.displayName}`;
     this._addComment(fillTemplate(pick(COMMENTARY.champion), { winner: contestant.displayName }));
+    // === 冠军预测结算 ===
+    if (this.predictedChampion && this.predictedChampion === contestant) {
+      this.predictionCorrect = true;
+      this.predictionBonus = Math.floor(this.gold * 2);
+      this.gold += this.predictionBonus;
+      this._addComment(`🎯 神算！预测冠军命中！额外获得 ${this.predictionBonus} 金！`);
+    }
+    this.peakGold = Math.max(this.peakGold, this.gold);
   }
 
   getTournamentProgress() {
@@ -1074,6 +1104,7 @@ export class ArenaMode {
 
   getRating() {
     for (const r of this.ratings) {
+      if (r.prediction && !this.predictionCorrect) continue;
       if (this.gold >= r.gold) return r;
     }
     return this.ratings[this.ratings.length - 1];
@@ -1156,7 +1187,41 @@ export const arenaModeMethods = {
   _updateArenaOpening(dt) {
     const a = this.arena;
     a._openingTimer += dt;
-    if ((this.input.mouseLeftDown || this.input.pressed('Space')) && this._arenaClickCd <= 0 && a._openingTimer > 0.5) {
+    if (a._openingTimer < 0.5) return;
+
+    if (this.input.pressed('Space') && this._arenaClickCd <= 0) {
+      a.phase = 'bracket';
+      this._arenaClickCd = 0.3;
+      return;
+    }
+
+    if (!this.input.mouseLeftDown || this._arenaClickCd > 0) return;
+    const mx = this.input.mouseX, my = this.input.mouseY;
+    const cw = this.canvas._logicW || this.canvas.width;
+    const ch = this.canvas._logicH || this.canvas.height;
+    const cx = cw / 2;
+
+    // 16人卡牌点击→选为预测冠军
+    const cols = 4, cardW = 115, cardH = 52, gapX = 10, gapY = 6;
+    const gridW = cols * cardW + (cols - 1) * gapX;
+    const startX = cx - gridW / 2;
+    const startY = ch * 0.2;
+    for (let i = 0; i < a.pool.length; i++) {
+      const col = i % cols;
+      const row = Math.floor(i / cols);
+      const x = startX + col * (cardW + gapX);
+      const y = startY + row * (cardH + gapY);
+      if (mx >= x && mx <= x + cardW && my >= y && my <= y + cardH) {
+        a.predictedChampion = a.pool[i];
+        this._arenaClickCd = 0.15;
+        return;
+      }
+    }
+
+    // "开始比赛"按钮
+    const btnW = 160, btnH = 38;
+    const btnX = cx - btnW / 2, btnY = ch * 0.84;
+    if (mx >= btnX && mx <= btnX + btnW && my >= btnY && my <= btnY + btnH) {
       a.phase = 'bracket';
       this._arenaClickCd = 0.3;
     }
@@ -1442,12 +1507,23 @@ export const arenaModeMethods = {
     ctx.fillStyle = '#888';
     ctx.font = '12px "Microsoft YaHei", sans-serif';
     ctx.fillText('ESC 退出', lw - 12, 18);
+
+    // 冠军预测
+    if (a.predictedChampion) {
+      const pc = a.predictedChampion;
+      const predColor = pc.eliminated ? '#664444' : '#44cc44';
+      ctx.fillStyle = predColor;
+      ctx.font = '11px "Microsoft YaHei", sans-serif';
+      ctx.textAlign = 'right';
+      ctx.fillText(`🎯 ${pc.displayName}${pc.eliminated ? '(已淘汰)' : ''}`, lw - 12, 34);
+    }
   },
 
   // ===== 开幕式 =====
   _drawArenaOpening(ctx, lw, lh) {
     const a = this.arena;
     const cx = lw / 2;
+    const mx = this.input.mouseX, my = this.input.mouseY;
 
     ctx.textAlign = 'center';
     ctx.fillStyle = '#ffcc44';
@@ -1473,11 +1549,22 @@ export const arenaModeMethods = {
       const x = startX + col * (cardW + gapX);
       const y = startY + row * (cardH + gapY);
 
-      ctx.fillStyle = c.isSeed ? 'rgba(255,204,68,0.08)' : 'rgba(255,255,255,0.03)';
+      const isPredicted = a.predictedChampion === c;
+      const isHover = mx >= x && mx <= x + cardW && my >= y && my <= y + cardH;
+
+      ctx.fillStyle = isPredicted ? 'rgba(68,255,68,0.12)' : c.isSeed ? 'rgba(255,204,68,0.08)'
+        : isHover ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.03)';
       ctx.fillRect(x, y, cardW, cardH);
-      ctx.strokeStyle = c.isSeed ? '#ffcc44' : '#333';
-      ctx.lineWidth = c.isSeed ? 1.5 : 1;
+      ctx.strokeStyle = isPredicted ? '#44ff44' : c.isSeed ? '#ffcc44' : isHover ? '#555' : '#333';
+      ctx.lineWidth = isPredicted ? 2 : c.isSeed ? 1.5 : 1;
       ctx.strokeRect(x, y, cardW, cardH);
+
+      if (isPredicted) {
+        ctx.fillStyle = '#44ff44';
+        ctx.font = 'bold 10px "Microsoft YaHei", sans-serif';
+        ctx.textAlign = 'left';
+        ctx.fillText('🎯预测', x + 2, y + 12);
+      }
 
       ctx.fillStyle = '#555';
       ctx.font = '10px "Microsoft YaHei", sans-serif';
@@ -1503,7 +1590,7 @@ export const arenaModeMethods = {
         ctx.font = 'bold 9px "Microsoft YaHei", sans-serif';
         ctx.textAlign = 'right';
         ctx.fillText('👑卫冕', x + cardW - 4, y + 44);
-      } else if (c.isSeed) {
+      } else if (c.isSeed && !isPredicted) {
         ctx.fillStyle = '#ffcc44';
         ctx.font = 'bold 9px "Microsoft YaHei", sans-serif';
         ctx.textAlign = 'right';
@@ -1511,11 +1598,36 @@ export const arenaModeMethods = {
       }
     }
 
+    // 冠军预测提示
+    const hintY = startY + rows * (cardH + gapY) + 12;
     ctx.textAlign = 'center';
-    ctx.fillStyle = '#666';
-    ctx.font = '14px "Microsoft YaHei", sans-serif';
-    const blink = Math.sin(Date.now() * 0.005) > 0;
-    if (blink) ctx.fillText('点击开始比赛', cx, lh * 0.88);
+    ctx.font = '13px "Microsoft YaHei", sans-serif';
+    if (a.predictedChampion) {
+      ctx.fillStyle = '#44ff44';
+      ctx.fillText(`🎯 预测冠军: ${a.predictedChampion.displayName}（猜中奖励 3 倍金币！）`, cx, hintY);
+    } else {
+      ctx.fillStyle = '#ff8844';
+      ctx.fillText('🎯 点击选手预测冠军（可选，猜中奖励 3 倍金币！）', cx, hintY);
+    }
+
+    // 门票提示
+    ctx.fillStyle = '#888';
+    ctx.font = '11px "Microsoft YaHei", sans-serif';
+    ctx.fillText('💰 注意：进入后续轮次需缴纳门票（八强200·半决赛500·决赛1000）', cx, hintY + 18);
+
+    // "开始比赛"按钮
+    const btnW = 160, btnH = 38;
+    const btnX = cx - btnW / 2, btnY = lh * 0.84;
+    const btnHover = mx >= btnX && mx <= btnX + btnW && my >= btnY && my <= btnY + btnH;
+    ctx.fillStyle = btnHover ? '#cc3322' : '#992211';
+    ctx.fillRect(btnX, btnY, btnW, btnH);
+    ctx.strokeStyle = '#ff5544';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(btnX, btnY, btnW, btnH);
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 16px "Microsoft YaHei", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('⚔ 开始比赛', btnX + btnW / 2, btnY + btnH / 2 + 5);
   },
 
   // ===== 对阵表 =====
@@ -1913,10 +2025,36 @@ export const arenaModeMethods = {
     ctx.fillText(`已淘汰: ${dead.map(c => c.name).join('、')}`, cx, deadY);
 
     const nextRound = a.tournamentRound + 1;
+    let infoY = deadY + 30;
     if (nextRound <= 5) {
       ctx.fillStyle = '#ff8844';
       ctx.font = 'bold 14px "Microsoft YaHei", sans-serif';
-      ctx.fillText(`接下来: ${ROUND_NAMES[nextRound]}`, cx, deadY + 30);
+      ctx.fillText(`接下来: ${ROUND_NAMES[nextRound]}`, cx, infoY);
+      infoY += 22;
+
+      // 门票费提示
+      const fee = a.entryFees[nextRound] || 0;
+      if (fee > 0) {
+        const canAfford = a.gold >= fee;
+        ctx.fillStyle = canAfford ? '#ffcc44' : '#ff4444';
+        ctx.font = '13px "Microsoft YaHei", sans-serif';
+        ctx.fillText(`🎫 门票费: ${fee}金${canAfford ? '' : ' (金币不足！)'}`, cx, infoY);
+        infoY += 18;
+      }
+    }
+
+    // 预测冠军状态
+    if (a.predictedChampion) {
+      const pc = a.predictedChampion;
+      if (pc.eliminated) {
+        ctx.fillStyle = '#664444';
+        ctx.font = '12px "Microsoft YaHei", sans-serif';
+        ctx.fillText(`🎯 预测冠军 ${pc.displayName} 已淘汰`, cx, infoY);
+      } else {
+        ctx.fillStyle = '#44cc44';
+        ctx.font = '12px "Microsoft YaHei", sans-serif';
+        ctx.fillText(`🎯 预测冠军 ${pc.displayName} 仍在存活`, cx, infoY);
+      }
     }
 
     const L = this._layoutArenaRoundSummary();
@@ -1955,6 +2093,13 @@ export const arenaModeMethods = {
     ctx.fillStyle = '#888';
     ctx.font = '13px "Microsoft YaHei", sans-serif';
     ctx.fillText(`押中 ${a.totalBetWins}次  最高连赢 ${a.maxStreak}  峰值金币 ${a.peakGold}`, cx, lh * 0.52);
+
+    // 预测结果
+    if (a.predictedChampion) {
+      ctx.fillStyle = '#ff8844';
+      ctx.font = '12px "Microsoft YaHei", sans-serif';
+      ctx.fillText(`🎯 预测冠军: ${a.predictedChampion.displayName}（未完赛）`, cx, lh * 0.58);
+    }
 
     ctx.fillStyle = '#666';
     ctx.font = '13px "Microsoft YaHei", sans-serif';
@@ -2004,9 +2149,24 @@ export const arenaModeMethods = {
       ctx.fillText(`已达成里程碑: ${a.milestonesReached.join(' > ')}`, cx, lh * 0.69);
     }
 
+    // 预测结果
+    let predY = lh * 0.73;
+    if (a.predictedChampion) {
+      if (a.predictionCorrect) {
+        ctx.fillStyle = '#44ff44';
+        ctx.font = 'bold 15px "Microsoft YaHei", sans-serif';
+        ctx.fillText(`🎯 神算！预测冠军 ${a.predictedChampion.displayName} 命中！+${a.predictionBonus}金`, cx, predY);
+      } else {
+        ctx.fillStyle = '#ff6644';
+        ctx.font = '13px "Microsoft YaHei", sans-serif';
+        ctx.fillText(`🎯 预测冠军 ${a.predictedChampion.displayName} — 未命中`, cx, predY);
+      }
+      predY += 20;
+    }
+
     ctx.fillStyle = '#666';
     ctx.font = '13px "Microsoft YaHei", sans-serif';
-    ctx.fillText('点击任意位置返回菜单', cx, lh * 0.78);
+    ctx.fillText('点击任意位置返回菜单', cx, predY + 6);
   },
 
   // ===== 解说文字 =====
