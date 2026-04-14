@@ -1084,6 +1084,16 @@ export const sectModeMethods = {
           evt.desc = evt.desc.replace('{disciple}', d.name);
           evt._targetDiscipleId = d.id;
         }
+      } else if (evt.id === 'rivalry' || evt.id === 'friendship') {
+        const pool = this.sect.disciples.filter(d => !d.onQuest);
+        if (pool.length >= 2) {
+          const shuffled = [...pool].sort(() => Math.random() - 0.5);
+          evt.desc = evt.desc.replace('{discipleA}', shuffled[0].name).replace('{discipleB}', shuffled[1].name);
+          evt._targetDiscipleIdA = shuffled[0].id;
+          evt._targetDiscipleIdB = shuffled[1].id;
+        } else {
+          showEvent = false;
+        }
       }
       if (showEvent) {
         this.sect.pendingEvent = evt;
@@ -1210,9 +1220,141 @@ export const sectModeMethods = {
       case 'grantBreakthrough': {
         const d = this.sect.disciples.find(d => d.id === evt._targetDiscipleId);
         if (d) {
-          this._sectGainExp(d, 30);
-          this._sectAddLog(`💡 ${d.name} 顿悟，经验+30`, '#ffdd00');
+          const exp = choice.params?.exp || 30;
+          this._sectGainExp(d, exp);
+          this._sectAddLog(`💡 ${d.name} 顿悟，经验+${exp}`, '#ffdd00');
         }
+        break;
+      }
+
+      case 'breakthroughTrait': {
+        const d = this.sect.disciples.find(d => d.id === evt._targetDiscipleId);
+        if (d) {
+          if (d.traits.length < 3) {
+            const pool = COMMON_TRAITS.filter(t => !d.traits.includes(t.id));
+            if (pool.length > 0) {
+              const nt = pool[Math.floor(Math.random() * pool.length)];
+              d.traits.push(nt.id);
+              this._sectAddLog(`💡 ${d.name} 参悟武学，领悟「${nt.name}」！`, '#ffaa44');
+            } else {
+              this._sectGainExp(d, 40);
+              this._sectAddLog(`💡 ${d.name} 已无可学特质，转化为经验+40`, '#ffdd00');
+            }
+          } else {
+            this._sectGainExp(d, 40);
+            this._sectAddLog(`💡 ${d.name} 特质已满，转化为经验+40`, '#ffdd00');
+          }
+        }
+        break;
+      }
+
+      case 'alliancePay': {
+        const p = choice.params;
+        if (this.sect.gold < p.cost) { this._sectAddLog('银两不足', '#ff6644'); break; }
+        this.sect.gold -= p.cost;
+        this.sect.fame += p.fame;
+        this.sect.stats.highestFame = Math.max(this.sect.stats.highestFame, this.sect.fame);
+        this._sectAddLog(`🤝 盛情款待来客，声望+${p.fame}`, '#44dd88');
+        break;
+      }
+
+      case 'donationTrain': {
+        let count = 0;
+        for (const d of this.sect.disciples) {
+          if (d.level < d.talent) {
+            this._sectGainExp(d, 20);
+            count++;
+          }
+        }
+        this._sectAddLog(`📖 富商资助训练，${count}人各+20exp`, '#4499ff');
+        break;
+      }
+
+      case 'punishBoth': {
+        const dA = this.sect.disciples.find(d => d.id === evt._targetDiscipleIdA);
+        const dB = this.sect.disciples.find(d => d.id === evt._targetDiscipleIdB);
+        if (dA) dA.loyalty = Math.max(0, dA.loyalty - 5);
+        if (dB) dB.loyalty = Math.max(0, dB.loyalty - 5);
+        this._sectAddLog(`⚡ 各打五十大板，二人忠诚-5`, '#ff9944');
+        break;
+      }
+
+      case 'sparRivalry': {
+        const dA = this.sect.disciples.find(d => d.id === evt._targetDiscipleIdA);
+        const dB = this.sect.disciples.find(d => d.id === evt._targetDiscipleIdB);
+        if (dA) this._sectGainExp(dA, 15);
+        if (dB) this._sectGainExp(dB, 15);
+        this._sectAddLog(`⚔ 安排正式比武，双方各+15exp`, '#4499ff');
+        break;
+      }
+
+      case 'friendBoost': {
+        const dA = this.sect.disciples.find(d => d.id === evt._targetDiscipleIdA);
+        const dB = this.sect.disciples.find(d => d.id === evt._targetDiscipleIdB);
+        if (dA) dA.loyalty = Math.min(100, dA.loyalty + 10);
+        if (dB) dB.loyalty = Math.min(100, dB.loyalty + 10);
+        this._sectAddLog(`💞 嘉许互相扶持，二人忠诚+10`, '#ff88cc');
+        break;
+      }
+
+      case 'studyManual': {
+        const freeD = this.sect.disciples.filter(d => !d.onQuest && d.level < d.talent);
+        if (freeD.length === 0) { this._sectAddLog('无人可用', '#ff6644'); break; }
+        const d = freeD[Math.floor(Math.random() * freeD.length)];
+        this._sectGainExp(d, 30);
+        this._sectAddLog(`📕 ${d.name} 研读秘籍，经验+30`, '#ffaa44');
+        break;
+      }
+
+      case 'payRepair': {
+        const p = choice.params;
+        if (this.sect.gold < p.cost) { this._sectAddLog('银两不足，设施受损！', '#ff6644'); this._sectApplyArsonDamage(); break; }
+        this.sect.gold -= p.cost;
+        this._sectAddLog(`🔥 紧急修缮完成，花费${p.cost}银`, '#ff9944');
+        break;
+      }
+
+      case 'arsonDamage': {
+        this._sectApplyArsonDamage();
+        break;
+      }
+
+      case 'trialChallenge': {
+        const freeD = this.sect.disciples.filter(d => !d.onQuest && d.injury < 60);
+        if (freeD.length === 0) { this._sectAddLog('无人可派', '#ff6644'); break; }
+        const d = freeD[Math.floor(Math.random() * freeD.length)];
+        const luck = Math.random();
+        if (luck < 0.35) {
+          // 大成功：经验+武器
+          this._sectGainExp(d, 50);
+          const loot = { type: 'weapon', id: WEAPON_IDS[Math.floor(Math.random() * WEAPON_IDS.length)], quality: Math.random() < 0.3 ? 'rare' : 'fine' };
+          this.sect.inventory.push(loot);
+          const itemName = WEAPON_NAMES[loot.id];
+          this._sectAddLog(`⛩ ${d.name} 秘境大成！+50exp，获得${itemLabel(itemName, loot.quality)}`, '#ffd700');
+        } else if (luck < 0.65) {
+          // 小成功：经验
+          this._sectGainExp(d, 35);
+          this._sectAddLog(`⛩ ${d.name} 秘境有所收获，+35exp`, '#4499ff');
+        } else {
+          // 失败：受伤
+          d.injury = Math.min(100, d.injury + 25);
+          this._sectGainExp(d, 10);
+          this._sectAddLog(`⛩ ${d.name} 秘境历险受伤(+25)，但增长了见识+10exp`, '#ff6644');
+        }
+        break;
+      }
+
+      case 'herbHeal': {
+        for (const d of this.sect.disciples) d.injury = Math.max(0, d.injury - 20);
+        this._sectAddLog(`🌿 采集灵药，全员伤势-20`, '#44dd88');
+        break;
+      }
+
+      case 'herbSell': {
+        const bonus = 300; // 100*3天 一次性给
+        this.sect.gold += bonus;
+        this.sect.stats.totalGold += bonus;
+        this._sectAddLog(`🌿 移栽药田出售，获得${bonus}银`, '#ffd700');
         break;
       }
 
@@ -1302,6 +1444,21 @@ export const sectModeMethods = {
     this.sectPopup = null;
     // 事件处理后检查剧情
     this._sectCheckStory();
+  },
+
+  // ===== 纵火损失 =====
+  _sectApplyArsonDamage() {
+    // 随机降低一个已升级设施的等级
+    const upgraded = Object.entries(this.sect.buildings).filter(([, lv]) => lv > 0);
+    if (upgraded.length > 0) {
+      const [bid] = upgraded[Math.floor(Math.random() * upgraded.length)];
+      this.sect.buildings[bid] = Math.max(0, this.sect.buildings[bid] - 1);
+      const bld = BUILDINGS[bid];
+      this._sectAddLog(`🔥 ${bld?.name || bid} 被烧毁，等级降至Lv${this.sect.buildings[bid]}`, '#ff4444');
+    }
+    // 全员体力下降
+    for (const d of this.sect.disciples) d.stamina = Math.max(0, d.stamina - 20);
+    this._sectAddLog(`🔥 门派遭纵火，全员体力-20`, '#ff6644');
   },
 
   // ===== 存档 =====

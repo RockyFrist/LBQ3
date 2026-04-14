@@ -193,7 +193,8 @@ export const EVENT_TYPES = [
   { id: 'breakthrough', name: '弟子顿悟',  icon: '💡', weight: 12,
     desc: '{disciple}在训练中顿悟！',
     choices: [
-      { label: '太好了', effect: 'grantBreakthrough' },
+      { label: '闭关冲级(经验+50)', effect: 'grantBreakthrough', params: { exp: 50 } },
+      { label: '参悟武学(获特质)', effect: 'breakthroughTrait' },
     ] },
   { id: 'betrayal',    name: '弟子不满',   icon: '💢', weight: 8,
     desc: '{disciple}忠诚度过低，意图叛逃',
@@ -204,7 +205,8 @@ export const EVENT_TYPES = [
   { id: 'alliance',    name: '门派来访',  icon: '🤝', weight: 10,
     desc: '有门派提议结为友好',
     choices: [
-      { label: '结盟(+声望)', effect: 'gainFame', params: { fame: 15 } },
+      { label: '盛情款待(200银,声望+25)', effect: 'alliancePay', params: { cost: 200, fame: 25 } },
+      { label: '简单结盟(声望+10)', effect: 'gainFame', params: { fame: 10 } },
       { label: '婉拒', effect: 'none' },
     ] },
   { id: 'plague',      name: '瘟疫流行',  icon: '🤒', weight: 5,
@@ -216,7 +218,8 @@ export const EVENT_TYPES = [
   { id: 'donation',    name: '富商捐赠',  icon: '💎', weight: 10,
     desc: '一位仰慕你声望的富商前来捐赠',
     choices: [
-      { label: '收下', effect: 'gainGold', params: { gold: [150, 400] } },
+      { label: '收下银两(+金)', effect: 'gainGold', params: { gold: [150, 400] } },
+      { label: '请他资助训练(全员+20exp)', effect: 'donationTrain' },
     ] },
   { id: 'duel_invite', name: '江湖挑战书', icon: '📜', weight: 10,
     desc: '收到一封挑战书，对方点名挑战',
@@ -229,6 +232,50 @@ export const EVENT_TYPES = [
     choices: [
       { label: '派人探索', effect: 'treasureHunt' },
       { label: '忽略', effect: 'none' },
+    ] },
+  // ===== 新增事件 =====
+  { id: 'rivalry',     name: '弟子内斗',  icon: '⚡', weight: 8,
+    desc: '{discipleA}和{discipleB}因切磋起冲突，互不相让',
+    choices: [
+      { label: '各打五十大板(忠诚-5)', effect: 'punishBoth' },
+      { label: '安排正式比武(经验+15)', effect: 'sparRivalry' },
+    ] },
+  { id: 'friendship',  name: '弟子情谊',  icon: '💞', weight: 7,
+    desc: '{discipleA}和{discipleB}在训练中结为好友',
+    choices: [
+      { label: '嘉许鼓励(忠诚+10)', effect: 'friendBoost' },
+      { label: '不干涉',            effect: 'none' },
+    ] },
+  { id: 'secretManual', name: '武学残卷', icon: '📕', weight: 6,
+    desc: '在藏经阁角落发现一卷残破秘籍',
+    choices: [
+      { label: '研读(随机弟子+30exp)', effect: 'studyManual' },
+      { label: '变卖(+200银)', effect: 'gainGold', params: { gold: [200, 200] } },
+    ] },
+  { id: 'arson',       name: '贼人纵火',  icon: '🔥', weight: 5,
+    desc: '深夜有人潜入门派纵火，设施受损！',
+    choices: [
+      { label: '紧急修缮(300银)', effect: 'payRepair', params: { cost: 300 } },
+      { label: '忍受损失', effect: 'arsonDamage' },
+    ] },
+  { id: 'tourneyInvite', name: '武林大会', icon: '🏆', weight: 4, minFame: 50,
+    desc: '你的声望引起关注，收到武林大会邀请！',
+    choices: [
+      { label: '派人参加', effect: 'duelChallenge', params: { diff: [4, 5] } },
+      { label: '出资赞助(500银,声望+20)', effect: 'alliancePay', params: { cost: 500, fame: 20 } },
+      { label: '不参加', effect: 'none' },
+    ] },
+  { id: 'trialGround', name: '秘境试炼',  icon: '⛩', weight: 6, minDay: 5,
+    desc: '发现一处上古试炼秘境，危险与机遇并存',
+    choices: [
+      { label: '派人闯关', effect: 'trialChallenge' },
+      { label: '封印入口', effect: 'none' },
+    ] },
+  { id: 'herbGarden',  name: '灵药发现',  icon: '🌿', weight: 7,
+    desc: '门派后山发现一片灵药田',
+    choices: [
+      { label: '采集灵药(全员伤势-20)', effect: 'herbHeal' },
+      { label: '移栽药田(+100银/天,共3天)', effect: 'herbSell' },
     ] },
 ];
 
@@ -244,6 +291,14 @@ export function rollEvent(state) {
   if (!state.disciples.some(d => d.level < d.talent)) {
     pool = pool.filter(e => e.id !== 'breakthrough');
   }
+  // 弟子内斗/情谊需要至少2名弟子
+  if (state.disciples.length < 2) {
+    pool = pool.filter(e => e.id !== 'rivalry' && e.id !== 'friendship');
+  }
+  // 声望门槛事件
+  pool = pool.filter(e => !e.minFame || state.fame >= e.minFame);
+  // 天数门槛事件
+  pool = pool.filter(e => !e.minDay || state.day >= e.minDay);
   const totalWeight = pool.reduce((s, e) => s + e.weight, 0);
   let r = Math.random() * totalWeight;
   for (const evt of pool) {
