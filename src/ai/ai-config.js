@@ -21,11 +21,11 @@ export function buildAIConfig(d) {
     heavyReactDist: 190,
     punishRate: 0.99,
     feintChance: 0.10,
-    blockChance: 0.18,
+    blockChance: 0.25,
     perfectDodgeChance: 0.98,
     heavyReactDelay: 0.005,
     heavyCooldown: 0,
-    blockCooldownBase: 0.8,
+    blockCooldownBase: 0.5,
     // 神级AI额外能力
     patternReadSpeed: 2.5,     // 读取玩家模式速度翻倍
     counterAdaptRate: 0.95,    // 针对性变招概率
@@ -63,10 +63,10 @@ export function buildAIConfig(d) {
     heavyReactDist:  [50,   70,   115,  155,  155 ][d - 1],
     punishRate:      [0.03, 0.10, 0.30, 0.65, 0.95][d - 1],
     feintChance:     [0.01, 0.02, 0.06, 0.08, 0.08][d - 1],
-    blockChance:     [0.01, 0.03, 0.10, 0.15, 0.15][d - 1],
+    blockChance:     [0.02, 0.05, 0.14, 0.20, 0.22][d - 1],
     perfectDodgeChance: [0.05, 0.15, 0.35, 0.55, 0.75][d - 1],
     heavyReactDelay: [0.20, 0.12, 0.06, 0.03, 0.03][d - 1],
     heavyCooldown:   [4.0,  2.5,  1.2,  0.5,  0  ][d - 1],
-    blockCooldownBase: [6.0,  5.0,  4.0,  3.0,  3.0][d - 1],
+    blockCooldownBase: [5.0,  4.0,  2.5,  1.8,  1.8][d - 1],
   };
 }

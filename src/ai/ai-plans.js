@@ -368,9 +368,9 @@ export const planMethods = {
 
     // 权重分配：按难度分级（低难度偏笨拙，高难度偏精准）
     const s = smartness; // 0.10(D1) ~ 0.99(D5)
-    let wBlock = 0.08 + s * 0.15;   // D1=0.10  D5=0.23
+    let wBlock = 0.12 + s * 0.20;   // D1=0.14  D5=0.32
     let wRead  = 0.00;
-    let wDodge = 0.08 + s * 0.15;   // D1=0.10  D5=0.23
+    let wDodge = 0.08 + s * 0.12;   // D1=0.09  D5=0.20
     let wTrade = 0.30 - s * 0.10;   // D1=0.29  D5=0.20 (低难度爱硬扛)
     let wHeavy = 0.25 - s * 0.15;   // D1=0.24  D5=0.10 (低难度爱无脑对冲)
 

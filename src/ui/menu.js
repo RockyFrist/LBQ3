@@ -1,7 +1,7 @@
 // ===================== 开始菜单（多页设计） =====================
 import { WEAPON_LIST, WEAPONS, getWeapon } from '../weapons/weapon-defs.js';
 import { ARMOR_LIST, getArmor } from '../weapons/armor-defs.js';
-const GAME_VERSION = 'v0.12.3';
+const GAME_VERSION = 'v0.12.4';
 
 export class Menu {
   constructor(canvas, input) {
@@ -707,11 +707,15 @@ export class Menu {
     const totalW = WEAPON_LIST.length * 52;
     ctx.fillText(label, x + totalW / 2 - 3, y - 10);
 
+    let hoveredWeapon = null;
+    let hoveredBx = 0;
+
     for (let i = 0; i < WEAPON_LIST.length; i++) {
       const w = WEAPON_LIST[i];
       const bx = x + i * 52;
       const selected = w.id === selectedId;
       const hovered = mx >= bx && mx <= bx + 46 && my >= y && my <= y + 38;
+      if (hovered) { hoveredWeapon = w; hoveredBx = bx; }
 
       ctx.fillStyle = selected ? w.color : hovered ? 'rgba(255,255,255,0.10)' : 'rgba(255,255,255,0.05)';
       ctx.fillRect(bx, y, 46, 38);
@@ -728,6 +732,10 @@ export class Menu {
       ctx.font = '10px "Microsoft YaHei", sans-serif';
       ctx.fillText(w.name, bx + 23, y + 33);
     }
+
+    if (hoveredWeapon) {
+      this._drawWeaponTooltip(ctx, hoveredBx, y, hoveredWeapon);
+    }
   }
 
   _drawArmorSelector(ctx, x, y, label, selectedId, mx, my) {
@@ -737,11 +745,15 @@ export class Menu {
     const totalW = ARMOR_LIST.length * 52;
     ctx.fillText(label, x + totalW / 2 - 3, y - 10);
 
+    let hoveredArmor = null;
+    let hoveredBx = 0;
+
     for (let i = 0; i < ARMOR_LIST.length; i++) {
       const a = ARMOR_LIST[i];
       const bx = x + i * 52;
       const selected = a.id === selectedId;
       const hovered = mx >= bx && mx <= bx + 46 && my >= y && my <= y + 38;
+      if (hovered) { hoveredArmor = a; hoveredBx = bx; }
 
       ctx.fillStyle = selected ? (a.armorColor || '#556') : hovered ? 'rgba(255,255,255,0.10)' : 'rgba(255,255,255,0.05)';
       ctx.fillRect(bx, y, 46, 38);
@@ -757,6 +769,127 @@ export class Menu {
       ctx.fillStyle = selected ? '#fff' : '#777';
       ctx.font = '10px "Microsoft YaHei", sans-serif';
       ctx.fillText(a.name, bx + 23, y + 33);
+    }
+
+    if (hoveredArmor) {
+      this._drawArmorTooltip(ctx, hoveredBx, y, hoveredArmor);
+    }
+  }
+
+  // 武器悬浮详情面板
+  _drawWeaponTooltip(ctx, bx, by, weapon) {
+    const info = WEAPON_INFO[weapon.id];
+    if (!info) return;
+    const cw = this.canvas._logicW || this.canvas.width;
+    const tw = 230, th = 68;
+    let tx = bx + 23 - tw / 2;
+    if (tx < 4) tx = 4;
+    if (tx + tw > cw - 4) tx = cw - tw - 4;
+    const ty = by - th - 6;
+
+    // 背景 + 边框
+    ctx.fillStyle = 'rgba(0,0,0,0.7)';
+    ctx.fillRect(tx - 1, ty - 1, tw + 2, th + 2);
+    ctx.fillStyle = '#111122';
+    ctx.fillRect(tx, ty, tw, th);
+    ctx.strokeStyle = weapon.color;
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(tx, ty, tw, th);
+
+    // 标题: 名称 + 类型
+    ctx.textAlign = 'left';
+    ctx.fillStyle = weapon.color;
+    ctx.font = 'bold 13px "Microsoft YaHei", sans-serif';
+    ctx.fillText(`${weapon.icon} ${weapon.name} — ${info.type}`, tx + 8, ty + 16);
+
+    // 属性条
+    const stats = [
+      { label: '速', val: info.spd, color: '#44ff88' },
+      { label: '攻', val: info.dmg, color: '#ff4444' },
+      { label: '距', val: info.rng, color: '#4499ff' },
+      { label: '防', val: info.def, color: '#ffcc44' },
+    ];
+    const barFullW = 24, barH = 5;
+    let sx = tx + 8;
+    const sy = ty + 30;
+    for (const st of stats) {
+      ctx.fillStyle = '#777';
+      ctx.font = '10px "Microsoft YaHei", sans-serif';
+      ctx.textAlign = 'left';
+      ctx.fillText(st.label, sx, sy);
+      ctx.fillStyle = 'rgba(255,255,255,0.08)';
+      ctx.fillRect(sx + 14, sy - 6, barFullW, barH);
+      ctx.fillStyle = st.color;
+      ctx.fillRect(sx + 14, sy - 6, barFullW * st.val / 5, barH);
+      sx += 54;
+    }
+
+    // 特性
+    ctx.fillStyle = '#aaa';
+    ctx.font = '10px "Microsoft YaHei", sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText(info.traits.join(' · '), tx + 8, ty + 48);
+
+    // 绝技
+    ctx.fillStyle = '#cc88ff';
+    ctx.font = '10px "Microsoft YaHei", sans-serif';
+    ctx.fillText('绝技: ' + info.ult, tx + 8, ty + 62);
+  }
+
+  // 护甲悬浮详情面板
+  _drawArmorTooltip(ctx, bx, by, armor) {
+    const cw = this.canvas._logicW || this.canvas.width;
+    if (armor.id === 'none') {
+      const tw = 170, th = 36;
+      let tx = bx + 23 - tw / 2;
+      if (tx < 4) tx = 4;
+      if (tx + tw > cw - 4) tx = cw - tw - 4;
+      const ty = by - th - 6;
+      ctx.fillStyle = 'rgba(0,0,0,0.7)';
+      ctx.fillRect(tx - 1, ty - 1, tw + 2, th + 2);
+      ctx.fillStyle = '#111122';
+      ctx.fillRect(tx, ty, tw, th);
+      ctx.strokeStyle = '#666';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(tx, ty, tw, th);
+      ctx.textAlign = 'left';
+      ctx.fillStyle = '#ccc';
+      ctx.font = '12px "Microsoft YaHei", sans-serif';
+      ctx.fillText('👤 无甲 — 轻装上阵', tx + 8, ty + 15);
+      ctx.fillStyle = '#888';
+      ctx.font = '10px "Microsoft YaHei", sans-serif';
+      ctx.fillText('无防护加成，全速灵活', tx + 8, ty + 29);
+      return;
+    }
+    const tw = 220, th = 50;
+    let tx = bx + 23 - tw / 2;
+    if (tx < 4) tx = 4;
+    if (tx + tw > cw - 4) tx = cw - tw - 4;
+    const ty = by - th - 6;
+    ctx.fillStyle = 'rgba(0,0,0,0.7)';
+    ctx.fillRect(tx - 1, ty - 1, tw + 2, th + 2);
+    ctx.fillStyle = '#111122';
+    ctx.fillRect(tx, ty, tw, th);
+    ctx.strokeStyle = armor.armorColor || '#888';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(tx, ty, tw, th);
+    ctx.textAlign = 'left';
+    ctx.fillStyle = armor.armorColor || '#ccc';
+    ctx.font = 'bold 12px "Microsoft YaHei", sans-serif';
+    ctx.fillText(`${armor.icon} ${armor.name} — ${armor.desc}`, tx + 8, ty + 16);
+    ctx.fillStyle = '#aaa';
+    ctx.font = '10px "Microsoft YaHei", sans-serif';
+    let line = `HP+${armor.hpBonus}  速度${Math.round(armor.speedMult * 100)}%  减伤${Math.round(armor.damageReductionPct * 100)}%`;
+    if (armor.staggerResist > 0) line += `  硬直-${armor.staggerResist.toFixed(2)}s`;
+    ctx.fillText(line, tx + 8, ty + 32);
+    let specials = [];
+    if (armor.blockCostReduction > 0) specials.push(`格挡消耗-${armor.blockCostReduction}`);
+    if (armor.executionResist) specials.push('抗处决');
+    if (armor.heavyDamageResist > 0) specials.push(`重击减伤${Math.round(armor.heavyDamageResist * 100)}%`);
+    if (specials.length > 0) {
+      ctx.fillStyle = '#cc8844';
+      ctx.font = '10px "Microsoft YaHei", sans-serif';
+      ctx.fillText(specials.join(' · '), tx + 8, ty + 44);
     }
   }
 
@@ -1112,40 +1245,17 @@ export class Menu {
   // ---- 娱乐模式页（入口） ----
   _updateEntertainment(mx, my) {
     const L = this._layoutEntertainment();
-    if (this._hit(mx, my, L.jianghuBtn.x, L.jianghuBtn.y, L.jianghuBtn.w, L.jianghuBtn.h)) {
-      this.page = 'jianghu';
-      this._clickCooldown = 0.2;
-      return;
-    }
-    if (this._hit(mx, my, L.wushengBtn.x, L.wushengBtn.y, L.wushengBtn.w, L.wushengBtn.h)) {
-      this.page = 'wusheng';
-      this._clickCooldown = 0.2;
-      return;
-    }
-    if (this._hit(mx, my, L.chainBtn.x, L.chainBtn.y, L.chainBtn.w, L.chainBtn.h)) {
-      this.page = 'chainKill';
-      this._clickCooldown = 0.2;
-      return;
-    }
-    if (this._hit(mx, my, L.arenaBtn.x, L.arenaBtn.y, L.arenaBtn.w, L.arenaBtn.h)) {
-      this.result = { mode: 'arena' };
-      this._clickCooldown = 0.3;
-      return;
-    }
-    if (this._hit(mx, my, L.horseBtn.x, L.horseBtn.y, L.horseBtn.w, L.horseBtn.h)) {
-      this.result = { mode: 'horseracing' };
-      this._clickCooldown = 0.3;
-      return;
-    }
-    if (this._hit(mx, my, L.trainingBtn.x, L.trainingBtn.y, L.trainingBtn.w, L.trainingBtn.h)) {
-      this.result = { mode: 'training', diffA: 1, diffB: 3, rounds: 0, simOnly: false };
-      this._clickCooldown = 0.3;
-      return;
-    }
-    if (this._hit(mx, my, L.local2pBtn.x, L.local2pBtn.y, L.local2pBtn.w, L.local2pBtn.h)) {
-      this.page = 'local2p';
-      this._clickCooldown = 0.2;
-      return;
+    for (const card of L.cards) {
+      if (this._hit(mx, my, card.x, card.y, card.w, card.h)) {
+        if (card.page) {
+          this.page = card.page;
+          this._clickCooldown = 0.2;
+        } else if (card.result) {
+          this.result = { ...card.result };
+          this._clickCooldown = 0.3;
+        }
+        return;
+      }
     }
     if (this._hit(mx, my, L.backBtn.x, L.backBtn.y, L.backBtn.w, L.backBtn.h)) {
       this.page = 'main';
@@ -1156,46 +1266,127 @@ export class Menu {
   _drawEntertainment() {
     const ctx = this.ctx;
     const cw = this.canvas._logicW || this.canvas.width;
+    const ch = this.canvas._logicH || this.canvas.height;
     const mx = this.input.mouseX;
     const my = this.input.mouseY;
     const L = this._layoutEntertainment();
 
-    this._drawSubHeader(ctx, cw, '🎮 娱乐模式', '选择挑战方式');
-    this._drawActionBtn(ctx, L.jianghuBtn, '🏔 江湖行', '#ffcc44', mx, my);
-    this._drawActionBtn(ctx, L.wushengBtn, '🏆 挑战武圣', '#ff00ff', mx, my);
-    this._drawActionBtn(ctx, L.chainBtn, '⚔ 连战模式', '#ff6633', mx, my);
-    this._drawActionBtn(ctx, L.arenaBtn, '🎲 比武擂台', '#ff9944', mx, my);
-    this._drawActionBtn(ctx, L.horseBtn, '🐎 田忌赛马', '#88cc44', mx, my);
-    this._drawActionBtn(ctx, L.trainingBtn, '🎯 自由训练', '#66ccff', mx, my);
-    this._drawActionBtn(ctx, L.local2pBtn, '🎮 本地双人', '#44dd88', mx, my);
+    this._drawSubHeader(ctx, cw, '🎮 娱乐模式', '选择你的挑战方式');
 
-    // 简要说明
-    ctx.fillStyle = '#666';
-    ctx.font = '12px "Microsoft YaHei", sans-serif';
-    ctx.textAlign = 'center';
-    const descY = L.local2pBtn.y + L.local2pBtn.h + 16;
-    ctx.fillText('擂台: AI对战押注  |  赛马: 策略排兵  |  连战: 无尽挑战  |  江湖行: 十关爬塔', cw / 2, descY);
+    // 绘制分类标题
+    for (const cat of L.catHeaders) {
+      ctx.textAlign = 'left';
+      ctx.fillStyle = cat.color;
+      ctx.font = 'bold 13px "Microsoft YaHei", sans-serif';
+      ctx.fillText(cat.name, L.gridX, cat.y + 13);
+      const textW = ctx.measureText(cat.name).width;
+      ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(L.gridX + textW + 10, cat.y + 9);
+      ctx.lineTo(L.gridX + L.gridW, cat.y + 9);
+      ctx.stroke();
+    }
+
+    // 绘制模式卡片
+    for (const card of L.cards) {
+      this._drawModeCard(ctx, card, mx, my);
+    }
 
     this._drawActionBtn(ctx, L.backBtn, '← 返回', '#666', mx, my);
+  }
+
+  _drawModeCard(ctx, card, mx, my) {
+    const hovered = this._hit(mx, my, card.x, card.y, card.w, card.h);
+
+    // 背景
+    ctx.fillStyle = hovered ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.025)';
+    ctx.fillRect(card.x, card.y, card.w, card.h);
+
+    // 左侧强调条
+    if (!hovered) ctx.globalAlpha = 0.4;
+    ctx.fillStyle = card.accent;
+    ctx.fillRect(card.x, card.y, 3, card.h);
+    ctx.globalAlpha = 1.0;
+
+    // 边框
+    ctx.strokeStyle = hovered ? card.accent : 'rgba(255,255,255,0.07)';
+    ctx.lineWidth = hovered ? 1.5 : 1;
+    ctx.strokeRect(card.x, card.y, card.w, card.h);
+
+    // 图标 + 名称
+    ctx.textAlign = 'left';
+    ctx.fillStyle = hovered ? '#fff' : '#ddd';
+    ctx.font = 'bold 14px "Microsoft YaHei", sans-serif';
+    ctx.fillText(card.icon + ' ' + card.name, card.x + 12, card.y + 20);
+
+    // 描述
+    ctx.fillStyle = hovered ? '#aaa' : '#555';
+    ctx.font = '11px "Microsoft YaHei", sans-serif';
+    ctx.fillText(card.desc, card.x + 12, card.y + 37);
   }
 
   _layoutEntertainment() {
     const cw = this.canvas._logicW || this.canvas.width;
     const ch = this.canvas._logicH || this.canvas.height;
     const cx = cw / 2;
-    const btnW = 280;
-    const btnH = 38;
-    const gap = 10;
-    const startY = ch * 0.22;
+    const cardW = 220, cardH = 48, cardGap = 8, colGap = 12;
+    const catGap = 8, catHeaderH = 22;
+    const gridW = cardW * 2 + colGap;
+    const gridX = cx - gridW / 2;
+
+    let y = ch * 0.20;
+    const cards = [];
+    const catHeaders = [];
+
+    const categories = [
+      { name: '⚔ 单人挑战', color: '#ff6644' },
+      { name: '🎲 休闲娱乐', color: '#ffaa44' },
+      { name: '🔧 练习', color: '#66ccff' },
+    ];
+
+    const modes = [
+      [
+        { icon: '🏔', name: '江湖行', desc: '十关爬塔 · 3条命 · 闯荡江湖', accent: '#ffcc44', page: 'jianghu' },
+        { icon: '⚔', name: '连战模式', desc: '击杀变大 · 无尽挑战', accent: '#ff6633', page: 'chainKill' },
+        { icon: '🏆', name: '挑战武圣', desc: '神经网络终极AI', accent: '#ff00ff', page: 'wusheng' },
+      ],
+      [
+        { icon: '🎮', name: '本地双人', desc: '键鼠 vs 手柄 · 同屏对战', accent: '#44dd88', page: 'local2p' },
+        { icon: '🎲', name: '比武擂台', desc: 'AI对战 · 下注竞猜', accent: '#ff9944', result: { mode: 'arena' } },
+        { icon: '🐎', name: '田忌赛马', desc: '策略排兵 · 以弱胜强', accent: '#88cc44', result: { mode: 'horseracing' } },
+      ],
+      [
+        { icon: '🎯', name: '自由训练', desc: '无限制沙盒 · 按E召唤敌人 · 自由练习', accent: '#66ccff', page: 'training' },
+      ],
+    ];
+
+    for (let c = 0; c < modes.length; c++) {
+      catHeaders.push({ y, name: categories[c].name, color: categories[c].color });
+      y += catHeaderH;
+      const modeList = modes[c];
+      for (let i = 0; i < modeList.length; i++) {
+        const col = i % 2;
+        const row = Math.floor(i / 2);
+        const singleItem = modeList.length === 1;
+        cards.push({
+          ...modeList[i],
+          x: singleItem ? gridX : gridX + col * (cardW + colGap),
+          y: y + row * (cardH + cardGap),
+          w: singleItem ? gridW : cardW,
+          h: cardH,
+        });
+      }
+      const rows = Math.ceil(modeList.length / 2);
+      y += rows * (cardH + cardGap) + catGap;
+    }
+
     return {
-      jianghuBtn:  { x: cx - btnW / 2, y: startY, w: btnW, h: btnH },
-      wushengBtn:  { x: cx - btnW / 2, y: startY + (btnH + gap), w: btnW, h: btnH },
-      chainBtn:    { x: cx - btnW / 2, y: startY + (btnH + gap) * 2, w: btnW, h: btnH },
-      arenaBtn:    { x: cx - btnW / 2, y: startY + (btnH + gap) * 3, w: btnW, h: btnH },
-      horseBtn:    { x: cx - btnW / 2, y: startY + (btnH + gap) * 4, w: btnW, h: btnH },
-      trainingBtn: { x: cx - btnW / 2, y: startY + (btnH + gap) * 5, w: btnW, h: btnH },
-      local2pBtn:  { x: cx - btnW / 2, y: startY + (btnH + gap) * 6, w: btnW, h: btnH },
-      backBtn:     { x: cx - 60, y: startY + (btnH + gap) * 7 + 12, w: 120, h: 34 },
+      cards,
+      catHeaders,
+      gridX,
+      gridW,
+      backBtn: { x: cx - 60, y: y + 4, w: 120, h: 34 },
     };
   }
 

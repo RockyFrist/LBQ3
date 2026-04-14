@@ -844,7 +844,7 @@ export class Enemy {
       if (isHeavyThreat && Math.random() < identifyChance) {
         // === 识别重击 → 交换/格挡/闪避（高难度偏进攻，保持节奏） ===
         // D4+ 有概率选择霸体重击交换（牺牲防御换攻击节奏）
-        const tradeOverBlock = this.difficulty >= 4 ? 0.20 + (this._effDiff - 4) * 0.30 : 0; // D4=20% D5=50%
+        const tradeOverBlock = this.difficulty >= 4 ? 0.15 + (this._effDiff - 4) * 0.20 : 0; // D4=15% D5=35%
         if (this._heavyCD <= 0 && Math.random() < tradeOverBlock) {
           cmd.heavyAttack = true;
           this.aiState = 'recover';
