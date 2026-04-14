@@ -433,7 +433,8 @@ export class SectUI {
     const weaponName = WEAPON_NAMES[d.weaponId] || '?';
     // 品质颜色
     const wQColor = ITEM_QUALITY[d.weaponQuality || 'normal']?.color || COL_DIM;
-    const statusStr = d.onQuest ? '📜任务中' : d.injury > 30 ? '🤕受伤' : '待命';
+    const staminaIcon = d.stamina >= 70 ? '\u26A1' : d.stamina >= 35 ? '\uD83D\uDCAB' : d.stamina >= 15 ? '\uD83D\uDE05' : '\uD83D\uDCA4';
+    const statusStr = d.onQuest ? '\uD83D\uDCDC任务中' : d.injury > 30 ? '\uD83E\uDD15受伤' : d.stamina < 15 ? `${staminaIcon}体乏` : d.stamina < 40 ? `${staminaIcon}疲劳` : '\u2705待命';
     ctx.fillStyle = COL_DIM;
     ctx.fillText(`Lv${d.level} `, x + 8, y + (narrow ? 24 : 28));
     const lvW = ctx.measureText(`Lv${d.level} `).width;
@@ -447,11 +448,23 @@ export class SectUI {
     const expNeed = expToLevel(d.level);
     const barW = narrow ? 50 : 70;
     const barX = x + w - barW - 6;
-    drawBar(ctx, barX, y + 4, barW, 6, d.exp / expNeed, '#4499ff');
+    drawBar(ctx, barX, y + 4, barW, 5, d.exp / expNeed, '#4499ff');
 
     // HP条
     const hpRatio = (100 - d.injury) / 100;
-    drawBar(ctx, barX, y + 14, barW, 6, hpRatio, hpRatio > 0.5 ? COL_HP_OK : COL_HP_HURT);
+    drawBar(ctx, barX, y + 12, barW, 5, hpRatio, hpRatio > 0.5 ? COL_HP_OK : COL_HP_HURT);
+
+    // 体力条（新增）
+    const staRatio = (d.stamina || 0) / 100;
+    const staColor = staRatio >= 0.7 ? '#ffcc44' : staRatio >= 0.35 ? '#ff9944' : '#ff4444';
+    drawBar(ctx, barX, y + 20, barW, 5, staRatio, staColor);
+
+    // 体力小标签
+    ctx.textAlign = 'right';
+    ctx.fillStyle = staColor;
+    ctx.font = `${narrow ? 8 : 9}px ${FONT}`;
+    ctx.fillText(`体${d.stamina}`, x + w - barW - 9, y + (narrow ? 25 : 27));
+    ctx.textAlign = 'left';
   }
 
   // ===== 弟子列表面板 =====
@@ -1931,6 +1944,18 @@ export class SectUI {
         line += '…';
       }
       ctx.fillText(line, bubX + bw / 2, bubY + bh / 2 + 5);
+      ctx.globalAlpha = 1;
+    }
+
+    // ===== 训练阶段标签 =====
+    if (!waitForClick) {
+      const phaseLabel = progress < 0.3 ? '\u26A1 热身中…' : progress < 0.65 ? '\uD83D\uDD25 修炼中…' : progress < 0.88 ? '\uD83D\uDCA5 全力冲刺！' : '\u2728 训练完成！';
+      const phaseAlpha = Math.min(1, progress * 6);
+      ctx.globalAlpha = phaseAlpha;
+      ctx.textAlign = 'center';
+      ctx.fillStyle = progress < 0.3 ? '#88aaff' : progress < 0.65 ? '#ffcc44' : progress < 0.88 ? '#ff6644' : '#44dd88';
+      ctx.font = `bold ${narrow ? 13 : 16}px ${FONT}`;
+      ctx.fillText(phaseLabel, cw / 2, narrow ? 74 : 88);
       ctx.globalAlpha = 1;
     }
 

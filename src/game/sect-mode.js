@@ -20,6 +20,7 @@ import {
   PERSONALITY_TYPES, pickTrainLine, pickGroupSpeakers,
 } from './sect-data.js';
 import { checkNewAchievements, getAchievement } from './sect-achievements.js';
+import { resetDialogueMemory } from './sect-dialogues.js';
 
 export const sectModeMethods = {
 
@@ -657,6 +658,12 @@ export const sectModeMethods = {
 
   // ===== 训练 =====
   _sectDoTrainAll() {
+    // 每天限全体训练一次
+    if ((this.sect.trainedToday || 0) >= 1) {
+      this._sectShowToast('今日已完成全体训练，明日再练！', '#ff9944');
+      this._sectAddLog('全体训练今日已进行过一次，明天再练。', '#ff9944');
+      return;
+    }
     const mul = trainExpMul(this.sect.buildings.dojo);
     const libLv = this.sect.buildings.library;
     const expGain = Math.floor(15 * mul); // 全体训练经验
@@ -687,6 +694,7 @@ export const sectModeMethods = {
     }
     if (trained > 0) {
       this.sect.stats.totalTrains++;
+      this.sect.trainedToday = (this.sect.trainedToday || 0) + 1;
       this._sectAddLog(`🗡 训练完成(${trained}人参与, -15体力, +${expGain}exp)`, '#4499ff');
       for (const info of details) {
         this._sectAddLog(`  · ${info}`, '#88aadd');
@@ -730,6 +738,7 @@ export const sectModeMethods = {
       d.exp -= need;
       d.level = Math.min(d.talent, d.level + 1);
       this._sectAddLog(`🎉 ${d.name} 升级到 Lv${d.level}！`, '#ffdd00');
+      resetDialogueMemory(d.id); // 升级后清除台词记忆，避免短期重复殪奒語
     }
   },
 
@@ -1039,11 +1048,14 @@ export const sectModeMethods = {
       this.sect.stats.totalGold += income;
     }
 
+    // 每天重置训练次数
+    this.sect.trainedToday = 0;
+
     // 恢复弟子状态
     const hMul = healMul(this.sect.buildings.clinic);
     for (const d of this.sect.disciples) {
-      // 体力恢复（+35/天）
-      d.stamina = Math.min(100, d.stamina + 35);
+      // 体力恢复（+40/天，稍提上以支持全体+个人双训练）
+      d.stamina = Math.min(100, d.stamina + 40);
       // 受伤恢复
       if (d.injury > 0) {
         d.injury = Math.max(0, d.injury - Math.floor(15 * hMul));
