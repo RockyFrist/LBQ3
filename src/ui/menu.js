@@ -1,7 +1,16 @@
 // ===================== 开始菜单（多页设计） =====================
 import { WEAPON_LIST, WEAPONS, getWeapon } from '../weapons/weapon-defs.js';
 import { ARMOR_LIST, getArmor } from '../weapons/armor-defs.js';
-const GAME_VERSION = 'v0.12.4';
+const GAME_VERSION = 'v0.12.7';
+
+// 武器详情面板数据
+const WEAPON_INFO = {
+  dao:     { type: '均衡型', desc: '攻守兼备，适合入门', spd: 3, dmg: 3, rng: 3, def: 3, traits: ['三段连击','精准弹反'], ult: '拔刀 — 四连斩' },
+  daggers: { type: '速度型', desc: '高速连击，以闪为守', spd: 5, dmg: 2, rng: 1, def: 1, traits: ['五段连击','影步背刺','完美闪避回体'], ult: '影杀 — 六连瞬杀' },
+  hammer:  { type: '力量型', desc: '重击制敌，霸体无双', spd: 1, dmg: 5, rng: 3, def: 3, traits: ['全程霸体','360°重击','震地护盾'], ult: '开山 — 跳砸破防' },
+  spear:   { type: '控制型', desc: '远距克敌，拒人千里', spd: 3, dmg: 3, rng: 5, def: 3, traits: ['超长射程','自动反刺','后撤刺'], ult: '龙舞 — 旋风四连' },
+  shield:  { type: '防御型', desc: '铜墙铁壁，伺机反击', spd: 3, dmg: 2, rng: 2, def: 5, traits: ['盾行格挡','弹反反伤','盾击控制'], ult: '绝对防御 — 无敌反击' },
+};
 
 export class Menu {
   constructor(canvas, input) {
@@ -425,21 +434,32 @@ export class Menu {
   _drawPvai() {
     const ctx = this.ctx;
     const cw = this.canvas._logicW || this.canvas.width;
+    const ch = this.canvas._logicH || this.canvas.height;
     const mx = this.input.mouseX;
     const my = this.input.mouseY;
     const L = this._layoutSub('pvai');
 
-    this._drawSubHeader(ctx, cw, '⚔ 对战模式', '选择武器和敌人AI难度');
+    this._drawSubHeader(ctx, cw, '⚔ 对战模式', '选择装备与敌人难度，挑战AI');
     this._drawDiffSelector(ctx, L.diffX, L.diffY, '敌人难度', this.pvaiDiff, '#ff4444', mx, my, true);
+
+    // 分隔线
+    ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(cw / 2 - 140, L.weaponAy - 22);
+    ctx.lineTo(cw / 2 + 140, L.weaponAy - 22);
+    ctx.stroke();
+
     this._drawWeaponSelector(ctx, L.weaponAx, L.weaponAy, '你的武器', this.weaponA, mx, my);
     this._drawArmorSelector(ctx, L.armorAx, L.armorAy, '你的护甲', this.armorA, mx, my);
-    this._drawActionBtn(ctx, L.startBtn, '开始对战', '#4499ff', mx, my);
+    this._drawActionBtn(ctx, L.startBtn, '⚔ 开始对战', '#4499ff', mx, my);
     this._drawActionBtn(ctx, L.backBtn, '← 返回', '#666', mx, my);
 
+    // 底部操作提示
     ctx.fillStyle = '#444';
-    ctx.font = '12px "Microsoft YaHei", sans-serif';
+    ctx.font = '11px "Microsoft YaHei", sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText('J轻击 K重击 L绝技 · 游戏中可按 1-5 切换难度 · 6 拼刀训练 · 7 格挡训练 · H 帮助', cw / 2, (this.canvas._logicH || this.canvas.height) - 24);
+    ctx.fillText('J轻击  K重击  L绝技  ·  1-5切换难度  ·  H帮助', cw / 2, ch - 20);
   }
 
   // ---- 斗蛐蛐页 ----
@@ -509,22 +529,24 @@ export class Menu {
     const selectorW = 5 * 42;
     const btnW = 280;
     const btnH = 44;
+    // 武器选择器总高: 10(label) + 38(icons) + 44(card) = 92, 间距到下一区块 +14
+    // 护甲选择器总高: 10(label) + 38(icons) + 24(card) = 72, 间距到下一区块 +14
 
     if (page === 'pvai') {
       const diffX = cx - selectorW / 2;
-      const diffY = ch * 0.25;
+      const diffY = ch * 0.19;
       const weaponW = WEAPON_LIST.length * 52;
       const weaponAx = cx - weaponW / 2;
-      const weaponAy = diffY + 65;
+      const weaponAy = diffY + 68;
       const armorW = ARMOR_LIST.length * 52;
       const armorAx = cx - armorW / 2;
-      const armorAy = weaponAy + 55;
+      const armorAy = weaponAy + 98;
       return {
         diffX, diffY,
         weaponAx, weaponAy,
         armorAx, armorAy,
-        startBtn: { x: cx - btnW / 2, y: armorAy + 70, w: btnW, h: btnH },
-        backBtn:  { x: cx - 60, y: armorAy + 130, w: 120, h: 34 },
+        startBtn: { x: cx - btnW / 2, y: armorAy + 82, w: btnW, h: btnH },
+        backBtn:  { x: cx - 60, y: armorAy + 82 + btnH + 12, w: 120, h: 34 },
       };
     }
 
@@ -532,15 +554,15 @@ export class Menu {
       const diffGap = 50;
       const diffAx = cx - selectorW - diffGap / 2;
       const diffBx = cx + diffGap / 2;
-      const diffY = ch * 0.22;
+      const diffY = ch * 0.18;
       const weaponW = WEAPON_LIST.length * 52;
       const weaponAx = cx - weaponW - 10;
       const weaponBx = cx + 10;
-      const weaponY = diffY + 60;
+      const weaponY = diffY + 68;
       const armorW = ARMOR_LIST.length * 52;
       const armorAx = cx - armorW - 10;
       const armorBx = cx + 10;
-      const armorY = weaponY + 55;
+      const armorY = weaponY + 98;
       return {
         diffAx, diffAy: diffY,
         diffBx, diffBy: diffY,
@@ -548,8 +570,8 @@ export class Menu {
         weaponBx, weaponBy: weaponY,
         armorAx, armorAy: armorY,
         armorBx, armorBy: armorY,
-        startBtn: { x: cx - btnW / 2, y: armorY + 80, w: btnW, h: btnH },
-        backBtn:  { x: cx - 60, y: armorY + 140, w: 120, h: 34 },
+        startBtn: { x: cx - btnW / 2, y: armorY + 82, w: btnW, h: btnH },
+        backBtn:  { x: cx - 60, y: armorY + 82 + btnH + 12, w: 120, h: 34 },
       };
     }
 
@@ -557,16 +579,16 @@ export class Menu {
     const diffGap = 50;
     const diffAx = cx - selectorW - diffGap / 2;
     const diffBx = cx + diffGap / 2;
-    const diffY = ch * 0.18;
+    const diffY = ch * 0.16;
     const weaponW = WEAPON_LIST.length * 52;
     const weaponAx = cx - weaponW - 10;
     const weaponBx = cx + 10;
-    const weaponY = diffY + 60;
+    const weaponY = diffY + 68;
     const armorW = ARMOR_LIST.length * 52;
     const armorAx = cx - armorW - 10;
     const armorBx = cx + 10;
-    const armorY = weaponY + 55;
-    const roundsY = armorY + 55;
+    const armorY = weaponY + 98;
+    const roundsY = armorY + 76;
     const startBtnY = roundsY + 52;
     return {
       diffAx, diffAy: diffY,
@@ -707,15 +729,11 @@ export class Menu {
     const totalW = WEAPON_LIST.length * 52;
     ctx.fillText(label, x + totalW / 2 - 3, y - 10);
 
-    let hoveredWeapon = null;
-    let hoveredBx = 0;
-
     for (let i = 0; i < WEAPON_LIST.length; i++) {
       const w = WEAPON_LIST[i];
       const bx = x + i * 52;
       const selected = w.id === selectedId;
       const hovered = mx >= bx && mx <= bx + 46 && my >= y && my <= y + 38;
-      if (hovered) { hoveredWeapon = w; hoveredBx = bx; }
 
       ctx.fillStyle = selected ? w.color : hovered ? 'rgba(255,255,255,0.10)' : 'rgba(255,255,255,0.05)';
       ctx.fillRect(bx, y, 46, 38);
@@ -733,8 +751,63 @@ export class Menu {
       ctx.fillText(w.name, bx + 23, y + 33);
     }
 
-    if (hoveredWeapon) {
-      this._drawWeaponTooltip(ctx, hoveredBx, y, hoveredWeapon);
+    // 选中武器信息卡片
+    const selW = WEAPON_LIST.find(w => w.id === selectedId);
+    if (selW) {
+      const info = WEAPON_INFO[selW.id];
+      if (info) {
+        const cardX = x - 4;
+        const cardY = y + 44;
+        const cardW = totalW + 8;
+        const cardH = 38;
+        // 背景面板
+        ctx.fillStyle = 'rgba(8,8,20,0.85)';
+        ctx.fillRect(cardX, cardY, cardW, cardH);
+        ctx.strokeStyle = selW.color + '44';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(cardX, cardY, cardW, cardH);
+        // 左侧强调条
+        ctx.fillStyle = selW.color;
+        ctx.fillRect(cardX, cardY, 3, cardH);
+        // 第一行: 名称 + 类型 + 属性
+        ctx.textAlign = 'left';
+        ctx.fillStyle = selW.color;
+        ctx.font = 'bold 11px "Microsoft YaHei", sans-serif';
+        ctx.fillText(`${selW.icon} ${selW.name}`, cardX + 8, cardY + 14);
+        ctx.fillStyle = '#999';
+        ctx.font = '10px "Microsoft YaHei", sans-serif';
+        ctx.fillText(info.type, cardX + 8 + ctx.measureText(`${selW.icon} ${selW.name}`).width + 6, cardY + 14);
+        // 属性条
+        const stats = [
+          { l: '速', v: info.spd, c: '#44ff88' },
+          { l: '攻', v: info.dmg, c: '#ff4444' },
+          { l: '距', v: info.rng, c: '#4499ff' },
+          { l: '防', v: info.def, c: '#ffcc44' },
+        ];
+        let sx = cardX + cardW - 8;
+        ctx.textAlign = 'right';
+        for (let si = stats.length - 1; si >= 0; si--) {
+          const st = stats[si];
+          const barW = 20;
+          ctx.fillStyle = 'rgba(255,255,255,0.06)';
+          ctx.fillRect(sx - barW, cardY + 7, barW, 4);
+          ctx.fillStyle = st.c;
+          ctx.fillRect(sx - barW, cardY + 7, barW * st.v / 5, 4);
+          ctx.fillStyle = '#666';
+          ctx.font = '9px "Microsoft YaHei", sans-serif';
+          ctx.fillText(st.l, sx - barW - 2, cardY + 13);
+          sx -= barW + 18;
+        }
+        // 第二行: 特性 + 绝技
+        ctx.textAlign = 'left';
+        ctx.fillStyle = '#888';
+        ctx.font = '10px "Microsoft YaHei", sans-serif';
+        const traitsStr = info.traits.join(' · ');
+        ctx.fillText(traitsStr, cardX + 8, cardY + 30);
+        ctx.fillStyle = '#9966cc';
+        ctx.textAlign = 'right';
+        ctx.fillText('绝:' + info.ult.split(' ')[0], cardX + cardW - 6, cardY + 30);
+      }
     }
   }
 
@@ -745,15 +818,11 @@ export class Menu {
     const totalW = ARMOR_LIST.length * 52;
     ctx.fillText(label, x + totalW / 2 - 3, y - 10);
 
-    let hoveredArmor = null;
-    let hoveredBx = 0;
-
     for (let i = 0; i < ARMOR_LIST.length; i++) {
       const a = ARMOR_LIST[i];
       const bx = x + i * 52;
       const selected = a.id === selectedId;
       const hovered = mx >= bx && mx <= bx + 46 && my >= y && my <= y + 38;
-      if (hovered) { hoveredArmor = a; hoveredBx = bx; }
 
       ctx.fillStyle = selected ? (a.armorColor || '#556') : hovered ? 'rgba(255,255,255,0.10)' : 'rgba(255,255,255,0.05)';
       ctx.fillRect(bx, y, 46, 38);
@@ -771,129 +840,43 @@ export class Menu {
       ctx.fillText(a.name, bx + 23, y + 33);
     }
 
-    if (hoveredArmor) {
-      this._drawArmorTooltip(ctx, hoveredBx, y, hoveredArmor);
-    }
-  }
-
-  // 武器悬浮详情面板
-  _drawWeaponTooltip(ctx, bx, by, weapon) {
-    const info = WEAPON_INFO[weapon.id];
-    if (!info) return;
-    const cw = this.canvas._logicW || this.canvas.width;
-    const tw = 230, th = 68;
-    let tx = bx + 23 - tw / 2;
-    if (tx < 4) tx = 4;
-    if (tx + tw > cw - 4) tx = cw - tw - 4;
-    const ty = by - th - 6;
-
-    // 背景 + 边框
-    ctx.fillStyle = 'rgba(0,0,0,0.7)';
-    ctx.fillRect(tx - 1, ty - 1, tw + 2, th + 2);
-    ctx.fillStyle = '#111122';
-    ctx.fillRect(tx, ty, tw, th);
-    ctx.strokeStyle = weapon.color;
-    ctx.lineWidth = 1.5;
-    ctx.strokeRect(tx, ty, tw, th);
-
-    // 标题: 名称 + 类型
-    ctx.textAlign = 'left';
-    ctx.fillStyle = weapon.color;
-    ctx.font = 'bold 13px "Microsoft YaHei", sans-serif';
-    ctx.fillText(`${weapon.icon} ${weapon.name} — ${info.type}`, tx + 8, ty + 16);
-
-    // 属性条
-    const stats = [
-      { label: '速', val: info.spd, color: '#44ff88' },
-      { label: '攻', val: info.dmg, color: '#ff4444' },
-      { label: '距', val: info.rng, color: '#4499ff' },
-      { label: '防', val: info.def, color: '#ffcc44' },
-    ];
-    const barFullW = 24, barH = 5;
-    let sx = tx + 8;
-    const sy = ty + 30;
-    for (const st of stats) {
-      ctx.fillStyle = '#777';
-      ctx.font = '10px "Microsoft YaHei", sans-serif';
-      ctx.textAlign = 'left';
-      ctx.fillText(st.label, sx, sy);
-      ctx.fillStyle = 'rgba(255,255,255,0.08)';
-      ctx.fillRect(sx + 14, sy - 6, barFullW, barH);
-      ctx.fillStyle = st.color;
-      ctx.fillRect(sx + 14, sy - 6, barFullW * st.val / 5, barH);
-      sx += 54;
-    }
-
-    // 特性
-    ctx.fillStyle = '#aaa';
-    ctx.font = '10px "Microsoft YaHei", sans-serif';
-    ctx.textAlign = 'left';
-    ctx.fillText(info.traits.join(' · '), tx + 8, ty + 48);
-
-    // 绝技
-    ctx.fillStyle = '#cc88ff';
-    ctx.font = '10px "Microsoft YaHei", sans-serif';
-    ctx.fillText('绝技: ' + info.ult, tx + 8, ty + 62);
-  }
-
-  // 护甲悬浮详情面板
-  _drawArmorTooltip(ctx, bx, by, armor) {
-    const cw = this.canvas._logicW || this.canvas.width;
-    if (armor.id === 'none') {
-      const tw = 170, th = 36;
-      let tx = bx + 23 - tw / 2;
-      if (tx < 4) tx = 4;
-      if (tx + tw > cw - 4) tx = cw - tw - 4;
-      const ty = by - th - 6;
-      ctx.fillStyle = 'rgba(0,0,0,0.7)';
-      ctx.fillRect(tx - 1, ty - 1, tw + 2, th + 2);
-      ctx.fillStyle = '#111122';
-      ctx.fillRect(tx, ty, tw, th);
-      ctx.strokeStyle = '#666';
+    // 选中护甲信息卡片
+    const selA = ARMOR_LIST.find(a => a.id === selectedId);
+    if (selA) {
+      const cardX = x - 4;
+      const cardY = y + 44;
+      const cardW = totalW + 8;
+      const cardH = 24;
+      // 背景面板
+      ctx.fillStyle = 'rgba(8,8,20,0.85)';
+      ctx.fillRect(cardX, cardY, cardW, cardH);
+      const borderColor = selA.armorColor || '#555';
+      ctx.strokeStyle = borderColor + '44';
       ctx.lineWidth = 1;
-      ctx.strokeRect(tx, ty, tw, th);
+      ctx.strokeRect(cardX, cardY, cardW, cardH);
+      // 左侧强调条
+      ctx.fillStyle = borderColor;
+      ctx.fillRect(cardX, cardY, 3, cardH);
+
       ctx.textAlign = 'left';
-      ctx.fillStyle = '#ccc';
-      ctx.font = '12px "Microsoft YaHei", sans-serif';
-      ctx.fillText('👤 无甲 — 轻装上阵', tx + 8, ty + 15);
-      ctx.fillStyle = '#888';
-      ctx.font = '10px "Microsoft YaHei", sans-serif';
-      ctx.fillText('无防护加成，全速灵活', tx + 8, ty + 29);
-      return;
-    }
-    const tw = 220, th = 50;
-    let tx = bx + 23 - tw / 2;
-    if (tx < 4) tx = 4;
-    if (tx + tw > cw - 4) tx = cw - tw - 4;
-    const ty = by - th - 6;
-    ctx.fillStyle = 'rgba(0,0,0,0.7)';
-    ctx.fillRect(tx - 1, ty - 1, tw + 2, th + 2);
-    ctx.fillStyle = '#111122';
-    ctx.fillRect(tx, ty, tw, th);
-    ctx.strokeStyle = armor.armorColor || '#888';
-    ctx.lineWidth = 1;
-    ctx.strokeRect(tx, ty, tw, th);
-    ctx.textAlign = 'left';
-    ctx.fillStyle = armor.armorColor || '#ccc';
-    ctx.font = 'bold 12px "Microsoft YaHei", sans-serif';
-    ctx.fillText(`${armor.icon} ${armor.name} — ${armor.desc}`, tx + 8, ty + 16);
-    ctx.fillStyle = '#aaa';
-    ctx.font = '10px "Microsoft YaHei", sans-serif';
-    let line = `HP+${armor.hpBonus}  速度${Math.round(armor.speedMult * 100)}%  减伤${Math.round(armor.damageReductionPct * 100)}%`;
-    if (armor.staggerResist > 0) line += `  硬直-${armor.staggerResist.toFixed(2)}s`;
-    ctx.fillText(line, tx + 8, ty + 32);
-    let specials = [];
-    if (armor.blockCostReduction > 0) specials.push(`格挡消耗-${armor.blockCostReduction}`);
-    if (armor.executionResist) specials.push('抗处决');
-    if (armor.heavyDamageResist > 0) specials.push(`重击减伤${Math.round(armor.heavyDamageResist * 100)}%`);
-    if (specials.length > 0) {
-      ctx.fillStyle = '#cc8844';
-      ctx.font = '10px "Microsoft YaHei", sans-serif';
-      ctx.fillText(specials.join(' · '), tx + 8, ty + 44);
+      if (selA.id === 'none') {
+        ctx.fillStyle = '#999';
+        ctx.font = '11px "Microsoft YaHei", sans-serif';
+        ctx.fillText('👤 无甲 — 轻装上阵，全速灵活', cardX + 8, cardY + 16);
+      } else {
+        ctx.fillStyle = selA.armorColor || '#ccc';
+        ctx.font = 'bold 11px "Microsoft YaHei", sans-serif';
+        ctx.fillText(`${selA.icon} ${selA.name}`, cardX + 8, cardY + 16);
+        // 右侧属性
+        ctx.fillStyle = '#999';
+        ctx.font = '10px "Microsoft YaHei", sans-serif';
+        let attrs = `HP+${selA.hpBonus}  速${Math.round(selA.speedMult * 100)}%  减伤${Math.round(selA.damageReductionPct * 100)}%`;
+        if (selA.executionResist) attrs += '  抗处决';
+        ctx.textAlign = 'right';
+        ctx.fillText(attrs, cardX + cardW - 6, cardY + 16);
+      }
     }
   }
-
-  // ---- 自由训练页 ----
   _updateTraining(mx, my) {
     const L = this._layoutTraining();
     // 难度选择
@@ -993,13 +976,13 @@ export class Menu {
     ctx.textAlign = 'center';
     ctx.fillStyle = '#aaa';
     ctx.font = '14px "Microsoft YaHei", sans-serif';
-    ctx.fillText('从山贼到武林盟主，敌人体型、血量、智能逐步升级', cw / 2, ch * 0.40);
-    ctx.fillText('每关战胜后恢复40%HP，挑战到底!', cw / 2, ch * 0.45);
+    ctx.fillText('从山贼到武林盟主，敌人体型、血量、智能逐步升级', cw / 2, L.weaponAy + 105);
+    ctx.fillText('每关战胜后恢复40%HP，挑战到底!', cw / 2, L.weaponAy + 125);
 
     // 关卡预览
     ctx.fillStyle = '#666';
     ctx.font = '12px "Microsoft YaHei", sans-serif';
-    ctx.fillText('关卡: 山贼 → 镖师 → 恶霸 → 剑客 → 力士 → 捕快 → 武僧 → 长老 → 剑仙 → 盟主', cw / 2, ch * 0.52);
+    ctx.fillText('关卡: 山贼 → 镖师 → 恶霸 → 剑客 → 力士 → 捕快 → 武僧 → 长老 → 剑仙 → 盟主', cw / 2, L.weaponAy + 150);
 
     this._drawActionBtn(ctx, L.startBtn, '⚔ 踏入江湖', '#ffcc44', mx, my);
     this._drawActionBtn(ctx, L.backBtn, '← 返回', '#666', mx, my);
@@ -1013,11 +996,11 @@ export class Menu {
     const btnH = 48;
     const weaponW = WEAPON_LIST.length * 52;
     const weaponAx = cx - weaponW / 2;
-    const weaponAy = ch * 0.26;
+    const weaponAy = ch * 0.24;
     return {
       weaponAx, weaponAy,
-      startBtn: { x: cx - btnW / 2, y: ch * 0.58, w: btnW, h: btnH },
-      backBtn: { x: cx - 60, y: ch * 0.58 + btnH + 20, w: 120, h: 34 },
+      startBtn: { x: cx - btnW / 2, y: weaponAy + 170, w: btnW, h: btnH },
+      backBtn: { x: cx - 60, y: weaponAy + 170 + btnH + 16, w: 120, h: 34 },
     };
   }
 
@@ -1435,9 +1418,9 @@ export class Menu {
 
     ctx.textAlign = 'center';
     ctx.fillStyle = '#aaa';
-    ctx.font = '13px "Microsoft YaHei", sans-serif';
-    ctx.fillText('P1: WASD移动 · 鼠标瞄准 · 左键/J轻击 · 右键/K重击 · 空格招架 · Shift闪避 · F/L绝技', cw / 2, L.weaponBy + 56);
-    ctx.fillText('P2: 方向键/左摇杆移动 · 小键盘1/X轻击 · 小键盘3/Y重击 · 小键盘5/B招架 · 小键盘2/RB闪避 · 小键盘4/RT绝技', cw / 2, L.weaponBy + 76);
+    ctx.font = '12px "Microsoft YaHei", sans-serif';
+    ctx.fillText('P1: WASD移动 · 鼠标瞄准 · J轻击 · K重击 · 空格招架 · Shift闪避 · L绝技', cw / 2, L.weaponBy + 96);
+    ctx.fillText('P2: 方向键 · 小键盘1轻击 · 3重击 · 5招架 · 2闪避 · 4绝技 / 手柄', cw / 2, L.weaponBy + 114);
 
     this._drawActionBtn(ctx, L.startBtn, '⚔ 开始对战', '#44dd88', mx, my);
     this._drawActionBtn(ctx, L.backBtn, '← 返回', '#666', mx, my);
@@ -1452,12 +1435,12 @@ export class Menu {
     const weaponW = WEAPON_LIST.length * 52;
     const weaponAx = cx - weaponW - 10;
     const weaponBx = cx + 10;
-    const weaponY = ch * 0.30;
+    const weaponY = ch * 0.26;
     return {
       weaponAx, weaponAy: weaponY,
       weaponBx, weaponBy: weaponY,
-      startBtn: { x: cx - btnW / 2, y: weaponY + 130, w: btnW, h: btnH },
-      backBtn:  { x: cx - 60, y: weaponY + 190, w: 120, h: 34 },
+      startBtn: { x: cx - btnW / 2, y: weaponY + 160, w: btnW, h: btnH },
+      backBtn:  { x: cx - 60, y: weaponY + 220, w: 120, h: 34 },
     };
   }
 
