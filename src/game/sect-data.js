@@ -1,0 +1,453 @@
+// ===================== 宗门风云 · 数据定义 =====================
+// 弟子、设施、任务、事件、特质、商品等所有静态数据
+
+import { randomChineseName, randomTitledName } from '../core/names.js';
+
+// ===== 特质定义 =====
+export const TRAITS = {
+  brave:     { id: 'brave',     name: '勇猛', desc: '攻击更积极', color: '#ff6644', aiMod: { heavyRate: 0.10, blockDurBase: -0.1 } },
+  steady:    { id: 'steady',    name: '稳健', desc: '防守见长',   color: '#4488ff', aiMod: { blockDurBase: 0.1, dodgeChance: 0.03 } },
+  stealthy:  { id: 'stealthy',  name: '鬼祟', desc: '善于偷袭',   color: '#aa44ff', aiMod: { backstabBias: 0.2 } },
+  ironwall:  { id: 'ironwall',  name: '铁壁', desc: '格挡高手',   color: '#88ccff', aiMod: { reactChance: 0.05 } },
+  fierce:    { id: 'fierce',    name: '暴躁', desc: '高攻低防',   color: '#ff4444', aiMod: { heavyRate: 0.15, reactChance: -0.05 } },
+  calm:      { id: 'calm',      name: '沉着', desc: '反应敏捷',   color: '#44ddaa', aiMod: { thinkCDMul: 0.8, perfectDodgeChance: 0.10 } },
+  genius:    { id: 'genius',    name: '天才', desc: '资质+1',     color: '#ffdd00', aiMod: {} },
+  tough:     { id: 'tough',     name: '坚韧', desc: 'HP+15%',    color: '#88aa44', aiMod: { hpMul: 0.15 } },
+  swift:     { id: 'swift',     name: '迅捷', desc: '移速+10%',   color: '#44ffaa', aiMod: { speedMul: 0.10 } },
+  lucky:     { id: 'lucky',     name: '幸运', desc: '任务奖励+20%', color: '#ffaa44', aiMod: {} },
+};
+export const TRAIT_LIST = Object.values(TRAITS);
+export const COMMON_TRAITS = TRAIT_LIST.filter(t => t.id !== 'genius');
+export const RARE_TRAITS = [TRAITS.genius];
+
+// ===== 武器中文名映射 =====
+export const WEAPON_NAMES = {
+  dao: '刀', daggers: '匕', hammer: '锤', spear: '枪', shield: '盾',
+};
+export const WEAPON_IDS = ['dao', 'daggers', 'hammer', 'spear', 'shield'];
+
+// ===== 护甲中文名映射 =====
+export const ARMOR_NAMES = {
+  none: '无甲', light: '轻甲', medium: '中甲', heavy: '重甲', plate: '板甲',
+};
+
+// ===== 弟子颜色池 =====
+const DISCIPLE_COLORS = [
+  '#ff6644', '#44aaff', '#ffcc33', '#44dd88', '#ff44aa',
+  '#aa88ff', '#ff8833', '#33cccc', '#cc6699', '#88cc44',
+  '#dd7744', '#5599ee', '#ddaa33', '#55bb77', '#cc5588',
+  '#9977dd', '#ee7722', '#44bbaa', '#bb5577', '#77aa33',
+];
+
+// ===== 设施定义 =====
+export const BUILDINGS = {
+  dojo:     { id: 'dojo',     name: '练武场', icon: '🏟', maxLv: 5, desc: '训练经验加成',
+              costs: [200, 500, 1200, 3000, 8000], effect: lv => `经验×${(1 + lv * 0.3).toFixed(1)}` },
+  smith:    { id: 'smith',    name: '铁匠铺', icon: '🔨', maxLv: 3, desc: '解锁护甲等级',
+              costs: [300, 800, 2000], effect: lv => ['轻甲', '中甲', '重甲'][lv - 1] || '—' },
+  library:  { id: 'library',  name: '藏经阁', icon: '📚', maxLv: 3, desc: '训练获得特质',
+              costs: [500, 1500, 4000], effect: lv => `特质概率+${lv * 10}%` },
+  clinic:   { id: 'clinic',   name: '药房',   icon: '💊', maxLv: 3, desc: '受伤恢复加速',
+              costs: [300, 800, 2000], effect: lv => `恢复×${(1 + lv * 0.5).toFixed(1)}` },
+  inn:      { id: 'inn',      name: '客栈',   icon: '🏨', maxLv: 3, desc: '增加每日来客',
+              costs: [200, 600, 1500], effect: lv => `+${lv}位来客` },
+  barracks: { id: 'barracks', name: '校场',   icon: '🏰', maxLv: 5, desc: '弟子容量上限',
+              costs: [100, 400, 1000, 2500, 6000], effect: lv => `${[3, 5, 8, 12, 16][lv - 1] || 3}人` },
+  bank:     { id: 'bank',     name: '钱庄',   icon: '💰', maxLv: 3, desc: '每日被动收入',
+              costs: [500, 1500, 5000], effect: lv => `+${lv * 80}银/天` },
+  tower:    { id: 'tower',    name: '望楼',   icon: '🗼', maxLv: 3, desc: '解锁高级任务',
+              costs: [400, 1200, 3500], effect: lv => `${lv}级区域` },
+};
+export const BUILDING_LIST = Object.values(BUILDINGS);
+
+/** 弟子容量上限 */
+export function maxDisciples(barracksLv) {
+  return [3, 5, 8, 12, 16][barracksLv - 1] || 3;
+}
+
+/** 可用护甲等级 */
+export function availableArmors(smithLv) {
+  const armors = ['none'];
+  if (smithLv >= 1) armors.push('light');
+  if (smithLv >= 2) armors.push('medium');
+  if (smithLv >= 3) armors.push('heavy');
+  return armors;
+}
+
+/** 每日被动收入 */
+export function dailyIncome(bankLv) {
+  return bankLv * 80;
+}
+
+/** 训练经验倍率 */
+export function trainExpMul(dojoLv) {
+  return 1 + dojoLv * 0.3;
+}
+
+/** 受伤恢复倍率 */
+export function healMul(clinicLv) {
+  return 1 + clinicLv * 0.5;
+}
+
+// ===== 任务定义 =====
+export const QUEST_TYPES = [
+  { id: 'bandit',   name: '剿匪',     icon: '⚔', minTower: 0, enemyDiff: [1, 2], reward: { gold: [80, 150], fame: [3, 8], exp: [15, 25] },  risk: 'low',  desc: '清剿山贼，维护治安' },
+  { id: 'escort',   name: '护镖',     icon: '📦', minTower: 0, enemyDiff: [2, 3], reward: { gold: [150, 300], fame: [5, 12], exp: [20, 35] }, risk: 'mid',  desc: '押送镖车，沿途遇敌' },
+  { id: 'tourney',  name: '比武大会', icon: '🏆', minTower: 1, enemyDiff: [3, 4], reward: { gold: [100, 200], fame: [15, 30], exp: [30, 50] }, risk: 'mid', desc: '参加武林大会，扬名立万' },
+  { id: 'explore',  name: '探秘古墓', icon: '🗝', minTower: 1, enemyDiff: [3, 5], reward: { gold: [200, 500], fame: [8, 15], exp: [25, 45] }, risk: 'high', desc: '深入古墓，寻宝探险' },
+  { id: 'justice',  name: '除暴安良', icon: '⚖', minTower: 0, enemyDiff: [2, 3], reward: { gold: [60, 120], fame: [10, 20], exp: [15, 30] }, risk: 'low', desc: '惩奸除恶，百姓称颂' },
+  { id: 'rival',    name: '门派挑战', icon: '🔥', minTower: 2, enemyDiff: [4, 5], reward: { gold: [200, 400], fame: [25, 50], exp: [40, 60] }, risk: 'high', desc: '挑战对手门派，胜者为王' },
+  { id: 'assassin', name: '夜袭敌营', icon: '🌙', minTower: 2, enemyDiff: [3, 5], reward: { gold: [250, 450], fame: [12, 25], exp: [35, 55] }, risk: 'high', desc: '趁夜突袭，一击制胜' },
+  { id: 'guard',    name: '守卫要塞', icon: '🛡', minTower: 1, enemyDiff: [2, 4], reward: { gold: [120, 250], fame: [8, 18], exp: [20, 40] }, risk: 'mid', desc: '驻守要塞，抵御来犯' },
+];
+
+/** 获取当前可用任务（基于望楼等级）*/
+export function getAvailableQuests(towerLv) {
+  return QUEST_TYPES.filter(q => q.minTower <= towerLv);
+}
+
+/** 生成任务实例 */
+export function generateQuest(towerLv) {
+  const available = getAvailableQuests(towerLv);
+  const qt = available[Math.floor(Math.random() * available.length)];
+  const diff = qt.enemyDiff[0] + Math.floor(Math.random() * (qt.enemyDiff[1] - qt.enemyDiff[0] + 1));
+  const gold = qt.reward.gold[0] + Math.floor(Math.random() * (qt.reward.gold[1] - qt.reward.gold[0] + 1));
+  const fame = qt.reward.fame[0] + Math.floor(Math.random() * (qt.reward.fame[1] - qt.reward.fame[0] + 1));
+  const exp = qt.reward.exp[0] + Math.floor(Math.random() * (qt.reward.exp[1] - qt.reward.exp[0] + 1));
+  const weaponId = WEAPON_IDS[Math.floor(Math.random() * WEAPON_IDS.length)];
+  return {
+    type: qt.id,
+    name: qt.name,
+    icon: qt.icon,
+    desc: qt.desc,
+    risk: qt.risk,
+    enemyDiff: diff,
+    enemyWeapon: weaponId,
+    reward: { gold, fame, exp },
+    discipleId: null, // 指派的弟子
+  };
+}
+
+// ===== 随机事件定义 =====
+export const EVENT_TYPES = [
+  { id: 'wanderer',    name: '流浪高手',   icon: '🗡', weight: 15,
+    desc: '一名落魄剑客求投门下',
+    choices: [
+      { label: '收留', effect: 'addDisciple', params: { loyaltyBase: 40, talentMin: 2, talentMax: 4 } },
+      { label: '拒绝', effect: 'none' },
+    ] },
+  { id: 'raid',        name: '山贼围攻',   icon: '💀', weight: 10,
+    desc: '一伙山贼盯上了宗门！',
+    choices: [
+      { label: '迎战', effect: 'raidBattle', params: { count: 2, diff: [1, 3] } },
+      { label: '交保护费', effect: 'payGold', params: { amount: 150 } },
+    ] },
+  { id: 'prodigy',     name: '天降奇才',   icon: '🌟', weight: 5,
+    desc: '山中发现练武奇童，资质惊人！',
+    choices: [
+      { label: '收为弟子(300银)', effect: 'addProdigy', params: { cost: 300, talent: [4, 5] } },
+      { label: '路过', effect: 'none' },
+    ] },
+  { id: 'merchant',    name: '黑市商人',   icon: '🎭', weight: 12,
+    desc: '神秘商人兜售稀有物品',
+    choices: [
+      { label: '买秘药(200银)', effect: 'buyElixir', params: { cost: 200 } },
+      { label: '买护甲(300银)', effect: 'buyArmor', params: { cost: 300 } },
+      { label: '不买',          effect: 'none' },
+    ] },
+  { id: 'breakthrough', name: '弟子顿悟',  icon: '💡', weight: 12,
+    desc: '{disciple}在训练中顿悟！',
+    choices: [
+      { label: '太好了', effect: 'grantBreakthrough' },
+    ] },
+  { id: 'betrayal',    name: '弟子不满',   icon: '💢', weight: 8,
+    desc: '{disciple}忠诚度过低，意图叛逃',
+    choices: [
+      { label: '挽留(100银)', effect: 'retainDisciple', params: { cost: 100 } },
+      { label: '放走',        effect: 'removeDisciple' },
+    ] },
+  { id: 'alliance',    name: '门派来访',  icon: '🤝', weight: 10,
+    desc: '有门派提议结为友好',
+    choices: [
+      { label: '结盟(+声望)', effect: 'gainFame', params: { fame: 15 } },
+      { label: '婉拒', effect: 'none' },
+    ] },
+  { id: 'plague',      name: '瘟疫流行',  icon: '🤒', weight: 5,
+    desc: '门派爆发疫病，全员受影响',
+    choices: [
+      { label: '全力医治(200银)', effect: 'cureAll', params: { cost: 200 } },
+      { label: '自行恢复', effect: 'plagueAll' },
+    ] },
+  { id: 'donation',    name: '富商捐赠',  icon: '💎', weight: 10,
+    desc: '一位仰慕你声望的富商前来捐赠',
+    choices: [
+      { label: '收下', effect: 'gainGold', params: { gold: [150, 400] } },
+    ] },
+  { id: 'duel_invite', name: '江湖挑战书', icon: '📜', weight: 10,
+    desc: '收到一封挑战书，对方点名挑战',
+    choices: [
+      { label: '应战', effect: 'duelChallenge', params: { diff: [3, 5] } },
+      { label: '无视(-声望)', effect: 'loseFame', params: { fame: 10 } },
+    ] },
+  { id: 'treasure',    name: '藏宝图线索', icon: '🗺', weight: 6,
+    desc: '获得一张残破的藏宝图',
+    choices: [
+      { label: '派人探索', effect: 'treasureHunt' },
+      { label: '忽略', effect: 'none' },
+    ] },
+];
+
+/** 按权重随机选取事件 */
+export function rollEvent(state) {
+  // 过滤掉不适用的事件
+  let pool = [...EVENT_TYPES];
+  // 弟子不满需要有弟子且忠诚度低
+  if (!state.disciples.some(d => d.loyalty < 50)) {
+    pool = pool.filter(e => e.id !== 'betrayal');
+  }
+  // 弟子顿悟需要有弟子
+  if (state.disciples.length === 0) {
+    pool = pool.filter(e => e.id !== 'breakthrough');
+  }
+  const totalWeight = pool.reduce((s, e) => s + e.weight, 0);
+  let r = Math.random() * totalWeight;
+  for (const evt of pool) {
+    r -= evt.weight;
+    if (r <= 0) return { ...evt };
+  }
+  return { ...pool[pool.length - 1] };
+}
+
+// ===== 弟子生成 =====
+
+let _nextDiscipleId = 1;
+export function resetDiscipleIdCounter(maxId = 0) { _nextDiscipleId = maxId + 1; }
+
+/** 生成一名新弟子 */
+export function createDisciple(opts = {}) {
+  const talent = opts.talent || (1 + Math.floor(Math.random() * 4)); // 1-4 默认
+  const name = opts.name || randomChineseName();
+  const weaponId = opts.weaponId || WEAPON_IDS[Math.floor(Math.random() * WEAPON_IDS.length)];
+  const color = opts.color || DISCIPLE_COLORS[Math.floor(Math.random() * DISCIPLE_COLORS.length)];
+
+  // 随机特质（10%概率自带一个）
+  let traits = opts.traits || [];
+  if (traits.length === 0 && Math.random() < 0.15) {
+    const t = COMMON_TRAITS[Math.floor(Math.random() * COMMON_TRAITS.length)];
+    traits = [t.id];
+  }
+
+  // 天才特质提升资质上限
+  const hasTalentBoost = traits.includes('genius');
+  const effectiveTalent = Math.min(5, talent + (hasTalentBoost ? 1 : 0));
+
+  return {
+    id: _nextDiscipleId++,
+    name,
+    talent: effectiveTalent,
+    level: 1,
+    exp: 0,
+    loyalty: opts.loyalty ?? (60 + Math.floor(Math.random() * 30)),
+    stamina: 100,
+    injury: 0,
+    weaponId,
+    armorId: 'none',
+    color,
+    traits,
+    wins: 0,
+    losses: 0,
+    joinDay: opts.joinDay || 1,
+    onQuest: false, // 是否在执行任务
+  };
+}
+
+/** 弟子升级所需经验 */
+export function expToLevel(currentLevel) {
+  return [0, 40, 100, 200, 400][currentLevel - 1] || 999;
+}
+
+/** 宗门名称池 */
+const SECT_NAMES = [
+  '青云门', '太虚宫', '烈焰堂', '寒冰谷', '幽冥阁',
+  '天剑派', '龙虎山', '碧水庄', '铁拳帮', '飞雪门',
+  '紫霄宫', '玄武堂', '凤凰台', '苍狼寨', '白鹤观',
+  '逍遥阁', '凌云宗', '武当派', '少林寺', '峨眉派',
+];
+
+export function randomSectName() {
+  return SECT_NAMES[Math.floor(Math.random() * SECT_NAMES.length)];
+}
+
+// ===== 初始状态 =====
+export function createInitialState() {
+  resetDiscipleIdCounter(0);
+  const sectName = randomSectName();
+  // 初始3个弟子
+  const d1 = createDisciple({ talent: 2, loyalty: 80, joinDay: 1 });
+  const d2 = createDisciple({ talent: 1, loyalty: 75, joinDay: 1 });
+  const d3 = createDisciple({ talent: 2, loyalty: 70, joinDay: 1 });
+  return {
+    version: 1,
+    sectName,
+    day: 1,
+    phase: 'morning', // morning | noon | night
+    gold: 500,
+    fame: 0,
+    disciples: [d1, d2, d3],
+    buildings: {
+      dojo: 1, smith: 0, library: 0, clinic: 0,
+      inn: 0, barracks: 1, bank: 0, tower: 0,
+    },
+    quests: [],           // 当前可选任务（每天刷新）
+    activeQuests: [],     // 进行中的任务
+    log: [],              // 事件日志（最近30条）
+    stats: {
+      totalDays: 0,
+      totalFights: 0,
+      totalWins: 0,
+      totalGold: 0,
+      highestFame: 0,
+    },
+    pendingEvent: null,  // 当前待处理事件
+    pendingFightResult: null, // 战斗观看结果
+    storyProgress: [],  // 已触发的剧情ID列表
+    pendingStory: null, // 当前待显示的剧情
+  };
+}
+
+// ===== 剧情/故事系统 =====
+// 按触发条件排列的故事节点，每个只触发一次
+export const STORY_NODES = [
+  {
+    id: 'intro',
+    trigger: s => s.day === 1 && s.storyProgress.length === 0,
+    title: '宗门初立',
+    pages: [
+      '江湖动荡，群雄逐鹿。你受恩师遗命，于乱世中重建{sect}。',
+      '如今门下仅有三名弟子，经费拮据，前路漫漫。',
+      '恩师临终前说：「先把弟子练好，根基牢固方可成大事。」',
+      '💡 提示：点击「训练弟子」提升弟子实力，训练完成后点击「进入下一天」推进时间。',
+    ],
+  },
+  {
+    id: 'day2_buildings',
+    trigger: s => s.day >= 2 && !s.storyProgress.includes('day2_buildings'),
+    title: '门派建设',
+    pages: [
+      '经过一天苦训，弟子们已有些长进。',
+      '巡视门派四周，许多设施年久失修，需要修缮和扩建。',
+      '💡 现已解锁「建造设施」。升级练武场可提高训练效率，升级校场可容纳更多弟子。',
+    ],
+  },
+  {
+    id: 'day3_quests',
+    trigger: s => (s.day >= 3 || Object.values(s.buildings).some(v => v > 1)) && !s.storyProgress.includes('day3_quests'),
+    title: '初涉江湖',
+    pages: [
+      '门派小有规模，附近村庄听闻你的名号，纷纷前来求助。',
+      '山贼横行、镖车遭劫，这些都是弟子历练的好机会。',
+      '💡 现已解锁「派遣任务」。选择合适的弟子出战，胜利可获得银两、声望和经验。注意敌方难度，量力而行！',
+    ],
+  },
+  {
+    id: 'first_win',
+    trigger: s => s.stats.totalWins === 1 && !s.storyProgress.includes('first_win'),
+    title: '初露锋芒',
+    pages: [
+      '首战告捷！弟子凯旋归来，门派上下欢欣鼓舞。',
+      '江湖中开始有人谈论{sect}的名号，虽然还不算响亮，但这是个好的开始。',
+      '继续派遣弟子完成任务，积累声望。声望越高，吸引的人才越优秀。',
+    ],
+  },
+  {
+    id: 'first_loss',
+    trigger: s => s.stats.totalFights - s.stats.totalWins >= 1 && s.stats.totalWins === 0 && !s.storyProgress.includes('first_loss'),
+    title: '一败涂地',
+    pages: [
+      '弟子负伤而归，全门上下士气低落。',
+      '你想起恩师的话：「败不可怕，怕的是不知道为何而败。」',
+      '💡 弟子等级越高战力越强。多训练几天、升级练武场，再去挑战低难度任务。',
+    ],
+  },
+  {
+    id: 'spar_unlock',
+    trigger: s => (s.day >= 4 || s.stats.totalFights > 0) && !s.storyProgress.includes('spar_unlock'),
+    title: '以武会友',
+    pages: [
+      '弟子们训练之余，摩拳擦掌想要一较高下。',
+      '你决定在门内设立擂台，让弟子切磋武艺、取长补短。',
+      '💡 现已解锁「门派擂台」。切磋不会造成重伤，但能获得经验并观看精彩对战。',
+    ],
+  },
+  {
+    id: 'fame_30',
+    trigger: s => s.fame >= 30 && !s.storyProgress.includes('fame_30'),
+    title: '声名鹊起',
+    pages: [
+      '{sect}的名号在江湖中逐渐传开，隔壁武馆感受到了威胁。',
+      '有人带来消息：周边门派开始注意到你们，既有善意也有敌意。',
+      '未雨绸缪，升级望楼可解锁更高级的任务，升级客栈则能吸引更多人才。',
+    ],
+  },
+  {
+    id: 'fame_100',
+    trigger: s => s.fame >= 100 && !s.storyProgress.includes('fame_100'),
+    title: '名震一方',
+    pages: [
+      '{sect}声望已达百分，在本地已是一方豪强。',
+      '各路英雄纷纷来访，既有切磋的，也有挑战的。',
+      '江湖之路才走了一半，若要称雄武林，声望还需更上一层楼。',
+    ],
+  },
+  {
+    id: 'disciples_6',
+    trigger: s => s.disciples.length >= 6 && !s.storyProgress.includes('disciples_6'),
+    title: '人才济济',
+    pages: [
+      '门下弟子已有六人之多，{sect}日益壮大。',
+      '弟子多了，管理也要跟上。留意每个弟子的忠诚度和伤势，适时关怀。',
+      '忠诚低于50的弟子可能会心生不满，必要时花些银两安抚。',
+    ],
+  },
+  {
+    id: 'gold_2000',
+    trigger: s => s.gold >= 2000 && !s.storyProgress.includes('gold_2000'),
+    title: '家底渐厚',
+    pages: [
+      '门派金库已有两千银两，终于不再捉襟见肘。',
+      '是时候大兴土木了——升级钱庄可获得每日被动收入，让财源滚滚而来。',
+    ],
+  },
+  {
+    id: 'day_10',
+    trigger: s => s.day >= 10 && !s.storyProgress.includes('day_10'),
+    title: '十日回首',
+    pages: [
+      '转眼间门派已立十日，回首往事，感慨万千。',
+      `目前战绩 ${0}胜${0}负，声望${0}，弟子${0}人。`,  // 占位，运行时替换
+      '江湖路远，但{sect}的传奇才刚刚开始。',
+    ],
+    dynamicPage: 1, // 标记第2页需要运行时替换
+  },
+  {
+    id: 'day_30',
+    trigger: s => s.day >= 30 && !s.storyProgress.includes('day_30'),
+    title: '月余长歌',
+    pages: [
+      '一个月过去了，{sect}从无名小派成长至今，江湖中已有了一席之地。',
+      '恩师若泉下有知，定会欣慰。但你知道，真正的武林之路，才刚刚开始……',
+      '（更多剧情开发中…感谢游玩！）',
+    ],
+  },
+];
+
+/** 检查是否有剧情需要触发，返回第一个匹配的剧情节点或null */
+export function checkStoryTrigger(state) {
+  for (const node of STORY_NODES) {
+    if (state.storyProgress.includes(node.id)) continue;
+    try {
+      if (node.trigger(state)) return node;
+    } catch { /* 忽略 */ }
+  }
+  return null;
+}

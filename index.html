@@ -32,6 +32,7 @@
           <button class="help-tab active" data-tab="controls">🎮 操作指南</button>
           <button class="help-tab" data-tab="mechanics">⚙ 战斗机制</button>
           <button class="help-tab" data-tab="weapons">🗡 武器图鉴</button>
+          <button class="help-tab" data-tab="sect">🏯 宗门风云</button>
         </div>
 
         <div class="help-body">
@@ -356,9 +357,55 @@
               </div>
             </div>
 
+          </div><!-- end tab-weapons -->
+
+          <!-- ========== 宗门风云 ========== -->
+          <div class="help-tab-content" id="tab-sect">
+            <div class="help-columns">
+              <div class="help-col">
+                <div class="section-title">🔄 每日循环</div>
+                <div class="help-item"><span class="help-key" style="color:#ffcc44">推进一天</span><span class="help-desc">触发随机事件 → 招募弟子 → 刷新任务 → 银庄收益</span></div>
+                <div class="help-item"><span class="help-key" style="color:#aaa">训练</span><span class="help-desc">全体训练(-15体力)消耗体力换经验；专训(-20体力)高收益单人训练</span></div>
+                <div class="help-item"><span class="help-key" style="color:#44dd88">任务派遣</span><span class="help-desc">选弟子出征，观看实时战斗，战斗结束后自动结算奖励</span></div>
+                <div class="help-item"><span class="help-key" style="color:#88aaff">门派切磋</span><span class="help-desc">选两名弟子互相对练，双方均获经验（不消耗体力太多）</span></div>
+
+                <div class="section-title">👥 弟子属性</div>
+                <div class="help-item"><span class="help-key" style="color:#4499ff">等级</span><span class="help-desc">1–10，任务/训练积累经验，受资质上限约束</span></div>
+                <div class="help-item"><span class="help-key" style="color:#dd8">资质☆</span><span class="help-desc">1–5星，决定最高等级（☆=Lv上限，5☆最高Lv10）</span></div>
+                <div class="help-item"><span class="help-key" style="color:#ffcc44">体力</span><span class="help-desc">训练/派遣消耗，每天自动恢复（药堂提升恢复量）</span></div>
+                <div class="help-item"><span class="help-key" style="color:#ff6644">受伤</span><span class="help-desc">任务失败增加，影响战斗力；药堂每天治疗一定量</span></div>
+                <div class="help-item"><span class="help-key" style="color:#8888ff">忠诚</span><span class="help-desc">多次失败后降低；为0时弟子可能自行离开</span></div>
+                <div class="help-item"><span class="help-key" style="color:#44dd88">特质</span><span class="help-desc">升级时随机获得（急袭/铁盾/神速/炁感等），影响战斗能力</span></div>
+
+                <div class="section-title">📋 弟子状态徽章</div>
+                <div class="help-item"><span class="help-key" style="color:#ffaa44">出征</span><span class="help-desc">正在执行任务，不可再次派遣</span></div>
+                <div class="help-item"><span class="help-key" style="color:#ff4444">重伤</span><span class="help-desc">伤势&gt;70%，战斗力大幅下降</span></div>
+                <div class="help-item"><span class="help-key" style="color:#ff8844">受伤</span><span class="help-desc">伤势30–70%，轻微影响</span></div>
+                <div class="help-item"><span class="help-key" style="color:#aaa">疲惫</span><span class="help-desc">体力&lt;20，无法训练或派遣</span></div>
+                <div class="help-item"><span class="help-key" style="color:#cc44cc">不满</span><span class="help-desc">忠诚&lt;40，有离开风险</span></div>
+                <div class="help-item"><span class="help-key" style="color:#ffdd33">大成</span><span class="help-desc">已达资质等级上限，无法继续成长</span></div>
+              </div>
+              <div class="help-col">
+                <div class="section-title">📜 任务系统</div>
+                <div class="help-item"><span class="help-key" style="color:#44dd88">容易（绿）</span><span class="help-desc">敌方难度低，风险小，奖励少</span></div>
+                <div class="help-item"><span class="help-key" style="color:#ffaa44">中等（橙）</span><span class="help-desc">与弟子等级相当，胜负五五开</span></div>
+                <div class="help-item"><span class="help-key" style="color:#ff4444">危险（红）</span><span class="help-desc">敌方强力，高风险高奖励</span></div>
+                <div class="help-item"><span class="help-key" style="color:#88aaff">推荐弟子</span><span class="help-desc">任务卡片右侧自动显示最合适的弟子及实力对比</span></div>
+
+                <div class="section-title">🏗 设施系统</div>
+                <div class="help-item"><span class="help-key">🏠 宿舍</span><span class="help-desc">提升弟子数量上限（Lv1→3人）</span></div>
+                <div class="help-item"><span class="help-key">🏋 练功房</span><span class="help-desc">降低训练体力消耗</span></div>
+                <div class="help-item"><span class="help-key">⚔ 兵器架</span><span class="help-desc">解锁高级武器/护甲供弟子使用</span></div>
+                <div class="help-item"><span class="help-key">🏦 银庄</span><span class="help-desc">每日被动金币收入</span></div>
+                <div class="help-item"><span class="help-key">💊 药堂</span><span class="help-desc">提升每日体力/伤势恢复速度</span></div>
+
+                <div class="section-title">💡 经营策略</div>
+                <div class="weapon-tip">优先升级银庄（持续收入→快速扩张）和宿舍（更多弟子→更多任务产出）。让高资质弟子专注训练+难任务，低资质弟子接简单任务积累奖励。体力不足时别强行训练，等待自然回复或升级药堂。注意任务难度对比：绿色推荐弟子基本稳赢，红色危险任务请确认弟子够强。</div>
+              </div>
+            </div>
           </div>
-        </div>
-        <div class="help-footer">
+
+        </div><!-- end help-body -->
           按 <span class="key-badge">H</span> 关闭帮助
           <button id="help-close-btn" style="margin-left:16px;padding:4px 18px;font-size:15px;border-radius:6px;border:1px solid rgba(100,150,255,0.3);background:rgba(40,50,80,0.8);color:#cce;cursor:pointer;">✕ 关闭</button>
         </div>

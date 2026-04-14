@@ -1,0 +1,1076 @@
+// ===================== 宗门风云 · 核心逻辑 (mixin) =====================
+// 混入 Game.prototype，管理宗门经营的所有游戏逻辑
+// 战斗使用现有 AI vs AI 引擎，管理界面用 SectUI Canvas 渲染
+
+import * as C from '../core/constants.js';
+import { Enemy } from '../ai/enemy.js';
+import { CombatSystem } from '../combat/combat-system.js';
+import { Fighter } from '../combat/fighter.js';
+import { getWeapon, WEAPON_LIST } from '../weapons/weapon-defs.js';
+import { getArmor } from '../weapons/armor-defs.js';
+import { SectUI } from './sect-ui.js';
+import { saveSect, loadSect, getSaveSlots } from './sect-save.js';
+import {
+  createInitialState, createDisciple, generateQuest, rollEvent,
+  BUILDINGS, maxDisciples, availableArmors, trainExpMul, healMul,
+  dailyIncome, expToLevel, TRAITS, TRAIT_LIST, COMMON_TRAITS,
+  WEAPON_IDS, WEAPON_NAMES, ARMOR_NAMES, resetDiscipleIdCounter,
+  checkStoryTrigger,
+} from './sect-data.js';
+
+export const sectModeMethods = {
+
+  // ===== 初始化 =====
+  _setupSectMode(savedState) {
+    this.sect = savedState || createInitialState();
+    this.sectUI = new SectUI();
+    this.sectSubPage = 'main'; // main | disciples | buildings | quests | market | log | disciple_detail
+    this.sectPopup = null;     // null | 'event' | 'discipleSelect' | 'fightResult' | 'saveSlots' | 'armorSelect'
+    this.sectSaveMode = 'save';
+    this.sectTrainAnim = 0;    // 训练进度动画 0-1，>0 时播放
+    this.sectSelectedQuestIdx = -1;  // 当前选择的任务索引
+    this.sect._selectedDisciple = null; // 弟子详情用
+    this.sect._armorSelectDisciple = null;
+
+    // 战斗观看相关
+    this.sectWatchingFight = false;
+    this.sectFightData = null;
+    this.sectFightEnemies = [];
+    this.sectFightAllies = [];
+    this.sectFightResult = null;
+    this.sectFightShowResult = false;
+    this.sectFightResultTimer = 0;
+    this.sectPendingQuest = null;
+    this.sectPendingDisciple = null;
+
+    // Toast通知系统
+    this.sectToast = null; // { text, color, timer }
+
+    // 剧情系统
+    this.sectStoryPageIdx = 0;
+    // 兼容旧存档（没有storyProgress字段）
+    if (!this.sect.storyProgress) this.sect.storyProgress = [];
+    if (this.sect.pendingStory === undefined) this.sect.pendingStory = null;
+
+    // 首日生成任务
+    if (this.sect.quests.length === 0) {
+      this._sectRefreshQuests();
+    }
+
+    this._sectAddLog('欢迎来到'+this.sect.sectName+'！', '#ffcc44');
+
+    // 检查是否有剧情需要触发（开局剧情）
+    this._sectCheckStory();
+  },
+
+  // ===== Update =====
+  _updateSect(dt) {
+    const input = this.input;
+
+    // ESC / 触屏返回 — 如果有弹窗先关弹窗
+    if (input.pressed('Escape') || input.touchBack) {
+      if (this.sectPopup === 'story' && this.sect.pendingStory) {
+        // 剧情弹窗：ESC跳到最后一页或关闭
+        if (this.sectStoryPageIdx < this.sect.pendingStory.pages.length - 1) {
+          this.sectStoryPageIdx = this.sect.pendingStory.pages.length - 1;
+        } else {
+          this.sect.storyProgress.push(this.sect.pendingStory.id);
+          this.sect.pendingStory = null;
+          this.sectPopup = null;
+          this.sectStoryPageIdx = 0;
+          this._sectCheckStory();
+        }
+        return;
+      }
+      if (this.sectPopup) {
+        this.sectPopup = null;
+        this.sectSelectedQuestIdx = -1;
+        return;
+      }
+      if (this.sectSubPage === 'disciple_detail') {
+        this.sectSubPage = 'disciples';
+        return;
+      }
+      // 无弹窗在主页则退出
+      if (this.sectSubPage === 'main' && this.onExit) {
+        this.onExit();
+        return;
+      }
+      this.sectSubPage = 'main';
+      return;
+    }
+
+    // 训练动画快速播放
+    if (this.sectTrainAnim > 0) {
+      this.sectTrainAnim += dt * 4; // 0.25秒完成
+      if (this.sectTrainAnim >= 1) {
+        this.sectTrainAnim = 0;
+        this._sectDoTrainAll();
+      }
+      return;
+    }
+
+    // Toast倒计时
+    if (this.sectToast) {
+      this.sectToast.timer -= dt;
+      if (this.sectToast.timer <= 0) this.sectToast = null;
+    }
+
+    // 战斗观看模式
+    if (this.sectWatchingFight) {
+      this._updateSectFight(dt);
+      return;
+    }
+
+    // 点击处理
+    if (input.mouseLeftDown) {
+      const mx = input.mouseX;
+      const my = input.mouseY;
+      const action = this.sectUI.handleClick(mx, my);
+      if (action) {
+        this._sectHandleAction(action);
+      }
+    }
+  },
+
+  // ===== 动作处理 =====
+  _sectHandleAction(action) {
+    switch (action.type) {
+      case 'nav':
+        this.sectSubPage = action.page;
+        this.sectPopup = null;
+        break;
+
+      case 'action':
+        this._sectDoAction(action.id, action);
+        break;
+
+      case 'selectDisciple': {
+        const d = this.sect.disciples.find(d => d.id === action.id);
+        if (d) {
+          this.sect._selectedDisciple = d;
+          this.sectSubPage = 'disciple_detail';
+        }
+        break;
+      }
+
+      case 'eventChoice':
+        this._sectHandleEventChoice(action.choiceIndex);
+        break;
+
+      case 'selectForQuest':
+        this._sectAssignDisciple(action.discipleId);
+        break;
+
+      case 'cancelSelect':
+        this.sectPopup = null;
+        this.sectSelectedQuestIdx = -1;
+        break;
+
+      case 'closeFightResult':
+        this.sect.pendingFightResult = null;
+        this.sectPopup = null;
+        this._sectCheckStory();
+        break;
+
+      case 'saveSlot':
+        this._sectHandleSaveSlot(action.slot, action.mode);
+        break;
+
+      case 'cancelSave':
+        this.sectPopup = null;
+        break;
+
+      case 'selectArmor':
+        this._sectChangeArmor(action.armorId);
+        break;
+
+      case 'storyNext':
+        this.sectStoryPageIdx++;
+        break;
+
+      case 'storyDone':
+        if (this.sect.pendingStory) {
+          this.sect.storyProgress.push(this.sect.pendingStory.id);
+          this.sect.pendingStory = null;
+        }
+        this.sectPopup = null;
+        this.sectStoryPageIdx = 0;
+        // 关闭剧情后立刻检查是否有下一个连续剧情
+        this._sectCheckStory();
+        break;
+    }
+  },
+
+  _sectDoAction(id, action) {
+    switch (id) {
+      case 'train':
+        // 全体训练
+        this.sectTrainAnim = 0.01; // 开始动画
+        break;
+
+      case 'trainOne': {
+        const d = this.sect.disciples.find(d => d.id === action.discipleId);
+        if (d) this._sectTrainDisciple(d);
+        break;
+      }
+
+      case 'spar':
+        this._sectStartSpar();
+        break;
+
+      case 'nextDay':
+        this._sectNextDay();
+        break;
+
+      case 'save':
+        this.sectPopup = 'saveSlots';
+        this.sectSaveMode = 'save';
+        break;
+
+      case 'load':
+        this.sectPopup = 'saveSlots';
+        this.sectSaveMode = 'load';
+        break;
+
+      case 'upgrade':
+        this._sectUpgradeBuilding(action.buildingId);
+        break;
+
+      case 'assignQuest':
+        this._sectShowDiscipleSelect(action.questIndex);
+        break;
+
+      case 'changeArmor': {
+        const d = this.sect.disciples.find(d => d.id === action.discipleId);
+        if (d) {
+          // 循环切换可用护甲
+          const armors = availableArmors(this.sect.buildings.smith);
+          const idx = armors.indexOf(d.armorId);
+          d.armorId = armors[(idx + 1) % armors.length];
+          this._sectAddLog(`${d.name} 换装为 ${ARMOR_NAMES[d.armorId] || d.armorId}`, '#44dd88');
+          this._sectShowToast(`${d.name} → ${ARMOR_NAMES[d.armorId]}`, '#44dd88');
+        }
+        break;
+      }
+
+      case 'dismiss': {
+        const idx = this.sect.disciples.findIndex(d => d.id === action.discipleId);
+        if (idx >= 0) {
+          const name = this.sect.disciples[idx].name;
+          this.sect.disciples.splice(idx, 1);
+          this._sectAddLog(`${name} 已被逐出门派`, '#ff6644');
+          this.sectSubPage = 'disciples';
+        }
+        break;
+      }
+
+      case 'exitSect':
+        if (this.onExit) this.onExit();
+        break;
+    }
+  },
+
+  // ===== 训练 =====
+  _sectDoTrainAll() {
+    const mul = trainExpMul(this.sect.buildings.dojo);
+    const libLv = this.sect.buildings.library;
+    const expGain = Math.floor(12 * mul);
+    let trained = 0;
+    let skipped = 0;
+    const details = [];
+    for (const d of this.sect.disciples) {
+      if (d.onQuest) { skipped++; continue; }
+      if (d.injury > 50) { skipped++; details.push(`${d.name}(伤重休养)`); continue; }
+      if (d.stamina < 15) { skipped++; details.push(`${d.name}(体力不足)`); continue; }
+      const oldLv = d.level;
+      this._sectGainExp(d, expGain);
+      d.stamina = Math.max(0, d.stamina - 15);
+      d.loyalty = Math.min(100, d.loyalty + 1);
+      trained++;
+      let info = `${d.name} +${expGain}exp`;
+      if (d.level > oldLv) info += ` 🎉升Lv${d.level}`;
+      // 藏经阁：概率获得特质
+      if (libLv > 0 && d.traits.length < 3 && Math.random() < libLv * 0.08) {
+        const pool = COMMON_TRAITS.filter(t => !d.traits.includes(t.id));
+        if (pool.length > 0) {
+          const newTrait = pool[Math.floor(Math.random() * pool.length)];
+          d.traits.push(newTrait.id);
+          info += ` 💡领悟${newTrait.name}`;
+        }
+      }
+      details.push(info);
+    }
+    if (trained > 0) {
+      this._sectAddLog(`🗡 训练完成(${trained}人参与, -15体力, +${expGain}exp)`, '#4499ff');
+      for (const info of details) {
+        this._sectAddLog(`  · ${info}`, '#88aadd');
+      }
+      this._sectShowToast(`训练完成！${trained}人+${expGain}exp`, '#4499ff');
+    } else {
+      this._sectAddLog('训练失败：无可训练弟子', '#ff6644');
+      this._sectShowToast('无可训练的弟子！', '#ff6644');
+    }
+  },
+
+  _sectTrainDisciple(d) {
+    if (d.level >= d.talent) {
+      this._sectAddLog(`${d.name} 已达资质上限`, '#ff6644');
+      this._sectShowToast(`${d.name}已满级`, '#ff6644');
+      return;
+    }
+    if (d.stamina < 20) {
+      this._sectAddLog(`${d.name} 体力不足(${d.stamina}/20)`, '#ff6644');
+      this._sectShowToast('体力不足！', '#ff6644');
+      return;
+    }
+    const mul = trainExpMul(this.sect.buildings.dojo);
+    const expGain = Math.floor(18 * mul);
+    const oldLv = d.level;
+    this._sectGainExp(d, expGain);
+    d.stamina -= 20;
+    d.loyalty = Math.min(100, d.loyalty + 2);
+    let msg = `${d.name} 个人训练 +${expGain}exp -20体力`;
+    if (d.level > oldLv) msg += ` 🎉升Lv${d.level}！`;
+    this._sectAddLog(msg, '#4499ff');
+    this._sectShowToast(`+${expGain}exp${d.level > oldLv ? ' 升级！' : ''}`, '#4499ff');
+  },
+
+  _sectGainExp(d, amount) {
+    if (d.level >= d.talent) return;
+    d.exp += amount;
+    const need = expToLevel(d.level);
+    if (d.exp >= need) {
+      d.exp -= need;
+      d.level = Math.min(d.talent, d.level + 1);
+      this._sectAddLog(`🎉 ${d.name} 升级到 Lv${d.level}！`, '#ffdd00');
+    }
+  },
+
+  // ===== 建造 =====
+  _sectUpgradeBuilding(buildingId) {
+    const bld = BUILDINGS[buildingId];
+    if (!bld) return;
+    const lv = this.sect.buildings[buildingId] || 0;
+    if (lv >= bld.maxLv) return;
+    const cost = bld.costs[lv];
+    if (this.sect.gold < cost) {
+      this._sectAddLog('银两不足！', '#ff6644');
+      return;
+    }
+    this.sect.gold -= cost;
+    this.sect.buildings[buildingId] = lv + 1;
+    this._sectAddLog(`${bld.icon} ${bld.name} 升级到 Lv${lv + 1}`, '#44dd88');
+  },
+
+  // ===== 任务 =====
+  _sectRefreshQuests() {
+    const towerLv = this.sect.buildings.tower || 0;
+    this.sect.quests = [];
+    const count = 3 + Math.min(2, Math.floor(this.sect.fame / 30)); // 3-5个任务
+    for (let i = 0; i < count; i++) {
+      this.sect.quests.push(generateQuest(towerLv));
+    }
+  },
+
+  _sectShowDiscipleSelect(questIndex) {
+    this.sectSelectedQuestIdx = questIndex;
+    this.sectPopup = 'discipleSelect';
+  },
+
+  _sectAssignDisciple(discipleId) {
+    const qIdx = this.sectSelectedQuestIdx;
+    if (qIdx < 0 || qIdx >= this.sect.quests.length) return;
+    const quest = this.sect.quests[qIdx];
+    const d = this.sect.disciples.find(d => d.id === discipleId);
+    if (!d || d.onQuest) return;
+
+    // 指派
+    quest.discipleId = d.id;
+    d.onQuest = true;
+    d.stamina = Math.max(0, d.stamina - 30);
+    this.sect.activeQuests.push(quest);
+    this.sect.quests.splice(qIdx, 1);
+    this.sectPopup = null;
+    this.sectSelectedQuestIdx = -1;
+
+    // 直接进入战斗观看（不再headless预模拟）
+    this._sectStartQuestFight(d, quest);
+  },
+
+  // ===== 任务战斗（直接观看，无headless预模拟）=====
+  _sectStartQuestFight(disciple, quest) {
+    const d = disciple;
+    const aiDiffD = Math.min(5, d.level);
+
+    this.sectWatchingFight = true;
+    this.sectFightTimer = 0;
+    this.sectFightDone = false;
+    this.sectFightResult = null; // 结果在战斗结束后结算
+    this.sectFightShowResult = false;
+    this.sectFightResultTimer = 0;
+    this.sectPendingQuest = quest;
+    this.sectPendingDisciple = d;
+
+    // 创建Fighter + Enemy
+    const weaponA = getWeapon(d.weaponId);
+    const armorA = getArmor(d.armorId);
+    const fA = new Fighter(C.ARENA_W / 2 - 80, C.ARENA_H / 2, {
+      weapon: weaponA, armor: armorA,
+      color: d.color, name: d.name, team: 0,
+    });
+    // 特质HP增益
+    for (const tid of d.traits) {
+      const t = TRAITS[tid];
+      if (t && t.aiMod.hpMul) {
+        fA.maxHp = Math.floor(fA.maxHp * (1 + t.aiMod.hpMul));
+        fA.hp = fA.maxHp;
+      }
+    }
+    fA.showNameTag = true;
+
+    const weaponB = getWeapon(quest.enemyWeapon);
+    const fB = new Fighter(C.ARENA_W / 2 + 80, C.ARENA_H / 2, {
+      weapon: weaponB,
+      color: '#cc4444', name: `敌(D${quest.enemyDiff})`, team: 1,
+    });
+    fB.facing = Math.PI;
+    fB.showNameTag = true;
+
+    const eA = new Enemy(fA.x, fA.y, aiDiffD, { weaponId: d.weaponId, armorId: d.armorId });
+    eA.fighter = fA;
+    const eB = new Enemy(fB.x, fB.y, quest.enemyDiff, { weaponId: quest.enemyWeapon });
+    eB.fighter = fB;
+
+    this.sectFightEnemies = [eA, eB];
+    this.sectFightAllies = [fA, fB];
+    this.combat.playerFighter = null;
+    this.particles.particles = [];
+    this.camera.x = C.ARENA_W / 2;
+    this.camera.y = C.ARENA_H / 2;
+
+    this._sectAddLog(`⚔ ${d.name} 出战${quest.name}(D${quest.enemyDiff})`, '#ffaa44');
+  },
+
+  // ===== 战斗结束后结算奖惩 =====
+  _sectSettleFightResult(fAAlive) {
+    const d = this.sectPendingDisciple;
+    const quest = this.sectPendingQuest;
+    if (!d || !quest) return null;
+
+    const won = fAAlive;
+    this.sect.stats.totalFights++;
+
+    const result = {
+      won,
+      discipleId: d.id,
+      discipleName: d.name,
+      enemyDiff: quest.enemyDiff,
+      enemyWeapon: quest.enemyWeapon,
+      goldGain: 0, fameGain: 0, expGain: 0, injuryGain: 0,
+      levelUp: false, newTrait: null,
+    };
+
+    if (won) {
+      d.wins++;
+      this.sect.stats.totalWins++;
+      const lucky = d.traits.includes('lucky') ? 1.2 : 1.0;
+      result.goldGain = Math.floor(quest.reward.gold * lucky);
+      result.fameGain = Math.floor(quest.reward.fame * lucky);
+      result.expGain = quest.reward.exp;
+      this.sect.gold += result.goldGain;
+      this.sect.fame += result.fameGain;
+      this.sect.stats.totalGold += result.goldGain;
+      this.sect.stats.highestFame = Math.max(this.sect.stats.highestFame, this.sect.fame);
+
+      const oldLv = d.level;
+      this._sectGainExp(d, result.expGain);
+      result.levelUp = d.level > oldLv;
+
+      // 概率获得特质
+      if (d.traits.length < 3 && Math.random() < 0.12) {
+        const pool = COMMON_TRAITS.filter(t => !d.traits.includes(t.id));
+        if (pool.length > 0) {
+          const nt = pool[Math.floor(Math.random() * pool.length)];
+          d.traits.push(nt.id);
+          result.newTrait = nt.id;
+        }
+      }
+
+      d.injury = Math.min(100, d.injury + 5 + Math.floor(Math.random() * 10));
+      d.loyalty = Math.min(100, d.loyalty + 3);
+      this._sectAddLog(`✅ ${d.name} 完成${quest.name}！+${result.goldGain}💰 +${result.fameGain}🏆`, '#44dd88');
+    } else {
+      d.losses++;
+      result.injuryGain = 20 + Math.floor(Math.random() * 25);
+      d.injury = Math.min(100, d.injury + result.injuryGain);
+      d.loyalty = Math.max(0, d.loyalty - 3);
+      this._sectAddLog(`❌ ${d.name} 任务失败，受伤+${result.injuryGain}`, '#ff6644');
+    }
+
+    d.onQuest = false;
+    const aqIdx = this.sect.activeQuests.findIndex(q => q.discipleId === d.id);
+    if (aqIdx >= 0) this.sect.activeQuests.splice(aqIdx, 1);
+
+    this.sectPendingQuest = null;
+    this.sectPendingDisciple = null;
+    return result;
+  },
+
+  _updateSectFight(dt) {
+    const input = this.input;
+
+    // 结果面板阶段
+    if (this.sectFightShowResult) {
+      this.sectFightResultTimer += dt;
+      // 点击或ESC关闭结果
+      if (input.mouseLeftDown || input.pressed('Escape') || input.touchBack) {
+        this.sectWatchingFight = false;
+        this.sectFightShowResult = false;
+        this.sect.pendingFightResult = null;
+        this._sectCheckStory();
+      }
+      return;
+    }
+
+    // 战斗结束 → 先暂停1.5秒再结算+显示结果
+    if (this.sectFightDone) {
+      this.sectFightTimer += dt;
+      if (this.sectFightTimer > 1.5) {
+        // 如果是任务战斗，现在结算（战斗结果刚刚揭晓）
+        if (!this.sectFightResult) {
+          const [fA] = this.sectFightAllies;
+          this.sectFightResult = this._sectSettleFightResult(fA && fA.alive);
+        }
+        this.sectFightShowResult = true;
+        this.sect.pendingFightResult = this.sectFightResult;
+        this.sectFightResultTimer = 0;
+      }
+      return;
+    }
+
+    this.sectFightTimer += dt;
+    const [eA, eB] = this.sectFightEnemies;
+    const [fA, fB] = this.sectFightAllies;
+
+    // AI决策 + 战斗
+    if (fA.alive && fB.alive) {
+      const cmdA = eA.getCommands(dt, fB);
+      const cmdB = eB.getCommands(dt, fA);
+      fA.update(dt, cmdA, this.sectFightTimer);
+      fB.update(dt, cmdB, this.sectFightTimer);
+      this.combat.resolve([fA, fB], this.sectFightTimer, dt);
+    }
+
+    this.particles.update(dt);
+    this.camera.update(dt);
+
+    // 有人倒下
+    if (!fA.alive || !fB.alive) {
+      this.sectFightDone = true;
+      this.sectFightTimer = 0;
+    }
+    // 超时45秒 → 强制结束（HP低的一方判负）
+    if (this.sectFightTimer > 45 && !this.sectFightDone) {
+      if (fA.hp <= fB.hp) {
+        fA.hp = 0; fA.alive = false;
+      } else {
+        fB.hp = 0; fB.alive = false;
+      }
+      this.sectFightDone = true;
+      this.sectFightTimer = 0;
+    }
+  },
+
+  // ===== 切磋（门内对练）=====
+  _sectStartSpar() {
+    const freeDisciples = this.sect.disciples.filter(d => !d.onQuest && d.injury < 50);
+    if (freeDisciples.length < 2) {
+      this._sectAddLog('至少需要2名可用弟子才能切磋', '#ff6644');
+      return;
+    }
+    // 随机选2人
+    const shuffled = [...freeDisciples].sort(() => Math.random() - 0.5);
+    const a = shuffled[0];
+    const b = shuffled[1];
+
+    // 模拟
+    const wA = getWeapon(a.weaponId), wB = getWeapon(b.weaponId);
+    const aA = getArmor(a.armorId), aB = getArmor(b.armorId);
+    const fA = new Fighter(C.ARENA_W / 2 - 60, C.ARENA_H / 2, {
+      weapon: wA, armor: aA, color: a.color, name: a.name, team: 0,
+    });
+    fA.showNameTag = true;
+    const fB = new Fighter(C.ARENA_W / 2 + 60, C.ARENA_H / 2, {
+      weapon: wB, armor: aB, color: b.color, name: b.name, team: 1,
+    });
+    fB.facing = Math.PI;
+    fB.showNameTag = true;
+
+    const eA = new Enemy(fA.x, fA.y, Math.min(5, a.level), { weaponId: a.weaponId, armorId: a.armorId });
+    eA.fighter = fA;
+    const eB = new Enemy(fB.x, fB.y, Math.min(5, b.level), { weaponId: b.weaponId, armorId: b.armorId });
+    eB.fighter = fB;
+
+    // 直接进入观看
+    this.sectWatchingFight = true;
+    this.sectFightTimer = 0;
+    this.sectFightDone = false;
+    this.sectFightShowResult = false;
+    this.sectFightResultTimer = 0;
+    this.sectFightResult = {
+      won: true, // 切磋无胜负判定，用占位
+      isSpar: true,
+      discipleName: a.name,
+      enemyDiff: 0,
+      enemyWeapon: b.weaponId,
+      sparNames: [a.name, b.name],
+      goldGain: 0, fameGain: 0, expGain: 8, injuryGain: 0,
+      levelUp: false, newTrait: null,
+    };
+    this.sectFightEnemies = [eA, eB];
+    this.sectFightAllies = [fA, fB];
+    this.combat.playerFighter = null;
+    this.particles.particles = [];
+    this.camera.x = C.ARENA_W / 2;
+    this.camera.y = C.ARENA_H / 2;
+
+    // 双方获得少量经验
+    this._sectGainExp(a, 8);
+    this._sectGainExp(b, 8);
+    a.stamina = Math.max(0, a.stamina - 10);
+    b.stamina = Math.max(0, b.stamina - 10);
+    this._sectAddLog(`⚔ ${a.name} vs ${b.name} 切磋开始！`, '#ff9944');
+  },
+
+  // ===== 下一天 =====
+  _sectNextDay() {
+    this.sect.day++;
+    this.sect.stats.totalDays++;
+
+    // 被动收入
+    const income = dailyIncome(this.sect.buildings.bank);
+    if (income > 0) {
+      this.sect.gold += income;
+      this.sect.stats.totalGold += income;
+    }
+
+    // 恢复弟子状态
+    const hMul = healMul(this.sect.buildings.clinic);
+    for (const d of this.sect.disciples) {
+      // 体力恢复
+      d.stamina = Math.min(100, d.stamina + 30);
+      // 受伤恢复
+      if (d.injury > 0) {
+        d.injury = Math.max(0, d.injury - Math.floor(12 * hMul));
+      }
+      // 忠诚缓慢回升
+      if (d.loyalty < 60) d.loyalty += 1;
+    }
+
+    // 刷新任务
+    this._sectRefreshQuests();
+
+    // 随机事件（60%概率）
+    if (Math.random() < 0.6) {
+      const evt = rollEvent(this.sect);
+      // 处理需要弟子名的事件
+      if (evt.id === 'breakthrough') {
+        const candidates = this.sect.disciples.filter(d => d.level < d.talent);
+        if (candidates.length > 0) {
+          const d = candidates[Math.floor(Math.random() * candidates.length)];
+          evt.desc = evt.desc.replace('{disciple}', d.name);
+          evt._targetDiscipleId = d.id;
+        } else {
+          // 没有可突破的弟子，换事件
+          this.sect.pendingEvent = null;
+          this._sectAddLog(`第${this.sect.day}天开始`, '#888');
+          return;
+        }
+      } else if (evt.id === 'betrayal') {
+        const d = this.sect.disciples.filter(d => d.loyalty < 50).sort((a, b) => a.loyalty - b.loyalty)[0];
+        if (d) {
+          evt.desc = evt.desc.replace('{disciple}', d.name);
+          evt._targetDiscipleId = d.id;
+        }
+      }
+      this.sect.pendingEvent = evt;
+      this.sectPopup = 'event';
+    }
+
+    // 客栈来客（招募机会）
+    const innLv = this.sect.buildings.inn;
+    if (innLv > 0 && this.sect.disciples.length < maxDisciples(this.sect.buildings.barracks)) {
+      if (Math.random() < 0.15 * innLv) {
+        const talent = 1 + Math.floor(Math.random() * Math.min(4, 1 + Math.floor(this.sect.fame / 25)));
+        const recruit = createDisciple({ talent, joinDay: this.sect.day, loyalty: 55 + Math.floor(Math.random() * 20) });
+        this.sect.disciples.push(recruit);
+        this._sectAddLog(`🏨 ${recruit.name}(资质${recruit.talent})慕名而来！`, '#44dd88');
+      }
+    }
+
+    this._sectAddLog(`━ 第${this.sect.day}天 ━ ${income > 0 ? `收入+${income}💰` : ''}`, '#888');
+
+    // 检查剧情触发（仅在没有事件弹窗时）
+    if (!this.sectPopup) {
+      this._sectCheckStory();
+    }
+  },
+
+  // ===== 事件选择处理 =====
+  _sectHandleEventChoice(choiceIndex) {
+    const evt = this.sect.pendingEvent;
+    if (!evt) return;
+    const choice = evt.choices[choiceIndex];
+    if (!choice) return;
+
+    switch (choice.effect) {
+      case 'none':
+        break;
+
+      case 'addDisciple': {
+        if (this.sect.disciples.length >= maxDisciples(this.sect.buildings.barracks)) {
+          this._sectAddLog('弟子已满编，无法收留', '#ff6644');
+          break;
+        }
+        const p = choice.params;
+        const talent = p.talentMin + Math.floor(Math.random() * (p.talentMax - p.talentMin + 1));
+        const d = createDisciple({ talent, loyalty: p.loyaltyBase + Math.floor(Math.random() * 15), joinDay: this.sect.day });
+        this.sect.disciples.push(d);
+        this._sectAddLog(`✅ ${d.name}(资质${talent})加入门派`, '#44dd88');
+        break;
+      }
+
+      case 'addProdigy': {
+        const p = choice.params;
+        if (this.sect.gold < p.cost) { this._sectAddLog('银两不足', '#ff6644'); break; }
+        if (this.sect.disciples.length >= maxDisciples(this.sect.buildings.barracks)) { this._sectAddLog('弟子已满编', '#ff6644'); break; }
+        this.sect.gold -= p.cost;
+        const talent = p.talent[0] + Math.floor(Math.random() * (p.talent[1] - p.talent[0] + 1));
+        const d = createDisciple({ talent, loyalty: 70 + Math.floor(Math.random() * 15), joinDay: this.sect.day });
+        this.sect.disciples.push(d);
+        this._sectAddLog(`🌟 天才${d.name}(资质${talent})入门！`, '#ffdd00');
+        break;
+      }
+
+      case 'raidBattle': {
+        const p = choice.params;
+        const freeD = this.sect.disciples.filter(d => !d.onQuest && d.injury < 60);
+        if (freeD.length === 0) { this._sectAddLog('无人可战！声望-10', '#ff6644'); this.sect.fame = Math.max(0, this.sect.fame - 10); break; }
+        // 选最强弟子
+        const best = freeD.sort((a, b) => b.level - a.level)[0];
+        const diff = p.diff[0] + Math.floor(Math.random() * (p.diff[1] - p.diff[0] + 1));
+        const quest = { name: '山贼围攻', icon: '💀', enemyDiff: diff, enemyWeapon: 'dao', reward: { gold: 100, fame: 12, exp: 20 }, discipleId: best.id };
+        best.onQuest = true;
+        best.stamina = Math.max(0, best.stamina - 20);
+        this.sect.activeQuests.push(quest);
+        // 关闭事件弹窗后进入战斗
+        this.sect.pendingEvent = null;
+        this.sectPopup = null;
+        this._sectStartQuestFight(best, quest);
+        return; // 直接return，跳过底部的popup=null
+      }
+
+      case 'payGold': {
+        if (this.sect.gold < choice.params.amount) { this._sectAddLog('银两不足，被迫应战！', '#ff6644'); break; }
+        this.sect.gold -= choice.params.amount;
+        this._sectAddLog(`交了${choice.params.amount}银两保护费`, '#ff6644');
+        break;
+      }
+
+      case 'buyElixir': {
+        if (this.sect.gold < choice.params.cost) { this._sectAddLog('银两不足', '#ff6644'); break; }
+        this.sect.gold -= choice.params.cost;
+        // 给受伤最重的弟子回复
+        const injured = [...this.sect.disciples].sort((a, b) => b.injury - a.injury);
+        if (injured.length > 0 && injured[0].injury > 0) {
+          injured[0].injury = Math.max(0, injured[0].injury - 50);
+          this._sectAddLog(`💊 ${injured[0].name} 服用秘药，伤势大幅恢复`, '#44dd88');
+        } else {
+          this._sectAddLog('💊 购得秘药备用', '#44dd88');
+        }
+        break;
+      }
+
+      case 'buyArmor': {
+        if (this.sect.gold < choice.params.cost) { this._sectAddLog('银两不足', '#ff6644'); break; }
+        this.sect.gold -= choice.params.cost;
+        // 给没甲的弟子一件轻甲
+        const noArmor = this.sect.disciples.find(d => d.armorId === 'none');
+        if (noArmor) {
+          noArmor.armorId = 'light';
+          this._sectAddLog(`🛡 ${noArmor.name} 获得轻甲`, '#44dd88');
+        } else {
+          this._sectAddLog('🛡 购得护甲备用', '#44dd88');
+        }
+        break;
+      }
+
+      case 'grantBreakthrough': {
+        const d = this.sect.disciples.find(d => d.id === evt._targetDiscipleId);
+        if (d) {
+          this._sectGainExp(d, 30);
+          this._sectAddLog(`💡 ${d.name} 顿悟，经验+30`, '#ffdd00');
+        }
+        break;
+      }
+
+      case 'retainDisciple': {
+        if (this.sect.gold < choice.params.cost) { this._sectAddLog('银两不足', '#ff6644'); break; }
+        this.sect.gold -= choice.params.cost;
+        const d = this.sect.disciples.find(d => d.id === evt._targetDiscipleId);
+        if (d) { d.loyalty = Math.min(100, d.loyalty + 30); this._sectAddLog(`${d.name} 被挽留，忠诚+30`, '#44dd88'); }
+        break;
+      }
+
+      case 'removeDisciple': {
+        const idx = this.sect.disciples.findIndex(d => d.id === evt._targetDiscipleId);
+        if (idx >= 0) {
+          this._sectAddLog(`${this.sect.disciples[idx].name} 离开了门派`, '#ff6644');
+          this.sect.disciples.splice(idx, 1);
+        }
+        break;
+      }
+
+      case 'gainFame':
+        this.sect.fame += choice.params.fame;
+        this._sectAddLog(`🤝 结盟成功，声望+${choice.params.fame}`, '#44dd88');
+        break;
+
+      case 'cureAll':
+        if (this.sect.gold < choice.params.cost) { this._sectAddLog('银两不足', '#ff6644'); break; }
+        this.sect.gold -= choice.params.cost;
+        for (const d of this.sect.disciples) d.injury = Math.max(0, d.injury - 30);
+        this._sectAddLog('💊 全员得到治疗', '#44dd88');
+        break;
+
+      case 'plagueAll':
+        for (const d of this.sect.disciples) d.stamina = Math.max(0, d.stamina - 30);
+        this._sectAddLog('🤒 全员体力下降', '#ff6644');
+        break;
+
+      case 'gainGold': {
+        const g = choice.params.gold;
+        const amount = g[0] + Math.floor(Math.random() * (g[1] - g[0] + 1));
+        this.sect.gold += amount;
+        this.sect.stats.totalGold += amount;
+        this._sectAddLog(`💎 获得${amount}银两捐赠`, '#ffd700');
+        break;
+      }
+
+      case 'duelChallenge': {
+        const p = choice.params;
+        const freeD = this.sect.disciples.filter(d => !d.onQuest && d.injury < 60);
+        if (freeD.length === 0) { this._sectAddLog('无人可战！声望-15', '#ff6644'); this.sect.fame = Math.max(0, this.sect.fame - 15); break; }
+        const best = freeD.sort((a, b) => b.level - a.level)[0];
+        const diff = p.diff[0] + Math.floor(Math.random() * (p.diff[1] - p.diff[0] + 1));
+        const weapon = WEAPON_IDS[Math.floor(Math.random() * WEAPON_IDS.length)];
+        const quest = { name: '江湖挑战', icon: '📜', enemyDiff: diff, enemyWeapon: weapon, reward: { gold: 150, fame: 20, exp: 35 }, discipleId: best.id };
+        best.onQuest = true;
+        best.stamina = Math.max(0, best.stamina - 20);
+        this.sect.activeQuests.push(quest);
+        this.sect.pendingEvent = null;
+        this.sectPopup = null;
+        this._sectStartQuestFight(best, quest);
+        return;
+      }
+
+      case 'loseFame':
+        this.sect.fame = Math.max(0, this.sect.fame - choice.params.fame);
+        this._sectAddLog(`声望-${choice.params.fame}`, '#ff6644');
+        break;
+
+      case 'treasureHunt': {
+        const freeD = this.sect.disciples.filter(d => !d.onQuest && d.injury < 60);
+        if (freeD.length === 0) { this._sectAddLog('无人可派', '#ff6644'); break; }
+        const explorer = freeD[Math.floor(Math.random() * freeD.length)];
+        const luck = Math.random();
+        if (luck < 0.4) {
+          const gold = 200 + Math.floor(Math.random() * 300);
+          this.sect.gold += gold;
+          this.sect.stats.totalGold += gold;
+          this._sectAddLog(`🗺 ${explorer.name} 寻宝成功！+${gold}💰`, '#ffd700');
+        } else if (luck < 0.7) {
+          this._sectGainExp(explorer, 40);
+          this._sectAddLog(`🗺 ${explorer.name} 虽未寻到宝物，但修为大增 +40exp`, '#4499ff');
+        } else {
+          explorer.injury = Math.min(100, explorer.injury + 15);
+          this._sectAddLog(`🗺 ${explorer.name} 探索受伤，铩羽而归`, '#ff6644');
+        }
+        break;
+      }
+    }
+
+    this.sect.pendingEvent = null;
+    this.sectPopup = null;
+    // 事件处理后检查剧情
+    this._sectCheckStory();
+  },
+
+  // ===== 存档 =====
+  _sectHandleSaveSlot(slot, mode) {
+    if (mode === 'save') {
+      saveSect(slot, this.sect);
+      this._sectAddLog(`💾 存档成功 (槽位${slot + 1})`, '#44dd88');
+    } else {
+      const loaded = loadSect(slot);
+      if (loaded) {
+        this.sect = loaded;
+        this.sect._selectedDisciple = null;
+        // 兼容旧存档
+        if (!this.sect.storyProgress) this.sect.storyProgress = [];
+        if (this.sect.pendingStory === undefined) this.sect.pendingStory = null;
+        this._sectAddLog(`📂 读档成功`, '#44dd88');
+      }
+    }
+    this.sectPopup = null;
+  },
+
+  // ===== 剧情检查 =====
+  _sectCheckStory() {
+    const story = checkStoryTrigger(this.sect);
+    if (story) {
+      // 深拷贝剧情节点（避免修改原始数据）
+      const storyInstance = { ...story, pages: [...story.pages] };
+      // 替换模板变量
+      for (let i = 0; i < storyInstance.pages.length; i++) {
+        storyInstance.pages[i] = storyInstance.pages[i].replace(/\{sect\}/g, this.sect.sectName);
+      }
+      // 动态页内容替换
+      if (storyInstance.dynamicPage !== undefined) {
+        const s = this.sect;
+        const pi = storyInstance.dynamicPage;
+        storyInstance.pages[pi] = `目前战绩 ${s.stats.totalWins}胜${s.stats.totalFights - s.stats.totalWins}负，声望${s.fame}，弟子${s.disciples.length}人。`;
+      }
+      this.sect.pendingStory = storyInstance;
+      this.sectPopup = 'story';
+      this.sectStoryPageIdx = 0;
+    }
+  },
+
+  // ===== Toast通知（屏幕上方短暂提示）=====
+  _sectShowToast(text, color = '#ffcc44') {
+    this.sectToast = { text, color, timer: 2.0 };
+  },
+
+  // ===== 日志 =====
+  _sectAddLog(text, color = '#ccc') {
+    this.sect.log.unshift({ text: `[${this.sect.day}天] ${text}`, color, time: Date.now() });
+    if (this.sect.log.length > 50) this.sect.log.pop();
+  },
+
+  // ===== 渲染 =====
+  _renderSect() {
+    const dpr = this.canvas._dpr || 1;
+    const lw = this.canvas._logicW || this.canvas.width;
+    const lh = this.canvas._logicH || this.canvas.height;
+    const ctx = this.renderer.ctx;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    const mx = this.input.mouseX;
+    const my = this.input.mouseY;
+    const narrow = lw < 500;
+
+    // 如果在观战模式
+    if (this.sectWatchingFight) {
+      this.sectUI._buttons = []; // 重置按钮列表
+      this.renderer.clear(lw, lh);
+      ctx.save();
+      this.camera.applyWorldTransform(ctx);
+      this.renderer.drawGrid();
+      for (const f of this.sectFightAllies) {
+        this.renderer.drawFighter(f);
+      }
+      this.renderer.drawParticles(this.particles);
+      ctx.restore();
+
+      // HUD
+      const [fA, fB] = this.sectFightAllies;
+      if (fA && fB) {
+        this.ui.draw(fA, fB, [fB], 0);
+      }
+
+      // 计时器
+      ctx.textAlign = 'center';
+      ctx.fillStyle = '#888';
+      ctx.font = `${narrow ? 10 : 12}px "Microsoft YaHei", sans-serif`;
+      const timeLeft = Math.max(0, 45 - this.sectFightTimer);
+      if (!this.sectFightDone) {
+        ctx.fillText(`${Math.ceil(timeLeft)}s`, lw / 2, narrow ? 16 : 20);
+      }
+
+      // 模式标签 + 战斗上下文
+      ctx.fillStyle = '#ffcc44';
+      ctx.font = `bold ${narrow ? 12 : 14}px "Microsoft YaHei", sans-serif`;
+      let contextLabel = '🏯 宗门风云 · 战斗进行中';
+      if (this.sectPendingQuest) {
+        contextLabel = `🏯 ${this.sect.sectName} · ${this.sectPendingQuest.icon || ''}${this.sectPendingQuest.name}`;
+      } else if (this.sectFightResult && this.sectFightResult.isSpar) {
+        contextLabel = `⚔ 门派切磋`;
+      }
+      ctx.fillText(contextLabel, lw / 2, lh - 20);
+      if (this.sectPendingDisciple) {
+        ctx.fillStyle = '#aaa';
+        ctx.font = `${narrow ? 10 : 11}px "Microsoft YaHei", sans-serif`;
+        ctx.fillText(`出征弟子: ${this.sectPendingDisciple.name}  敌方: D${this.sectPendingQuest ? this.sectPendingQuest.enemyDiff : '?'}`, lw / 2, lh - 6);
+      }
+
+      // 战斗结束后的结果面板覆盖
+      if (this.sectFightShowResult && this.sect.pendingFightResult) {
+        this.sectUI.drawFightResult(ctx, lw, lh, this.sect.pendingFightResult, mx, my, narrow);
+      } else if (this.sectFightDone) {
+        // 过渡期 — 显示简单胜负
+        ctx.fillStyle = 'rgba(0,0,0,0.5)';
+        ctx.fillRect(0, lh / 2 - 30, lw, 60);
+        ctx.fillStyle = '#fff';
+        ctx.font = `bold ${narrow ? 18 : 24}px "Microsoft YaHei", sans-serif`;
+        const winner = this.sectFightAllies.find(f => f.alive);
+        ctx.fillText(winner ? `${winner.name} 胜利！` : '平局', lw / 2, lh / 2 + 8);
+      }
+      return;
+    }
+
+    // 管理界面
+    this.sectUI.draw(ctx, lw, lh, this.sect, this.sectSubPage, mx, my);
+
+    // 弹窗层
+    if (this.sectPopup === 'story' && this.sect.pendingStory) {
+      this.sectUI.drawStoryPopup(ctx, lw, lh, this.sect.pendingStory, this.sectStoryPageIdx, mx, my, narrow);
+    } else if (this.sectPopup === 'event' && this.sect.pendingEvent) {
+      this.sectUI.drawEventPopup(ctx, lw, lh, this.sect.pendingEvent, mx, my, narrow);
+    } else if (this.sectPopup === 'discipleSelect') {
+      const free = this.sect.disciples.filter(d => !d.onQuest && d.injury < 50 && d.stamina >= 30);
+      this.sectUI.drawDiscipleSelect(ctx, lw, lh, free, mx, my, narrow);
+    } else if (this.sectPopup === 'fightResult' && this.sect.pendingFightResult) {
+      this.sectUI.drawFightResult(ctx, lw, lh, this.sect.pendingFightResult, mx, my, narrow);
+    } else if (this.sectPopup === 'saveSlots') {
+      const slots = getSaveSlots();
+      this.sectUI.drawSaveSlots(ctx, lw, lh, slots, this.sectSaveMode, mx, my, narrow);
+    }
+
+    // 训练动画
+    if (this.sectTrainAnim > 0) {
+      this.sectUI.drawTrainAnim(ctx, lw, lh, this.sectTrainAnim, narrow);
+    }
+
+    // Toast通知（屏幕上方浮动提示）
+    if (this.sectToast) {
+      const t = this.sectToast;
+      const alpha = Math.min(1, t.timer * 2); // 最后0.5秒渐隐
+      ctx.globalAlpha = alpha;
+      const tw = Math.min(lw - 40, ctx.measureText(t.text).width + 40);
+      const tx = (lw - tw) / 2;
+      const ty = narrow ? 70 : 80;
+      ctx.fillStyle = 'rgba(0,0,0,0.8)';
+      ctx.fillRect(tx, ty, tw, 32);
+      ctx.strokeStyle = t.color;
+      ctx.lineWidth = 1;
+      ctx.strokeRect(tx, ty, tw, 32);
+      ctx.fillStyle = t.color;
+      ctx.font = `bold ${narrow ? 12 : 14}px "Microsoft YaHei", sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.fillText(t.text, lw / 2, ty + 20);
+      ctx.globalAlpha = 1;
+    }
+  },
+};

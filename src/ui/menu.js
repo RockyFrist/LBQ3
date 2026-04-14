@@ -1,7 +1,7 @@
 // ===================== 开始菜单（多页设计） =====================
 import { WEAPON_LIST, WEAPONS, getWeapon } from '../weapons/weapon-defs.js';
 import { ARMOR_LIST, getArmor } from '../weapons/armor-defs.js';
-const GAME_VERSION = 'v0.13.1';
+const GAME_VERSION = 'v0.14.3';
 
 // 武器详情面板数据
 const WEAPON_INFO = {
@@ -1389,6 +1389,7 @@ export class Menu {
     const categories = [
       { name: '⚔ 单人挑战', color: '#ff6644' },
       { name: '🎲 休闲娱乐', color: '#ffaa44' },
+      { name: '🏯 模拟经营', color: '#ffcc44' },
       { name: '🔧 练习', color: '#66ccff' },
     ];
 
@@ -1404,7 +1405,10 @@ export class Menu {
         { icon: '🐎', name: '田忌赛马', desc: '策略排兵 · 以弱胜强', accent: '#88cc44', result: { mode: 'horseracing' } },
       ],
       [
-        { icon: '🎯', name: '自由训练', desc: '无限制沙盒 · 按E召唤敌人 · 自由练习', accent: '#66ccff', page: 'training' },
+        { icon: '�', name: '宗门风云', desc: '门派养成 · 弟子培养 · AI观战 · 存档', accent: '#ffcc44', result: { mode: 'sect' } },
+      ],
+      [
+        { icon: '�🎯', name: '自由训练', desc: '无限制沙盒 · 按E召唤敌人 · 自由练习', accent: '#66ccff', page: 'training' },
       ],
     ];
 

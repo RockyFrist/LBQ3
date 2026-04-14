@@ -16,6 +16,7 @@ import { effectsMethods } from './effects.js';
 import { tutorialModeMethods } from './tutorial-mode.js';
 import { arenaModeMethods } from './arena-mode.js';
 import { horseRacingModeMethods } from './horse-racing-mode.js';
+import { sectModeMethods } from './sect-mode.js';
 import { JIANGHU_MAX_LIVES, JIANGHU_STAGES } from './jianghu-stages.js';
 import { Fighter } from '../combat/fighter.js';
 import { snapshotFighter, applyFighterSnapshot, serializeEvent, deserializeEvent } from '../net/net-sync.js';
@@ -169,6 +170,11 @@ export class Game {
     // ===== 田忌赛马初始化 =====
     if (this.mode === 'horseracing') {
       this._setupHorseRacing();
+    }
+
+    // ===== 宗门风云初始化 =====
+    if (this.mode === 'sect') {
+      this._setupSectMode(opts.sectSave || null);
     }
   }
 
@@ -502,6 +508,12 @@ export class Game {
     // 田忌赛马
     if (this.mode === 'horseracing') {
       this._updateHorseRacing(dt);
+      return;
+    }
+
+    // 宗门风云
+    if (this.mode === 'sect') {
+      this._updateSect(dt);
       return;
     }
 
@@ -1010,6 +1022,12 @@ export class Game {
     // 田忌赛马模式: 独立渲染
     if (this.mode === 'horseracing') {
       this._renderHorseRacing();
+      return;
+    }
+
+    // 宗门风云模式: 独立渲染
+    if (this.mode === 'sect') {
+      this._renderSect();
       return;
     }
 
@@ -1927,3 +1945,4 @@ Object.assign(Game.prototype, effectsMethods);
 Object.assign(Game.prototype, tutorialModeMethods);
 Object.assign(Game.prototype, arenaModeMethods);
 Object.assign(Game.prototype, horseRacingModeMethods);
+Object.assign(Game.prototype, sectModeMethods);
