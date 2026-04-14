@@ -34,14 +34,11 @@ export const sectModeMethods = {
 
     // 战斗观看相关
     this.sectWatchingFight = false;
-    this.sectFightData = null;
-    this.sectFightEnemies = [];
-    this.sectFightAllies = [];
     this.sectFightResult = null;
     this.sectFightShowResult = false;
-    this.sectFightResultTimer = 0;
     this.sectPendingQuest = null;
     this.sectPendingDisciple = null;
+    this._sectSaved = null;  // 战斗期间保存的游戏状态
 
     // Toast通知系统
     this.sectToast = null; // { text, color, timer }
@@ -116,9 +113,39 @@ export const sectModeMethods = {
       if (this.sectToast.timer <= 0) this.sectToast = null;
     }
 
-    // 战斗观看模式
+    // 战斗观看模式：直接走正常 _tick
     if (this.sectWatchingFight) {
-      this._updateSectFight(dt);
+      // 结果面板阶段
+      if (this.sectFightShowResult) {
+        if (input.mouseLeftDown || input.pressed('Escape') || input.touchBack) {
+          this._sectEndFight();
+        }
+        return;
+      }
+
+      // 正常战斗 tick（含 hitFreeze / 慢动作 / combat.resolve / 粒子 / 浮文字）
+      this._tick(dt);
+
+      // 45秒超时强制结束
+      if (this._victoryTimer < 0 && this.gameTime > 45) {
+        const fA = this.player.fighter;
+        const fB = this.enemies[0]?.fighter;
+        if (fA && fB) {
+          if (fA.hp <= fB.hp) { fA.hp = 0; fA.alive = false; }
+          else { fB.hp = 0; fB.alive = false; }
+        }
+      }
+
+      // 检测战斗结束（_tick 已把 _victoryTimer 设为 0）
+      if (this._victoryTimer >= 0) {
+        if (!this.sectFightResult) {
+          this.sectFightResult = this._sectSettleFightResult(this.player.fighter?.alive);
+        }
+        if (this._victoryTimer > 1.5) {
+          this.sectFightShowResult = true;
+          this.sect.pendingFightResult = this.sectFightResult;
+        }
+      }
       return;
     }
 
@@ -398,17 +425,14 @@ export const sectModeMethods = {
     this._sectStartQuestFight(d, quest);
   },
 
-  // ===== 任务战斗（直接观看，无headless预模拟）=====
+  // ===== 任务战斗（直接观看，使用正常战斗循环）=====
   _sectStartQuestFight(disciple, quest) {
     const d = disciple;
-    const aiDiffD = Math.min(5, d.level);
+    const aiDiffD = Math.min(5, Math.max(3, d.level));
 
     this.sectWatchingFight = true;
-    this.sectFightTimer = 0;
-    this.sectFightDone = false;
-    this.sectFightResult = null; // 结果在战斗结束后结算
+    this.sectFightResult = null;
     this.sectFightShowResult = false;
-    this.sectFightResultTimer = 0;
     this.sectPendingQuest = quest;
     this.sectPendingDisciple = d;
 
@@ -419,7 +443,6 @@ export const sectModeMethods = {
       weapon: weaponA, armor: armorA,
       color: d.color, name: d.name, team: 0,
     });
-    // 特质HP增益
     for (const tid of d.traits) {
       const t = TRAITS[tid];
       if (t && t.aiMod.hpMul) {
@@ -439,17 +462,62 @@ export const sectModeMethods = {
 
     const eA = new Enemy(fA.x, fA.y, aiDiffD, { weaponId: d.weaponId, armorId: d.armorId });
     eA.fighter = fA;
-    const eB = new Enemy(fB.x, fB.y, quest.enemyDiff, { weaponId: quest.enemyWeapon });
+    const eB = new Enemy(fB.x, fB.y, Math.max(3, quest.enemyDiff), { weaponId: quest.enemyWeapon });
     eB.fighter = fB;
 
-    this.sectFightEnemies = [eA, eB];
-    this.sectFightAllies = [fA, fB];
+    this._sectSwapInFighters(fA, eA, [eB]);
+    this._sectAddLog(`⚔ ${d.name} 出战${quest.name}(D${quest.enemyDiff})`, '#ffaa44');
+  },
+
+  // ===== 把宗门战斗角色注入正常游戏循环 =====
+  _sectSwapInFighters(fA, eA, enemies) {
+    // 保存当前游戏状态
+    this._sectSaved = {
+      playerFighter: this.player.fighter,
+      playerAI: this.playerAI,
+      enemies: this.enemies,
+      allies: this.allies,
+      gameTime: this.gameTime,
+      victoryTimer: this._victoryTimer,
+      floatingTexts: this.floatingTexts,
+      screenFlashTimer: this.screenFlash ? this.screenFlash.timer : 0,
+    };
+    // 注入宗门战斗角色
+    this.player.fighter = fA;
+    this.playerAI = eA;
+    this.enemies = enemies;
+    this.allies = [];
+    this._victoryTimer = -1;
+    this.gameTime = 0;
+    this.floatingTexts = [];
+    this.hitFreezeTimer = 0;
+    this.timeScaleTimer = 0;
+    this.timeScale = 1;
+    this._rebuildFighterList();
     this.combat.playerFighter = null;
     this.particles.particles = [];
     this.camera.x = C.ARENA_W / 2;
     this.camera.y = C.ARENA_H / 2;
+  },
 
-    this._sectAddLog(`⚔ ${d.name} 出战${quest.name}(D${quest.enemyDiff})`, '#ffaa44');
+  // ===== 战斗结束：恢复正常游戏状态 =====
+  _sectEndFight() {
+    const saved = this._sectSaved;
+    if (saved) {
+      this.player.fighter = saved.playerFighter;
+      this.playerAI = saved.playerAI;
+      this.enemies = saved.enemies;
+      this.allies = saved.allies;
+      this._victoryTimer = saved.victoryTimer;
+      this.gameTime = saved.gameTime;
+      this.floatingTexts = saved.floatingTexts;
+      this._rebuildFighterList();
+      this._sectSaved = null;
+    }
+    this.sectWatchingFight = false;
+    this.sectFightShowResult = false;
+    this.sect.pendingFightResult = null;
+    this._sectCheckStory();
   },
 
   // ===== 战斗结束后结算奖惩 =====
@@ -517,71 +585,6 @@ export const sectModeMethods = {
     return result;
   },
 
-  _updateSectFight(dt) {
-    const input = this.input;
-
-    // 结果面板阶段
-    if (this.sectFightShowResult) {
-      this.sectFightResultTimer += dt;
-      // 点击或ESC关闭结果
-      if (input.mouseLeftDown || input.pressed('Escape') || input.touchBack) {
-        this.sectWatchingFight = false;
-        this.sectFightShowResult = false;
-        this.sect.pendingFightResult = null;
-        this._sectCheckStory();
-      }
-      return;
-    }
-
-    // 战斗结束 → 先暂停1.5秒再结算+显示结果
-    if (this.sectFightDone) {
-      this.sectFightTimer += dt;
-      if (this.sectFightTimer > 1.5) {
-        // 如果是任务战斗，现在结算（战斗结果刚刚揭晓）
-        if (!this.sectFightResult) {
-          const [fA] = this.sectFightAllies;
-          this.sectFightResult = this._sectSettleFightResult(fA && fA.alive);
-        }
-        this.sectFightShowResult = true;
-        this.sect.pendingFightResult = this.sectFightResult;
-        this.sectFightResultTimer = 0;
-      }
-      return;
-    }
-
-    this.sectFightTimer += dt;
-    const [eA, eB] = this.sectFightEnemies;
-    const [fA, fB] = this.sectFightAllies;
-
-    // AI决策 + 战斗
-    if (fA.alive && fB.alive) {
-      const cmdA = eA.getCommands(dt, fB);
-      const cmdB = eB.getCommands(dt, fA);
-      fA.update(dt, cmdA, this.sectFightTimer);
-      fB.update(dt, cmdB, this.sectFightTimer);
-      this.combat.resolve([fA, fB], this.sectFightTimer, dt);
-    }
-
-    this.particles.update(dt);
-    this.camera.update(dt);
-
-    // 有人倒下
-    if (!fA.alive || !fB.alive) {
-      this.sectFightDone = true;
-      this.sectFightTimer = 0;
-    }
-    // 超时45秒 → 强制结束（HP低的一方判负）
-    if (this.sectFightTimer > 45 && !this.sectFightDone) {
-      if (fA.hp <= fB.hp) {
-        fA.hp = 0; fA.alive = false;
-      } else {
-        fB.hp = 0; fB.alive = false;
-      }
-      this.sectFightDone = true;
-      this.sectFightTimer = 0;
-    }
-  },
-
   // ===== 切磋（门内对练）=====
   _sectStartSpar() {
     const freeDisciples = this.sect.disciples.filter(d => !d.onQuest && d.injury < 50);
@@ -594,7 +597,6 @@ export const sectModeMethods = {
     const a = shuffled[0];
     const b = shuffled[1];
 
-    // 模拟
     const wA = getWeapon(a.weaponId), wB = getWeapon(b.weaponId);
     const aA = getArmor(a.armorId), aB = getArmor(b.armorId);
     const fA = new Fighter(C.ARENA_W / 2 - 60, C.ARENA_H / 2, {
@@ -607,33 +609,22 @@ export const sectModeMethods = {
     fB.facing = Math.PI;
     fB.showNameTag = true;
 
-    const eA = new Enemy(fA.x, fA.y, Math.min(5, a.level), { weaponId: a.weaponId, armorId: a.armorId });
+    const eA = new Enemy(fA.x, fA.y, Math.min(5, Math.max(3, a.level)), { weaponId: a.weaponId, armorId: a.armorId });
     eA.fighter = fA;
-    const eB = new Enemy(fB.x, fB.y, Math.min(5, b.level), { weaponId: b.weaponId, armorId: b.armorId });
+    const eB = new Enemy(fB.x, fB.y, Math.min(5, Math.max(3, b.level)), { weaponId: b.weaponId, armorId: b.armorId });
     eB.fighter = fB;
 
-    // 直接进入观看
     this.sectWatchingFight = true;
-    this.sectFightTimer = 0;
-    this.sectFightDone = false;
     this.sectFightShowResult = false;
-    this.sectFightResultTimer = 0;
     this.sectFightResult = {
-      won: true, // 切磋无胜负判定，用占位
-      isSpar: true,
+      won: true, isSpar: true,
       discipleName: a.name,
-      enemyDiff: 0,
-      enemyWeapon: b.weaponId,
+      enemyDiff: 0, enemyWeapon: b.weaponId,
       sparNames: [a.name, b.name],
       goldGain: 0, fameGain: 0, expGain: 8, injuryGain: 0,
       levelUp: false, newTrait: null,
     };
-    this.sectFightEnemies = [eA, eB];
-    this.sectFightAllies = [fA, fB];
-    this.combat.playerFighter = null;
-    this.particles.particles = [];
-    this.camera.x = C.ARENA_W / 2;
-    this.camera.y = C.ARENA_H / 2;
+    this._sectSwapInFighters(fA, eA, [eB]);
 
     // 双方获得少量经验
     this._sectGainExp(a, 8);
@@ -978,14 +969,24 @@ export const sectModeMethods = {
       ctx.save();
       this.camera.applyWorldTransform(ctx);
       this.renderer.drawGrid();
-      for (const f of this.sectFightAllies) {
+      for (const f of this.allFighters) {
         this.renderer.drawFighter(f);
       }
       this.renderer.drawParticles(this.particles);
+      this.renderer.drawFloatingTexts(this.floatingTexts);
       ctx.restore();
 
+      // 屏幕闪光（命中/受伤）
+      if (this.screenFlash && this.screenFlash.timer > 0) {
+        ctx.fillStyle = this.screenFlash.color || 'rgba(255,255,255,0.3)';
+        ctx.globalAlpha = Math.min(1, this.screenFlash.timer);
+        ctx.fillRect(0, 0, lw, lh);
+        ctx.globalAlpha = 1;
+      }
+
       // HUD
-      const [fA, fB] = this.sectFightAllies;
+      const fA = this.player.fighter;
+      const fB = this.enemies[0]?.fighter;
       if (fA && fB) {
         this.ui.draw(fA, fB, [fB], 0);
       }
@@ -994,9 +995,8 @@ export const sectModeMethods = {
       ctx.textAlign = 'center';
       ctx.fillStyle = '#888';
       ctx.font = `${narrow ? 10 : 12}px "Microsoft YaHei", sans-serif`;
-      const timeLeft = Math.max(0, 45 - this.sectFightTimer);
-      if (!this.sectFightDone) {
-        ctx.fillText(`${Math.ceil(timeLeft)}s`, lw / 2, narrow ? 16 : 20);
+      if (this._victoryTimer < 0) {
+        ctx.fillText(`${Math.ceil(Math.max(0, 45 - this.gameTime))}s`, lw / 2, narrow ? 16 : 20);
       }
 
       // 模式标签 + 战斗上下文
@@ -1018,14 +1018,6 @@ export const sectModeMethods = {
       // 战斗结束后的结果面板覆盖
       if (this.sectFightShowResult && this.sect.pendingFightResult) {
         this.sectUI.drawFightResult(ctx, lw, lh, this.sect.pendingFightResult, mx, my, narrow);
-      } else if (this.sectFightDone) {
-        // 过渡期 — 显示简单胜负
-        ctx.fillStyle = 'rgba(0,0,0,0.5)';
-        ctx.fillRect(0, lh / 2 - 30, lw, 60);
-        ctx.fillStyle = '#fff';
-        ctx.font = `bold ${narrow ? 18 : 24}px "Microsoft YaHei", sans-serif`;
-        const winner = this.sectFightAllies.find(f => f.alive);
-        ctx.fillText(winner ? `${winner.name} 胜利！` : '平局', lw / 2, lh / 2 + 8);
       }
       return;
     }
