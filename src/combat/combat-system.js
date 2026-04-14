@@ -102,9 +102,9 @@ export class CombatSystem {
       for (const t of fighters) {
         if (t === f || t.team === f.team || !t.alive) continue;
         const d = dist(f, t);
-        // 影步：闪避经过敌人身边时标记
+        // 影步：完美闪避且经过敌人身边时标记
         if (f.weapon.specials?.includes('shadowStep') && !f.shadowStepTarget &&
-            f.isInvulnerable() && d < f.radius + t.radius + 20) {
+            f.perfectDodged && f.isInvulnerable() && d < f.radius + t.radius + 20) {
           f.shadowStepTarget = t;
           this.events.push({ type: 'shadowStep', attacker: f, target: t });
         }
@@ -346,8 +346,12 @@ export class CombatSystem {
   // ===================== 轻击 vs 招架 =====================
   _resolveLightVsBlock(attacker, target, atkInfo, ang, mx, my) {
     target.blockHitCount++;
-    target.drainStamina(C.LIGHT_VS_BLOCK_STAMINA);
-    // 武器特效: 额外体力消耗
+    // 武器自定义格挡体力消耗（-1=标准，0=免费，N=消耗N点）
+    const baseCost = target.weapon.blockStaminaCost != null && target.weapon.blockStaminaCost >= 0
+      ? target.weapon.blockStaminaCost
+      : C.LIGHT_VS_BLOCK_STAMINA;
+    target.drainStamina(baseCost);
+    // 武器特效: 额外体力消耗（大锤 vsBlockExtraStaminaDrain）
     const extraDrain = attacker.weapon.vsBlockExtraStaminaDrain || 0;
     if (extraDrain > 0) target.drainStamina(extraDrain);
     this.particles.blockSpark(mx, my, ang, 5);

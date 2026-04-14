@@ -620,11 +620,19 @@ export class Fighter {
       this.perfectDodged = 'refunded';
     }
 
-    // 匕首影步：闪避穿透敌人后锁定目标朝向（由combat-system设置shadowStepTarget）
+    // 匕首影步：闪避穿透敌人后瞬移到背后，锁定目标朝向（由combat-system设置shadowStepTarget）
     if (this.shadowStepTarget && t >= invulnEnd && !this._shadowStepApplied) {
       this._shadowStepApplied = true;
       const target = this.shadowStepTarget;
       if (target.alive) {
+        // 瞬移到目标背后
+        const behindDist = target.radius + this.radius + 5;
+        const behindAngle = target.facing + Math.PI; // 目标朝向的正后方
+        this.x = target.x + Math.cos(behindAngle) * behindDist;
+        this.y = target.y + Math.sin(behindAngle) * behindDist;
+        // 自动面向目标背部
+        this.facing = target.facing; // 与目标同向 = 面向目标背部
+        // 锁定目标朝向使其无法转身
         target.facingLocked = this.weapon.shadowStepFacingLock || 0.30;
       }
     }

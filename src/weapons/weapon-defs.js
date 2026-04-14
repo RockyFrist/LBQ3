@@ -188,10 +188,8 @@ export const WEAPON_HAMMER = {
   speedMult: 0.85,
 
   lightAttacks: [
-    { startup: 0.20, active: 0.16, recovery: 0.42, range: 62, arc: Math.PI * 0.33, damage: 14, name: '横扫',
-      hyperArmor: true },
-    { startup: 0.22, active: 0.18, recovery: 0.45, range: 66, arc: Math.PI * 0.38, damage: 16, name: '上挑',
-      hyperArmor: true },
+    { startup: 0.20, active: 0.16, recovery: 0.42, range: 62, arc: Math.PI * 0.33, damage: 12, name: '横扫' },
+    { startup: 0.22, active: 0.18, recovery: 0.45, range: 66, arc: Math.PI * 0.38, damage: 14, name: '上挑' },
     { startup: 0.30, active: 0.20, recovery: 0.85, range: 72, arc: Math.PI * 0.50, damage: 18, name: '砸地',
       hyperArmor: true, hitStagger: 0.48 },
   ],
@@ -201,7 +199,7 @@ export const WEAPON_HAMMER = {
 
   heavy: {
     startup: 1.05, active: 0.20, recovery: 0.85,
-    range: 78, arc: Math.PI * 2, damage: 32,    // 360° AoE
+    range: 78, arc: Math.PI * 2, damage: 28,    // 360° AoE
     lunge: 70, drift: 0, knockback: 85,
     hyperArmor: true,
     hitStagger: 0.50,
@@ -251,7 +249,7 @@ export const WEAPON_HAMMER = {
 
   specials: ['quakeShield'],
 
-  qiMax: 75,  // 大锤蓄炁快（交换频繁，需要更低阈值才能用绝技）
+  qiMax: 100,  // 大锤蓄炁与其他武器一致
 
   // AI决策插件
   aiPlugin: HAMMER_AI,
@@ -276,9 +274,9 @@ export const WEAPON_SPEAR = {
   speedMult: 1.0,
 
   lightAttacks: [
-    { startup: 0.13, active: 0.12, recovery: 0.32, range: 75, arc: Math.PI * 0.20, damage: 8, name: '前刺' },
-    { startup: 0.13, active: 0.12, recovery: 0.32, range: 80, arc: Math.PI * 0.23, damage: 8, name: '横扫' },
-    { startup: 0.18, active: 0.16, recovery: 0.60, range: 88, arc: Math.PI * 0.30, damage: 14, name: '突刺' },
+    { startup: 0.13, active: 0.12, recovery: 0.32, range: 75, arc: Math.PI * 0.15, damage: 8, name: '前刺' },
+    { startup: 0.13, active: 0.12, recovery: 0.32, range: 80, arc: Math.PI * 0.17, damage: 8, name: '横扫' },
+    { startup: 0.18, active: 0.16, recovery: 0.60, range: 88, arc: Math.PI * 0.22, damage: 14, name: '突刺' },
   ],
   comboWindow: 0.45,
   lightLunge: 10,

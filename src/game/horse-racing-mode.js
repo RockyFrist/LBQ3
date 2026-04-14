@@ -14,10 +14,80 @@ function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
 
 const DIFF_NAMES = ['新手', '普通', '熟练', '困难', '大师'];
 
+// ===== 武器属性速查 =====
+const WEAPON_STATS = {
+  dao:     { atk: 3, def: 3, spd: 3, rng: 3, name: '刀', type: '均衡' },
+  daggers: { atk: 2, def: 1, spd: 5, rng: 1, name: '双匕', type: '速度' },
+  hammer:  { atk: 5, def: 3, spd: 1, rng: 3, name: '锤', type: '力量' },
+  spear:   { atk: 3, def: 3, spd: 3, rng: 5, name: '枪', type: '控制' },
+  shield:  { atk: 2, def: 5, spd: 3, rng: 2, name: '盾', type: '防御' },
+};
+
+// ===== 武器克制关系 =====
+const WEAPON_MATCHUPS = {
+  dao:     { advantage: ['daggers'], disadvantage: ['spear'] },
+  daggers: { advantage: ['hammer'],  disadvantage: ['dao', 'shield'] },
+  hammer:  { advantage: ['shield'],  disadvantage: ['daggers', 'spear'] },
+  spear:   { advantage: ['dao', 'hammer'], disadvantage: ['shield'] },
+  shield:  { advantage: ['daggers', 'spear'], disadvantage: ['hammer'] },
+};
+
+function getMatchupResult(wIdA, wIdB) {
+  const mu = WEAPON_MATCHUPS[wIdA];
+  if (!mu) return 0;
+  if (mu.advantage.includes(wIdB)) return 1;  // A克制B
+  if (mu.disadvantage.includes(wIdB)) return -1; // A被B克制
+  return 0;
+}
+
+function getMatchupLabel(wIdA, wIdB) {
+  const r = getMatchupResult(wIdA, wIdB);
+  if (r > 0) return '克制';
+  if (r < 0) return '被克';
+  return '均势';
+}
+
+// ===== 胜率预估 =====
+function estimateWinRate(pw, aw) {
+  let scoreP = pw.difficulty * 12;
+  let scoreA = aw.difficulty * 12;
+  scoreP += getMatchupResult(pw.weaponId, aw.weaponId) * 6;
+  scoreA += getMatchupResult(aw.weaponId, pw.weaponId) * 6;
+  scoreP += (pw.armor.hpBonus || 0) * 0.5;
+  scoreA += (aw.armor.hpBonus || 0) * 0.5;
+  scoreP = Math.max(5, scoreP);
+  scoreA = Math.max(5, scoreA);
+  return Math.round(scoreP / (scoreP + scoreA) * 100);
+}
+
+// ===== 赛马解说 =====
+const HR_COMMENTARY = {
+  matchStart: ['比武开始！', '请看！两位武者登场！'],
+  playerWin: ['干得漂亮！我方获胜！', '太好了！赢得漂亮！'],
+  playerLose: ['可惜！本场落败了…', '输了，但整体局势还在！'],
+  upset: ['爆冷了！实力较弱的一方反而获胜！', '万万没想到！打出了翻转！'],
+  sweep: ['完美的横扫！', '零封！对手毫无还手之力！'],
+};
+
+// ===== AI出战策略类型 =====
+const AI_STRATEGIES = [
+  { name: '强先出', sort: (team) => [...team.keys()].sort((a, b) => team[b].power - team[a].power) },
+  { name: '弱先出', sort: (team) => [...team.keys()].sort((a, b) => team[a].power - team[b].power) },
+  { name: '随机出', sort: (team) => { const arr = [...team.keys()]; for (let i = arr.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [arr[i], arr[j]] = [arr[j], arr[i]]; } return arr; } },
+  { name: '均衡出', sort: (team) => {
+    const arr = [...team.keys()];
+    arr.sort((a, b) => team[a].power - team[b].power);
+    // 中、强、弱的顺序
+    if (arr.length >= 3) return [arr[1], arr[2], arr[0]];
+    return arr;
+  }},
+];
+
 // ===== 创建参赛武者 =====
 function createWarrior(named, difficulty, weaponId, armorId) {
   const weapon = getWeapon(weaponId || randomWeapon());
   const armor = getArmor(armorId || 'none');
+  const ws = WEAPON_STATS[weapon.id] || { atk: 3, def: 3, spd: 3, rng: 3, type: '未知' };
   return {
     name: named.name,
     title: named.title,
@@ -28,7 +98,8 @@ function createWarrior(named, difficulty, weaponId, armorId) {
     armorId: armor.id,
     armor,
     color: weapon.color,
-    power: difficulty * 10 + (armor.hpBonus || 0), // 展示用综合"战力"
+    power: difficulty * 10 + (armor.hpBonus || 0),
+    stats: ws,
   };
 }
 
@@ -40,12 +111,18 @@ export class HorseRacingMode {
     this.losses = 0;
     this.phase = 'pick';        // 'pick' | 'fighting' | 'roundResult' | 'stageResult' | 'victory' | 'defeat'
 
+    // 金币系统
+    this.gold = 1000;
+    this.betAmount = 100;
+    this.goldHistory = [1000];
+
     // 当前关
     this.teamSize = 3;          // 每关3人
     this.playerTeam = [];       // 玩家的武者队伍
     this.aiTeam = [];           // AI的武者队伍
     this.playerOrder = [];      // 玩家出战顺序 (index数组)
     this.aiOrder = [];          // AI出战顺序 (index数组)
+    this.aiStrategyName = '';   // AI策略名称
     this.currentMatch = 0;      // 当前第几场 (0-based)
     this.stageScore = [0, 0];   // [玩家赢, AI赢]
 
@@ -57,8 +134,15 @@ export class HorseRacingMode {
     this.fightDone = false;
     this.winner = null;
 
+    // 每场战斗记录
+    this.matchResults = [];     // { playerWarrior, aiWarrior, playerWon, winRate, upset }
+
+    // 解说
+    this.commentary = '';
+    this.commentFade = 0;
+
     // 拖拽选择
-    this._selectedSlot = -1;    // 当前选中的玩家武者索引
+    this._selectedSlot = -1;
     this._hoverSlot = -1;
 
     this._setupStage();
@@ -70,6 +154,9 @@ export class HorseRacingMode {
     this.stageScore = [0, 0];
     this.fightDone = false;
     this.playerOrder = [];
+    this.matchResults = [];
+    this.commentary = '';
+    this.commentFade = 0;
 
     // 难度递增
     const baseDiff = Math.min(5, 1 + this.stage);
@@ -94,9 +181,24 @@ export class HorseRacingMode {
       this.aiTeam.push(createWarrior(names[this.teamSize + i], diff, weapons[this.teamSize + i]));
     }
 
-    // AI出战顺序：按战力从高到低（经典策略）
-    this.aiOrder = this.aiTeam.map((_, i) => i)
-      .sort((a, b) => this.aiTeam[b].power - this.aiTeam[a].power);
+    // 护甲随机分配（后期关卡更好的护甲）
+    const armorPool = this.stage <= 1 ? ['none', 'none', 'light']
+      : this.stage <= 3 ? ['none', 'light', 'light', 'medium']
+      : ['light', 'medium', 'medium', 'heavy'];
+    for (const w of [...this.playerTeam, ...this.aiTeam]) {
+      if (w.armorId === 'none' && Math.random() < 0.4 + this.stage * 0.1) {
+        const aId = pick(armorPool);
+        w.armorId = aId;
+        w.armor = getArmor(aId);
+        w.power = w.difficulty * 10 + (w.armor.hpBonus || 0);
+      }
+    }
+
+    // AI出战策略：随关卡变化
+    const stratIdx = this.stage % AI_STRATEGIES.length;
+    const strat = AI_STRATEGIES[stratIdx];
+    this.aiStrategyName = strat.name;
+    this.aiOrder = strat.sort(this.aiTeam);
   }
 
   // 玩家选择出战顺序
@@ -180,19 +282,44 @@ export class HorseRacingMode {
       if (alive.length === 1) {
         this.winner = alive[0];
       } else if (alive.length === 2) {
-        // 超时：血量高者胜
         this.winner = this.fighters[0].hp >= this.fighters[1].hp ? this.fighters[0] : this.fighters[1];
       }
       this.fightDone = true;
 
       // 记分
+      const playerWon = this.winner && this.winner.team === 0;
       if (this.winner) {
-        if (this.winner.team === 0) {
+        if (playerWon) {
           this.stageScore[0]++;
         } else {
           this.stageScore[1]++;
         }
       }
+
+      // 记录本场结果
+      const pIdx = this.playerOrder[this.currentMatch];
+      const aIdx = this.aiOrder[this.currentMatch];
+      const pw = this.playerTeam[pIdx];
+      const aw = this.aiTeam[aIdx];
+      const winRate = estimateWinRate(pw, aw);
+      const upset = (playerWon && winRate < 40) || (!playerWon && winRate > 60);
+      this.matchResults.push({
+        playerWarrior: pw, aiWarrior: aw,
+        playerWon, winRate, upset,
+        winnerHpPct: this.winner ? Math.round(this.winner.hp / this.winner.maxHp * 100) : 0,
+        duration: this.gameTime,
+      });
+
+      // 解说
+      if (upset) {
+        this.commentary = pick(HR_COMMENTARY.upset);
+      } else if (playerWon) {
+        this.commentary = pick(HR_COMMENTARY.playerWin);
+      } else {
+        this.commentary = pick(HR_COMMENTARY.playerLose);
+      }
+      this.commentFade = 3;
+
       this.phase = 'roundResult';
     }
   }
@@ -202,11 +329,23 @@ export class HorseRacingMode {
     this.currentMatch++;
     if (this.currentMatch >= this.teamSize) {
       // 本关结束
-      if (this.stageScore[0] > this.stageScore[1]) {
+      const playerWon = this.stageScore[0] > this.stageScore[1];
+      if (playerWon) {
         this.wins++;
+        // 奖励金币：基础200 + 每场胜利100
+        const bonus = 200 + this.stageScore[0] * 100;
+        // 完美通关额外奖励
+        const perfect = this.stageScore[1] === 0;
+        const reward = perfect ? bonus * 2 : bonus;
+        this.gold += reward;
+        this._lastGoldChange = reward;
+        this._lastPerfect = perfect;
       } else {
         this.losses++;
+        this._lastGoldChange = 0;
+        this._lastPerfect = false;
       }
+      this.goldHistory.push(this.gold);
       if (this.losses >= 2) {
         this.phase = 'defeat';
       } else if (this.stage >= this.maxStages - 1) {
@@ -404,6 +543,9 @@ export const horseRacingModeMethods = {
     ctx.fillStyle = 'rgba(0,0,0,0.7)';
     ctx.fillRect(0, 0, lw, 36);
     ctx.font = 'bold 14px "Microsoft YaHei", sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillStyle = '#ffcc44';
+    ctx.fillText(`💰 ${hr.gold}`, 12, 24);
     ctx.textAlign = 'center';
     ctx.fillStyle = '#e8e0d0';
     ctx.fillText(`🐎 田忌赛马 · 第 ${hr.stage + 1}/${hr.maxStages} 关 · 胜${hr.wins} 负${hr.losses}`, lw / 2, 24);
@@ -423,7 +565,7 @@ export const horseRacingModeMethods = {
     ctx.textAlign = 'center';
     ctx.fillStyle = '#ff6644';
     ctx.font = 'bold 16px "Microsoft YaHei", sans-serif';
-    ctx.fillText('对手阵容（出战顺序从左到右）', cx, lh * 0.06);
+    ctx.fillText(`对手阵容（AI策略: ${hr.aiStrategyName}）`, cx, lh * 0.06);
 
     // AI卡牌
     for (let i = 0; i < hr.teamSize; i++) {
@@ -441,6 +583,19 @@ export const horseRacingModeMethods = {
     ctx.font = 'bold 16px "Microsoft YaHei", sans-serif';
     ctx.fillText('你的阵容（点击选择出战顺序）', cx, lh * 0.32);
 
+    // 策略提示框
+    ctx.fillStyle = 'rgba(68,136,255,0.08)';
+    ctx.fillRect(cx - 220, lh * 0.54, 440, 52);
+    ctx.strokeStyle = 'rgba(68,136,255,0.2)';
+    ctx.strokeRect(cx - 220, lh * 0.54, 440, 52);
+    ctx.fillStyle = '#4488ff';
+    ctx.font = 'bold 11px "Microsoft YaHei", sans-serif';
+    ctx.fillText('💡 田忌赛马策略', cx, lh * 0.56 + 10);
+    ctx.fillStyle = '#aaa';
+    ctx.font = '10px "Microsoft YaHei", sans-serif';
+    ctx.fillText('核心：用弱马对强马，用强马对弱马 | 注意武器克制：枪克刀，匕克锤，锤克盾，盾克枪/匕', cx, lh * 0.56 + 26);
+    ctx.fillText(`对手策略: ${hr.aiStrategyName} — 利用这个信息安排出战顺序！`, cx, lh * 0.56 + 40);
+
     // 玩家卡牌
     for (let i = 0; i < hr.teamSize; i++) {
       const slotIdx = this._hrSlots.indexOf(i);
@@ -456,9 +611,8 @@ export const horseRacingModeMethods = {
       ctx.fillText(`出战顺序: ${orderStr}`, cx, lh * 0.70);
     }
 
-    // 对阵预测
+    // 对阵预测（增强版：显示胜率和克制关系）
     if (this._hrSlots.length === hr.teamSize) {
-      ctx.fillStyle = '#666';
       ctx.font = '12px "Microsoft YaHei", sans-serif';
       let previewY = lh * 0.74;
       for (let i = 0; i < hr.teamSize; i++) {
@@ -466,8 +620,40 @@ export const horseRacingModeMethods = {
         const aIdx = hr.aiOrder[i];
         const pw = hr.playerTeam[pIdx];
         const aw = hr.aiTeam[aIdx];
-        ctx.fillText(`第${i + 1}场: ${pw.fullName}(${pw.weapon.icon}★${pw.difficulty}) vs ${aw.fullName}(${aw.weapon.icon}★${aw.difficulty})`, cx, previewY);
-        previewY += 16;
+        const winRate = estimateWinRate(pw, aw);
+        const matchup = getMatchupLabel(pw.weaponId, aw.weaponId);
+        // 胜率颜色编码
+        const wrColor = winRate >= 60 ? '#44cc44' : winRate >= 45 ? '#cccc44' : '#ff6644';
+        const muColor = matchup === '克制' ? '#44cc44' : matchup === '被克' ? '#ff6644' : '#888';
+        ctx.fillStyle = '#888';
+        ctx.textAlign = 'left';
+        const lineX = cx - 200;
+        ctx.fillText(`第${i + 1}场: ${pw.fullName}(${pw.weapon.icon}) vs ${aw.fullName}(${aw.weapon.icon})`, lineX, previewY);
+        ctx.fillStyle = wrColor;
+        ctx.textAlign = 'right';
+        ctx.fillText(`胜率${winRate}%`, cx + 160, previewY);
+        ctx.fillStyle = muColor;
+        ctx.fillText(`[${matchup}]`, cx + 200, previewY);
+        previewY += 18;
+      }
+      // 总体胜率建议
+      let favorCount = 0;
+      for (let i = 0; i < hr.teamSize; i++) {
+        const pIdx = this._hrSlots[i];
+        const aIdx = hr.aiOrder[i];
+        const wr = estimateWinRate(hr.playerTeam[pIdx], hr.aiTeam[aIdx]);
+        if (wr >= 50) favorCount++;
+      }
+      ctx.textAlign = 'center';
+      if (favorCount >= 2) {
+        ctx.fillStyle = '#44cc44';
+        ctx.fillText('✅ 这个排阵算不错！多数场次占优', cx, previewY + 4);
+      } else if (favorCount === 1) {
+        ctx.fillStyle = '#cccc44';
+        ctx.fillText('⚠️ 排阵一般，试试调整顺序？', cx, previewY + 4);
+      } else {
+        ctx.fillStyle = '#ff6644';
+        ctx.fillText('❌ 这个排阵很不利！建议重新考虑', cx, previewY + 4);
       }
     }
 
@@ -502,31 +688,55 @@ export const horseRacingModeMethods = {
     }
 
     const cx = rect.x + rect.w / 2;
-    let ty = rect.y + 22;
+    let ty = rect.y + 18;
     ctx.textAlign = 'center';
 
     // 名字
     ctx.fillStyle = '#e8e0d0';
-    ctx.font = 'bold 14px "Microsoft YaHei", sans-serif';
+    ctx.font = 'bold 13px "Microsoft YaHei", sans-serif';
     ctx.fillText(warrior.fullName, cx, ty);
-    ty += 20;
+    ty += 17;
 
     // 武器
     ctx.fillStyle = warrior.color || '#aaa';
-    ctx.font = '13px "Microsoft YaHei", sans-serif';
+    ctx.font = '12px "Microsoft YaHei", sans-serif';
     ctx.fillText(`${warrior.weapon.icon} ${warrior.weapon.name}`, cx, ty);
-    ty += 18;
+    ty += 15;
 
     // 难度星级
     const stars = '★'.repeat(warrior.difficulty) + '☆'.repeat(5 - warrior.difficulty);
     ctx.fillStyle = '#aaa';
-    ctx.font = '12px "Microsoft YaHei", sans-serif';
+    ctx.font = '11px "Microsoft YaHei", sans-serif';
     ctx.fillText(stars, cx, ty);
-    ty += 16;
+    ty += 14;
 
     // 护甲
     ctx.fillStyle = '#777';
+    ctx.font = '11px "Microsoft YaHei", sans-serif';
     ctx.fillText(`${warrior.armor.icon} ${warrior.armor.name}`, cx, ty);
+    ty += 14;
+
+    // 武器属性条形图
+    const ws = warrior.stats || WEAPON_STATS[warrior.weaponId];
+    if (ws) {
+      const barLabels = ['攻', '防', '速', '范'];
+      const barValues = [ws.atk, ws.def, ws.spd, ws.rng];
+      const barColors = ['#ff6644', '#4488ff', '#44cc44', '#ffcc44'];
+      const barW = 24, barH = 3;
+      const totalBarW = barLabels.length * (barW + 14 + 2);
+      let bx = cx - totalBarW / 2;
+      for (let i = 0; i < barLabels.length; i++) {
+        ctx.fillStyle = '#555';
+        ctx.font = '8px "Microsoft YaHei", sans-serif';
+        ctx.textAlign = 'right';
+        ctx.fillText(barLabels[i], bx + 11, ty + 2);
+        ctx.fillStyle = 'rgba(255,255,255,0.06)';
+        ctx.fillRect(bx + 13, ty - 2, barW, barH);
+        ctx.fillStyle = barColors[i];
+        ctx.fillRect(bx + 13, ty - 2, barW * (barValues[i] / 5), barH);
+        bx += barW + 14 + 2;
+      }
+    }
   },
 
   _drawHRFightHUD(ctx, lw, lh) {
@@ -571,25 +781,42 @@ export const horseRacingModeMethods = {
     ctx.fillRect(0, 0, lw, lh);
     ctx.textAlign = 'center';
 
-    const pIdx = hr.playerOrder[hr.currentMatch];
-    const aIdx = hr.aiOrder[hr.currentMatch];
-
     const won = hr.winner && hr.winner.team === 0;
     ctx.fillStyle = won ? '#44ff44' : '#ff4444';
     ctx.font = 'bold 24px "Microsoft YaHei", sans-serif';
-    ctx.fillText(won ? '✅ 本场获胜！' : '❌ 本场落败', lw / 2, lh * 0.3);
+    ctx.fillText(won ? '✅ 本场获胜！' : '❌ 本场落败', lw / 2, lh * 0.22);
+
+    // 本场战斗详情
+    const lastResult = hr.matchResults[hr.matchResults.length - 1];
+    if (lastResult) {
+      ctx.fillStyle = '#aaa';
+      ctx.font = '13px "Microsoft YaHei", sans-serif';
+      ctx.fillText(`胜者剩余 ${lastResult.winnerHpPct}% 血量  战斗时长 ${lastResult.duration.toFixed(1)}s`, lw / 2, lh * 0.30);
+      if (lastResult.upset) {
+        ctx.fillStyle = '#ffcc44';
+        ctx.font = 'bold 13px "Microsoft YaHei", sans-serif';
+        ctx.fillText('⚡ 爆冷了！', lw / 2, lh * 0.35);
+      }
+    }
+
+    // 解说
+    if (hr.commentary && hr.commentFade > 0) {
+      ctx.fillStyle = '#ffcc44';
+      ctx.font = '14px "Microsoft YaHei", sans-serif';
+      ctx.fillText(`📢 ${hr.commentary}`, lw / 2, lh * 0.40);
+    }
 
     ctx.fillStyle = '#e8e0d0';
     ctx.font = '16px "Microsoft YaHei", sans-serif';
-    ctx.fillText(`当前比分: ${hr.stageScore[0]} - ${hr.stageScore[1]}`, lw / 2, lh * 0.42);
+    ctx.fillText(`当前比分: ${hr.stageScore[0]} - ${hr.stageScore[1]}`, lw / 2, lh * 0.50);
 
     ctx.fillStyle = '#888';
     ctx.font = '13px "Microsoft YaHei", sans-serif';
     const remain = hr.teamSize - hr.currentMatch - 1;
-    ctx.fillText(remain > 0 ? `还有 ${remain} 场比赛` : '本关所有比赛已结束', lw / 2, lh * 0.52);
+    ctx.fillText(remain > 0 ? `还有 ${remain} 场比赛` : '本关所有比赛已结束', lw / 2, lh * 0.58);
 
     ctx.fillStyle = '#666';
-    ctx.fillText('点击继续', lw / 2, lh * 0.62);
+    ctx.fillText('点击继续', lw / 2, lh * 0.66);
   },
 
   _drawHRStageResult(ctx, lw, lh) {
@@ -601,48 +828,112 @@ export const horseRacingModeMethods = {
     const playerWon = hr.stageScore[0] > hr.stageScore[1];
     ctx.fillStyle = playerWon ? '#44ff44' : '#ff4444';
     ctx.font = 'bold 26px "Microsoft YaHei", sans-serif';
-    ctx.fillText(playerWon ? '🏆 本关获胜！' : '💀 本关失败', lw / 2, lh * 0.25);
+    ctx.fillText(playerWon ? '🏆 本关获胜！' : '💀 本关失败', lw / 2, lh * 0.18);
 
     ctx.fillStyle = '#e8e0d0';
     ctx.font = '16px "Microsoft YaHei", sans-serif';
-    ctx.fillText(`比分 ${hr.stageScore[0]} : ${hr.stageScore[1]}`, lw / 2, lh * 0.38);
+    ctx.fillText(`比分 ${hr.stageScore[0]} : ${hr.stageScore[1]}`, lw / 2, lh * 0.28);
+
+    // 每场战绩回顾
+    ctx.font = '12px "Microsoft YaHei", sans-serif';
+    let ry = lh * 0.35;
+    for (let i = 0; i < hr.matchResults.length; i++) {
+      const r = hr.matchResults[i];
+      const icon = r.playerWon ? '✅' : '❌';
+      const upsetTag = r.upset ? ' ⚡爆冷' : '';
+      ctx.fillStyle = r.playerWon ? '#44cc44' : '#cc4444';
+      ctx.fillText(`${icon} 第${i + 1}场: ${r.playerWarrior.fullName} vs ${r.aiWarrior.fullName} (胜率${r.winRate}%)${upsetTag}`, lw / 2, ry);
+      ry += 16;
+    }
+
+    // 金币奖励
+    if (playerWon && hr._lastGoldChange > 0) {
+      ctx.fillStyle = '#ffcc44';
+      ctx.font = 'bold 14px "Microsoft YaHei", sans-serif';
+      let rewardText = `💰 获得 +${hr._lastGoldChange} 金`;
+      if (hr._lastPerfect) rewardText += ' (完美通关双倍奖励！)';
+      ctx.fillText(rewardText, lw / 2, ry + 10);
+    }
 
     ctx.fillStyle = '#aaa';
     ctx.font = '14px "Microsoft YaHei", sans-serif';
-    ctx.fillText(`总战绩 ${hr.wins}胜 ${hr.losses}负 (2负出局)`, lw / 2, lh * 0.48);
+    ctx.fillText(`总战绩 ${hr.wins}胜 ${hr.losses}负 (2负出局)  💰 ${hr.gold}`, lw / 2, lh * 0.72);
 
     ctx.fillStyle = '#666';
     ctx.font = '13px "Microsoft YaHei", sans-serif';
-    ctx.fillText('点击进入下一关', lw / 2, lh * 0.6);
+    ctx.fillText('点击进入下一关', lw / 2, lh * 0.82);
   },
 
   _drawHRVictory(ctx, lw, lh) {
+    const hr = this.horseRacing;
     ctx.fillStyle = 'rgba(0,0,0,0.85)';
     ctx.fillRect(0, 0, lw, lh);
     ctx.textAlign = 'center';
     ctx.fillStyle = '#ffcc44';
     ctx.font = 'bold 30px "Microsoft YaHei", sans-serif';
-    ctx.fillText('🐎 田忌赛马通关！', lw / 2, lh * 0.3);
+    ctx.fillText('🐎 田忌赛马通关！', lw / 2, lh * 0.2);
+
+    // 评级
+    const perfects = hr.goldHistory.length > 1 ? hr.losses : 0;
+    const grade = perfects === 0 ? 'S' : perfects === 1 ? 'A' : 'B';
+    const gradeColor = grade === 'S' ? '#ffcc44' : grade === 'A' ? '#44ff44' : '#4488ff';
+    ctx.fillStyle = gradeColor;
+    ctx.font = 'bold 50px "Microsoft YaHei", sans-serif';
+    ctx.fillText(grade, lw / 2, lh * 0.35);
+
     ctx.fillStyle = '#e8e0d0';
     ctx.font = '16px "Microsoft YaHei", sans-serif';
-    ctx.fillText(`最终战绩 ${this.horseRacing.wins}胜 ${this.horseRacing.losses}负`, lw / 2, lh * 0.45);
+    ctx.fillText(`最终战绩 ${hr.wins}胜 ${hr.losses}负`, lw / 2, lh * 0.45);
+    ctx.fillText(`💰 最终金币: ${hr.gold}`, lw / 2, lh * 0.52);
+
+    // 金币声势图
+    if (hr.goldHistory.length > 1) {
+      const gw = 200, gh = 40;
+      const gx = lw / 2 - gw / 2;
+      const gy = lh * 0.58;
+      ctx.strokeStyle = '#444';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(gx, gy, gw, gh);
+      const maxG = Math.max(...hr.goldHistory, 1);
+      ctx.beginPath();
+      ctx.strokeStyle = '#ffcc44';
+      ctx.lineWidth = 2;
+      for (let i = 0; i < hr.goldHistory.length; i++) {
+        const px = gx + (i / (hr.goldHistory.length - 1)) * gw;
+        const py = gy + gh - (hr.goldHistory[i] / maxG) * gh;
+        if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+      }
+      ctx.stroke();
+      ctx.fillStyle = '#888';
+      ctx.font = '10px "Microsoft YaHei", sans-serif';
+      ctx.fillText('金币走势', lw / 2, gy + gh + 14);
+    }
+
     ctx.fillStyle = '#666';
     ctx.font = '13px "Microsoft YaHei", sans-serif';
-    ctx.fillText('点击返回菜单', lw / 2, lh * 0.58);
+    ctx.fillText('点击返回菜单', lw / 2, lh * 0.82);
   },
 
   _drawHRDefeat(ctx, lw, lh) {
+    const hr = this.horseRacing;
     ctx.fillStyle = 'rgba(0,0,0,0.85)';
     ctx.fillRect(0, 0, lw, lh);
     ctx.textAlign = 'center';
     ctx.fillStyle = '#ff4444';
     ctx.font = 'bold 30px "Microsoft YaHei", sans-serif';
-    ctx.fillText('💀 两负出局', lw / 2, lh * 0.3);
+    ctx.fillText('💀 两负出局', lw / 2, lh * 0.22);
     ctx.fillStyle = '#aaa';
     ctx.font = '16px "Microsoft YaHei", sans-serif';
-    ctx.fillText(`走到了第 ${this.horseRacing.stage + 1} 关`, lw / 2, lh * 0.43);
+    ctx.fillText(`走到了第 ${hr.stage + 1} 关  ${hr.wins}胜${hr.losses}负`, lw / 2, lh * 0.35);
+    ctx.fillStyle = '#ffcc44';
+    ctx.font = '14px "Microsoft YaHei", sans-serif';
+    ctx.fillText(`💰 最终金币: ${hr.gold}`, lw / 2, lh * 0.45);
+    // 策略提示
+    ctx.fillStyle = '#777';
+    ctx.font = '12px "Microsoft YaHei", sans-serif';
+    ctx.fillText('💡 田忌赛马的核心：用弱挡强，用强打弱，利用武器克制', lw / 2, lh * 0.55);
     ctx.fillStyle = '#666';
     ctx.font = '13px "Microsoft YaHei", sans-serif';
-    ctx.fillText('点击返回菜单', lw / 2, lh * 0.55);
+    ctx.fillText('点击返回菜单', lw / 2, lh * 0.66);
   },
 };

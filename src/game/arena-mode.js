@@ -80,6 +80,65 @@ const COMMENTARY = {
     '这次看走眼了，下次加油！',
     '输了赌注，但江湖路长！',
   ],
+  // === 增强解说词库 ===
+  combo: [
+    '{attacker}连续攻击！气势如虹！',
+    '{attacker}连击不断！对手毫无还手之力！',
+    '恐怖的连击！{attacker}打出了节奏！',
+    '{attacker}如疾风骤雨般进攻！',
+    '一波接一波！{attacker}攻势凌厉！',
+  ],
+  comeback: [
+    '{fighter}绝地反击！逆转了局势！',
+    '不可思议！{fighter}触底反弹了！',
+    '逆风翻盘！{fighter}上演绝地求生！',
+    '{fighter}越战越勇，开始反攻了！',
+    '奇迹发生了！{fighter}从死亡边缘杀了回来！',
+  ],
+  domination: [
+    '{attacker}完全压制了{target}！',
+    '一边倒的局面！{target}毫无招架之力！',
+    '{attacker}如入无人之境！',
+    '碾压！{target}自始至终没有机会！',
+  ],
+  dodge: [
+    '好险！{fighter}千钧一发闪过去了！',
+    '身法了得！{fighter}轻松闪避！',
+    '{fighter}鬼魅般的步法，滴水不沾！',
+    '闪！{fighter}反应极快！',
+  ],
+  counter: [
+    '漂亮的反击！{attacker}后发先至！',
+    '{attacker}抓住破绽，致命反击！',
+    '以守为攻！{attacker}完美反击！',
+    '精准反击！{attacker}化被动为主动！',
+  ],
+  stalemate: [
+    '双方旗鼓相当，难分高下！',
+    '激烈的拉锯战！谁先撑不住？',
+    '棋逢对手，将遇良才！',
+    '互不相让！这场比赛精彩绝伦！',
+  ],
+  milestone: [
+    '恭喜！金币突破{amount}大关！',
+    '财源广进！已达成{amount}金里程碑！',
+    '赌神降临！{amount}金不在话下！',
+  ],
+  allIn: [
+    '豪赌！全部身家压上了！',
+    '梭哈！一把定乾坤！',
+    '孤注一掷！成败在此一举！',
+  ],
+  streakWin: [
+    '连续{count}次押中！判断力惊人！',
+    '{count}连赢！简直是赌神再世！',
+    '眼光独到！已经连赢{count}场！',
+  ],
+  weaponClash: [
+    '{weaponA}对{weaponB}！这可有看头了！',
+    '经典对决！{weaponA}vs{weaponB}！',
+    '{weaponA}与{weaponB}的宿命对决！',
+  ],
 };
 
 function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
@@ -87,21 +146,63 @@ function fillTemplate(tpl, vars) {
   return tpl.replace(/\{(\w+)\}/g, (_, k) => vars[k] || '???');
 }
 
+// ===== 武器属性速查（卡牌展示+赔率计算）=====
+const WEAPON_STATS = {
+  dao:     { atk: 3, def: 3, spd: 3, rng: 3, name: '刀', type: '均衡' },
+  daggers: { atk: 2, def: 1, spd: 5, rng: 1, name: '双匕', type: '速度' },
+  hammer:  { atk: 5, def: 3, spd: 1, rng: 3, name: '锤', type: '力量' },
+  spear:   { atk: 3, def: 3, spd: 3, rng: 5, name: '枪', type: '控制' },
+  shield:  { atk: 2, def: 5, spd: 3, rng: 2, name: '盾', type: '防御' },
+};
+
+// ===== 武器克制关系 =====
+const WEAPON_MATCHUPS = {
+  dao:     { advantage: ['daggers'], disadvantage: ['spear'] },
+  daggers: { advantage: ['hammer'],  disadvantage: ['dao', 'shield'] },
+  hammer:  { advantage: ['shield'],  disadvantage: ['daggers', 'spear'] },
+  spear:   { advantage: ['dao', 'hammer'], disadvantage: ['shield'] },
+  shield:  { advantage: ['daggers', 'spear'], disadvantage: ['hammer'] },
+};
+
+// ===== 护甲评分 =====
+const ARMOR_SCORE = { none: 0, light: 2, medium: 5, heavy: 8, plate: 12 };
+
+// ===== 获取武器克制提示 =====
+function getMatchupHint(weaponIdA, weaponIdB) {
+  const mu = WEAPON_MATCHUPS[weaponIdA];
+  if (!mu) return '未知';
+  if (mu.advantage.includes(weaponIdB)) return '克制';
+  if (mu.disadvantage.includes(weaponIdB)) return '被克';
+  return '均势';
+}
+
 // ===== 赔率计算 =====
 function calcOdds(fighterA, fighterB) {
-  // 根据难度、武器、护甲差异计算赔率
-  const scoreA = (fighterA.difficulty || 3) * 10 + (fighterA.hpMult || 1) * 5;
-  const scoreB = (fighterB.difficulty || 3) * 10 + (fighterB.hpMult || 1) * 5;
+  // 综合考虑难度、武器、护甲和克制关系
+  let scoreA = (fighterA.difficulty || 3) * 12;
+  let scoreB = (fighterB.difficulty || 3) * 12;
+  // 护甲加成
+  scoreA += ARMOR_SCORE[fighterA.armorId] || 0;
+  scoreB += ARMOR_SCORE[fighterB.armorId] || 0;
+  // 武器克制加成
+  const muA = WEAPON_MATCHUPS[fighterA.weaponId];
+  const muB = WEAPON_MATCHUPS[fighterB.weaponId];
+  if (muA && muA.advantage.includes(fighterB.weaponId)) scoreA += 5;
+  if (muA && muA.disadvantage.includes(fighterB.weaponId)) scoreA -= 3;
+  if (muB && muB.advantage.includes(fighterA.weaponId)) scoreB += 5;
+  if (muB && muB.disadvantage.includes(fighterA.weaponId)) scoreB -= 3;
+  scoreA = Math.max(5, scoreA);
+  scoreB = Math.max(5, scoreB);
   const total = scoreA + scoreB;
   const probA = scoreA / total;
   const probB = scoreB / total;
-  // 庄家抽成 10%
   const margin = 0.90;
   return {
     oddsA: +(margin / probA).toFixed(2),
     oddsB: +(margin / probB).toFixed(2),
     probA: +probA.toFixed(2),
     probB: +probB.toFixed(2),
+    matchup: getMatchupHint(fighterA.weaponId, fighterB.weaponId),
   };
 }
 
@@ -176,6 +277,33 @@ export class ArenaMode {
 
     // 通关倍率
     this.victoryGoldTarget = 5000;
+
+    // 连胜/连败追踪
+    this.streak = 0;            // 正=连赢, 负=连输
+    this.maxStreak = 0;         // 历史最高连赢
+    this.peakGold = 500;        // 历史最高金币
+    this.totalBetWins = 0;
+    this.totalBetLosses = 0;
+
+    // 里程碑系统
+    this.milestones = [1000, 2000, 3000, 5000];
+    this.milestonesReached = [];
+    this.lastMilestoneMsg = '';
+
+    // 评级系统目标
+    this.ratings = [
+      { grade: 'S', gold: 8000, label: '赌圣', color: '#ffcc44' },
+      { grade: 'A', gold: 5000, label: '赌侠', color: '#44ff44' },
+      { grade: 'B', gold: 3000, label: '赌徒', color: '#4488ff' },
+      { grade: 'C', gold: 1000, label: '赌棍', color: '#aaaaaa' },
+      { grade: 'D', gold: 0,    label: '赌狗', color: '#ff4444' },
+    ];
+
+    // 战斗统计追踪
+    this._comboCount = {};       // 每个fighter的连击计数
+    this._lastAttacker = null;   // 上次攻击者
+    this._hitCount = {};         // 每个fighter的命中次数
+    this._stalemateCalled = false;
 
     // 初始化第一轮
     this._setupRound();
@@ -330,6 +458,21 @@ export class ArenaMode {
     this.allFighters = this.fighters;
     // 擂台模式显示名字标签
     for (const f of this.fighters) f.showNameTag = true;
+    // 重置战斗统计
+    this._comboCount = {};
+    this._hitCount = {};
+    this._lastAttacker = null;
+    this._stalemateCalled = false;
+    // 武器对决解说
+    if (this.matchType === 'duel') {
+      const wA = this.contestants[0].weapon;
+      const wB = this.contestants[1].weapon;
+      if (wA.id !== wB.id) {
+        this._addComment(fillTemplate(pick(COMMENTARY.weaponClash), {
+          weaponA: wA.name, weaponB: wB.name,
+        }));
+      }
+    }
     this._addComment(pick(
       this.matchType === 'teamfight' ? COMMENTARY.teamFightStart :
       this.matchType === 'brawl' ? COMMENTARY.brawlStart :
@@ -400,31 +543,89 @@ export class ArenaMode {
       }
     }
 
+    // 胶着解说 (双方血量接近且时间过半)
+    if (this.gameTime > 15 && !this._stalemateCalled && this.matchType === 'duel') {
+      const [f1, f2] = this.fighters;
+      if (f1.alive && f2.alive) {
+        const ratio1 = f1.hp / f1.maxHp;
+        const ratio2 = f2.hp / f2.maxHp;
+        if (Math.abs(ratio1 - ratio2) < 0.15 && ratio1 > 0.3 && ratio2 > 0.3) {
+          this._stalemateCalled = true;
+          this._addComment(pick(COMMENTARY.stalemate));
+        }
+      }
+    }
+
     // 检测胜负
     this._checkFightEnd();
   }
 
   _handleCombatEvent(evt) {
-    if (this.gameTime - this._lastEventTime < 0.8) return; // 防精解说刷屏
+    // 更新命中统计
+    if (evt.type === 'hit') {
+      const atkName = evt.attacker.name;
+      this._hitCount[atkName] = (this._hitCount[atkName] || 0) + 1;
+      // 连击追踪
+      if (this._lastAttacker === atkName) {
+        this._comboCount[atkName] = (this._comboCount[atkName] || 1) + 1;
+      } else {
+        if (this._lastAttacker) this._comboCount[this._lastAttacker] = 0;
+        this._comboCount[atkName] = 1;
+      }
+      this._lastAttacker = atkName;
+    }
+
+    if (this.gameTime - this._lastEventTime < 0.5) return;
     this._lastEventTime = this.gameTime;
 
-    if (evt.type === 'hit' && !this._firstBlood) {
-      this._firstBlood = true;
-      this._addComment(fillTemplate(pick(COMMENTARY.firstBlood), {
-        attacker: evt.attacker.name, target: evt.target.name,
-      }));
-    } else if (evt.type === 'hit' && evt.atkType === 'heavy') {
-      if (Math.random() < 0.4) {
+    if (evt.type === 'hit') {
+      if (!this._firstBlood) {
+        this._firstBlood = true;
+        this._addComment(fillTemplate(pick(COMMENTARY.firstBlood), {
+          attacker: evt.attacker.name, target: evt.target.name,
+        }));
+        return;
+      }
+      // 连击解说 (3连击以上)
+      const combo = this._comboCount[evt.attacker.name] || 0;
+      if (combo >= 3 && Math.random() < 0.6) {
+        this._addComment(fillTemplate(pick(COMMENTARY.combo), {
+          attacker: evt.attacker.name, count: String(combo),
+        }));
+        return;
+      }
+      // 逆转解说（低血量方反击）
+      if (evt.attacker.hp / evt.attacker.maxHp < 0.3 && evt.target.hp / evt.target.maxHp > 0.5) {
+        if (Math.random() < 0.5) {
+          this._addComment(fillTemplate(pick(COMMENTARY.comeback), { fighter: evt.attacker.name }));
+          return;
+        }
+      }
+      // 碾压解说
+      if (evt.attacker.hp / evt.attacker.maxHp > 0.7 && evt.target.hp / evt.target.maxHp < 0.3) {
+        if (Math.random() < 0.4) {
+          this._addComment(fillTemplate(pick(COMMENTARY.domination), {
+            attacker: evt.attacker.name, target: evt.target.name,
+          }));
+          return;
+        }
+      }
+      // 重击解说
+      if (evt.atkType === 'heavy' && Math.random() < 0.5) {
         this._addComment(fillTemplate(pick(COMMENTARY.heavyHit), {
           attacker: evt.attacker.name, target: evt.target.name,
         }));
       }
-    } else if (evt.type === 'parry' && evt.level === 'precise') {
-      if (Math.random() < 0.5) {
-        this._addComment(fillTemplate(pick(COMMENTARY.parry), { target: evt.target.name }));
+    } else if (evt.type === 'parry') {
+      if (evt.level === 'precise') {
+        if (Math.random() < 0.5) {
+          this._addComment(fillTemplate(pick(COMMENTARY.counter), { attacker: evt.target.name }));
+        } else {
+          this._addComment(fillTemplate(pick(COMMENTARY.parry), { target: evt.target.name }));
+        }
       }
     } else if (evt.type === 'lightClash' || evt.type === 'heavyClash') {
-      if (Math.random() < 0.3) {
+      if (Math.random() < 0.35) {
         this._addComment(pick(COMMENTARY.clash));
       }
     } else if (evt.type === 'execution') {
@@ -532,16 +733,46 @@ export class ArenaMode {
       } else {
         multiplier = this.betTarget === 0 ? this.odds.oddsA : this.odds.oddsB;
       }
-      const winnings = Math.floor(this.betAmount * multiplier);
+      // 连胜加成
+      const streakBonus = this.streak > 0 ? 1 + this.streak * 0.05 : 1;
+      const winnings = Math.floor(this.betAmount * multiplier * streakBonus);
       this.gold += winnings;
       this._lastBetWon = true;
       this._lastGoldChange = winnings;
+      this._lastStreakBonus = streakBonus > 1 ? Math.floor((streakBonus - 1) * 100) : 0;
+      // 更新连胜
+      this.streak = Math.max(0, this.streak) + 1;
+      this.maxStreak = Math.max(this.maxStreak, this.streak);
+      this.totalBetWins++;
       this._addComment(pick(COMMENTARY.betWin));
+      // 连胜解说
+      if (this.streak >= 3) {
+        this._addComment(fillTemplate(pick(COMMENTARY.streakWin), { count: String(this.streak) }));
+      }
     } else {
       this.gold -= this.betAmount;
       this._lastBetWon = false;
       this._lastGoldChange = -this.betAmount;
+      this._lastStreakBonus = 0;
+      // 更新连败
+      this.streak = Math.min(0, this.streak) - 1;
+      this.totalBetLosses++;
       this._addComment(pick(COMMENTARY.betLose));
+      // 破产保护：前8轮不会彻底破产，给最低50金
+      if (this.gold <= 0 && this.round < 8) {
+        this.gold = 50;
+        this._addComment('好在庄家大发慈悲，赠你了点本钱继续！');
+      }
+    }
+    // 记录峰值金币
+    this.peakGold = Math.max(this.peakGold, this.gold);
+    // 检查里程碑
+    for (const m of this.milestones) {
+      if (this.gold >= m && !this.milestonesReached.includes(m)) {
+        this.milestonesReached.push(m);
+        this.lastMilestoneMsg = fillTemplate(pick(COMMENTARY.milestone), { amount: String(m) });
+        this._addComment(this.lastMilestoneMsg);
+      }
     }
   }
 
@@ -556,6 +787,14 @@ export class ArenaMode {
       return;
     }
     this._setupRound();
+  }
+
+  // ===== 获取评级 =====
+  getRating() {
+    for (const r of this.ratings) {
+      if (this.gold >= r.gold) return r;
+    }
+    return this.ratings[this.ratings.length - 1];
   }
 
   // ===== 解说系统 =====
@@ -645,18 +884,15 @@ export const arenaModeMethods = {
       }
     }
 
-    // 下注金额 +/-
-    if (L.betMinus && mx >= L.betMinus.x && mx <= L.betMinus.x + L.betMinus.w &&
-        my >= L.betMinus.y && my <= L.betMinus.y + L.betMinus.h) {
-      a.betAmount = Math.max(10, a.betAmount - 50);
-      this._arenaClickCd = 0.12;
-      return;
-    }
-    if (L.betPlus && mx >= L.betPlus.x && mx <= L.betPlus.x + L.betPlus.w &&
-        my >= L.betPlus.y && my <= L.betPlus.y + L.betPlus.h) {
-      a.betAmount = Math.min(a.gold, a.betAmount + 50);
-      this._arenaClickCd = 0.12;
-      return;
+    // 下注金额预设按钮
+    if (L.betAmountBtns) {
+      for (const btn of L.betAmountBtns) {
+        if (mx >= btn.x && mx <= btn.x + btn.w && my >= btn.y && my <= btn.y + btn.h) {
+          a.betAmount = Math.min(a.gold, Math.max(10, btn.value));
+          this._arenaClickCd = 0.12;
+          return;
+        }
+      }
     }
 
     // 下注类型切换（仅单挑）
@@ -729,20 +965,33 @@ export const arenaModeMethods = {
       ];
     }
 
-    // 下注金额按钮
-    const betY = ch * 0.62;
-    result.betMinus = { x: cx - 120, y: betY, w: 40, h: 30 };
-    result.betPlus = { x: cx + 80, y: betY, w: 40, h: 30 };
+    // 下注金额预设按钮
+    const betY = ch * 0.58;
+    const betAmounts = [
+      { label: '10', value: 10 },
+      { label: '50', value: 50 },
+      { label: '100', value: 100 },
+      { label: '1/4', value: Math.max(10, Math.floor(a.gold / 4)) },
+      { label: '半数', value: Math.max(10, Math.floor(a.gold / 2)) },
+      { label: '全押', value: a.gold },
+    ];
+    const btnW = 52, btnH = 28, btnGap = 6;
+    const totalBetW = betAmounts.length * btnW + (betAmounts.length - 1) * btnGap;
+    const betSx = cx - totalBetW / 2;
+    result.betAmountBtns = betAmounts.map((b, i) => ({
+      x: betSx + i * (btnW + btnGap), y: betY, w: btnW, h: btnH,
+      label: b.label, value: b.value,
+    }));
 
     // 下注类型（仅单挑）
     if (a.matchType === 'duel') {
       const types = [
         { id: 'win', label: '胜负' },
-        { id: 'hp_high', label: '完胜(>50%HP)' },
-        { id: 'hp_low', label: '险胜(<30%HP)' },
+        { id: 'hp_high', label: '完胜(>50%HP) 1.5x' },
+        { id: 'hp_low', label: '险胜(<30%HP) 2.5x' },
       ];
       result.betTypeBtns = types.map((t, i) => ({
-        x: cx - 150 + i * 110, y: betY + 40, w: 100, h: 28, id: t.id, label: t.label,
+        x: cx - 180 + i * 130, y: betY + 38, w: 120, h: 28, id: t.id, label: t.label,
       }));
     }
 
@@ -810,17 +1059,48 @@ export const arenaModeMethods = {
   _drawArenaTopBar(ctx, lw) {
     const a = this.arena;
     ctx.fillStyle = 'rgba(0,0,0,0.7)';
-    ctx.fillRect(0, 0, lw, 36);
+    ctx.fillRect(0, 0, lw, 50);
     ctx.font = 'bold 14px "Microsoft YaHei", sans-serif';
     ctx.textAlign = 'left';
     ctx.fillStyle = '#ffcc44';
-    ctx.fillText(`💰 ${a.gold}`, 12, 24);
+    ctx.fillText(`💰 ${a.gold}`, 12, 18);
+    // 连胜/连败显示
+    if (a.streak > 0) {
+      ctx.fillStyle = '#44ff44';
+      ctx.fillText(`🔥${a.streak}连赢`, 100, 18);
+    } else if (a.streak < 0) {
+      ctx.fillStyle = '#ff6644';
+      ctx.fillText(`❄️${Math.abs(a.streak)}连输`, 100, 18);
+    }
     ctx.textAlign = 'center';
     ctx.fillStyle = '#e8e0d0';
-    ctx.fillText(`第 ${a.round}/${a.maxRounds} 轮  ${TYPE_NAMES[a.matchType] || ''}`, lw / 2, 24);
+    ctx.fillText(`第 ${a.round}/${a.maxRounds} 轮  ${TYPE_NAMES[a.matchType] || ''}`, lw / 2, 18);
+    // 金币目标进度条
+    const progW = lw * 0.5;
+    const progH = 6;
+    const progX = lw / 2 - progW / 2;
+    const progY = 28;
+    ctx.fillStyle = 'rgba(255,255,255,0.1)';
+    ctx.fillRect(progX, progY, progW, progH);
+    const ratio = Math.min(1, a.gold / a.victoryGoldTarget);
+    const progColor = ratio >= 1 ? '#ffcc44' : ratio >= 0.6 ? '#44cc44' : ratio >= 0.3 ? '#4488ff' : '#888';
+    ctx.fillStyle = progColor;
+    ctx.fillRect(progX, progY, progW * ratio, progH);
+    // 里程碑标记
+    ctx.fillStyle = '#666';
+    ctx.font = '9px "Microsoft YaHei", sans-serif';
+    for (const m of a.milestones) {
+      const mx = progX + (m / a.victoryGoldTarget) * progW;
+      ctx.fillRect(mx - 0.5, progY - 1, 1, progH + 2);
+    }
+    ctx.textAlign = 'center';
+    ctx.font = '10px "Microsoft YaHei", sans-serif';
+    ctx.fillStyle = '#888';
+    ctx.fillText(`目标: ${a.victoryGoldTarget}金`, lw / 2, progY + progH + 12);
     ctx.textAlign = 'right';
     ctx.fillStyle = '#888';
-    ctx.fillText('ESC 退出', lw - 12, 24);
+    ctx.font = '12px "Microsoft YaHei", sans-serif';
+    ctx.fillText('ESC 退出', lw - 12, 18);
   },
 
   _drawArenaBetting(ctx, lw, lh) {
@@ -840,6 +1120,13 @@ export const arenaModeMethods = {
     ctx.fillStyle = '#888';
     ctx.fillText('选择你看好的武者，押下赌注！', cx, lh * 0.16);
 
+    // 战绩提示
+    if (a.streak > 0) {
+      ctx.fillStyle = '#44ff44';
+      ctx.font = '12px "Microsoft YaHei", sans-serif';
+      ctx.fillText(`🔥 当前${a.streak}连赢，下注加成 +${a.streak * 5}%`, cx, lh * 0.19);
+    }
+
     // 绘制选手卡牌
     if (a.matchType === 'duel') {
       this._drawContestantCard(ctx, L.contestantBtns[0], a.contestants[0], 0, a.betTarget === 0, mx, my);
@@ -848,11 +1135,21 @@ export const arenaModeMethods = {
       ctx.fillStyle = '#ff4444';
       ctx.font = 'bold 28px "Microsoft YaHei", sans-serif';
       ctx.fillText('VS', cx, lh * 0.30);
-      // 赔率
+      // 赔率 + 克制关系
       ctx.font = '12px "Microsoft YaHei", sans-serif';
       ctx.fillStyle = '#aaa';
       ctx.fillText(`赔率 ${a.odds.oddsA}x`, L.contestantBtns[0].x + L.contestantBtns[0].w / 2, L.contestantBtns[0].y + L.contestantBtns[0].h + 16);
       ctx.fillText(`赔率 ${a.odds.oddsB}x`, L.contestantBtns[1].x + L.contestantBtns[1].w / 2, L.contestantBtns[1].y + L.contestantBtns[1].h + 16);
+      // 武器克制提示
+      const matchup = a.odds.matchup;
+      if (matchup && matchup !== '均势') {
+        const wA = a.contestants[0].weapon.name;
+        const wB = a.contestants[1].weapon.name;
+        const hintColor = matchup === '克制' ? '#44cc44' : '#ff6644';
+        ctx.fillStyle = hintColor;
+        ctx.font = '11px "Microsoft YaHei", sans-serif';
+        ctx.fillText(matchup === '克制' ? `${wA}克制${wB}` : `${wA}被${wB}克制`, cx, L.contestantBtns[0].y + L.contestantBtns[0].h + 30);
+      }
       this._drawContestantCard(ctx, L.contestantBtns[1], a.contestants[1], 1, a.betTarget === 1, mx, my);
     } else if (a.matchType === 'brawl') {
       for (let i = 0; i < a.contestants.length; i++) {
@@ -877,16 +1174,30 @@ export const arenaModeMethods = {
       ctx.fillText(`赔率 ${a.odds.oddsB}x`, L.contestantBtns[1].x + L.contestantBtns[1].w / 2, L.contestantBtns[1].y + L.contestantBtns[1].h + 16);
     }
 
-    // 下注金额
+    // 下注金额预设按钮
     ctx.textAlign = 'center';
     ctx.font = '14px "Microsoft YaHei", sans-serif';
     ctx.fillStyle = '#e8e0d0';
-    const betY = L.betMinus.y;
-    ctx.fillText(`下注: ${a.betAmount} 金`, cx, betY + 20);
+    const betY = L.betAmountBtns ? L.betAmountBtns[0].y : 0;
+    ctx.fillText(`下注: ${a.betAmount} 金`, cx, betY - 8);
 
-    // -/+ 按钮
-    this._drawSmallBtn(ctx, L.betMinus, '-50', mx, my);
-    this._drawSmallBtn(ctx, L.betPlus, '+50', mx, my);
+    // 金额按钮
+    if (L.betAmountBtns) {
+      for (const btn of L.betAmountBtns) {
+        const sel = a.betAmount === btn.value;
+        const hover = mx >= btn.x && mx <= btn.x + btn.w && my >= btn.y && my <= btn.y + btn.h;
+        ctx.fillStyle = sel ? 'rgba(255,204,68,0.3)' : (hover ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.05)');
+        ctx.fillRect(btn.x, btn.y, btn.w, btn.h);
+        ctx.strokeStyle = sel ? '#ffcc44' : '#555';
+        ctx.lineWidth = sel ? 2 : 1;
+        ctx.strokeRect(btn.x, btn.y, btn.w, btn.h);
+        ctx.fillStyle = sel ? '#ffcc44' : '#ccc';
+        ctx.font = '12px "Microsoft YaHei", sans-serif';
+        ctx.textAlign = 'center';
+        const dispLabel = btn.label === '全押' ? `全押` : (btn.label === '半数' ? `半数` : btn.label);
+        ctx.fillText(dispLabel, btn.x + btn.w / 2, btn.y + btn.h / 2 + 4);
+      }
+    }
 
     // 下注类型（单挑）
     if (L.betTypeBtns) {
@@ -912,7 +1223,8 @@ export const arenaModeMethods = {
     ctx.fillStyle = '#fff';
     ctx.font = 'bold 18px "Microsoft YaHei", sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText('⚔ 开战！', fb.x + fb.w / 2, fb.y + fb.h / 2 + 6);
+    const isAllIn = a.betAmount >= a.gold && a.gold > 0;
+    ctx.fillText(isAllIn ? '🎲 梭哈！' : '⚔ 开战！', fb.x + fb.w / 2, fb.y + fb.h / 2 + 6);
   },
 
   _drawContestantCard(ctx, rect, contestant, idx, selected, mx, my) {
@@ -924,32 +1236,58 @@ export const arenaModeMethods = {
     ctx.strokeRect(rect.x, rect.y, rect.w, rect.h);
 
     const cx = rect.x + rect.w / 2;
-    let ty = rect.y + 20;
+    let ty = rect.y + 18;
     ctx.textAlign = 'center';
 
     // 名字
     ctx.fillStyle = '#e8e0d0';
-    ctx.font = 'bold 15px "Microsoft YaHei", sans-serif';
+    ctx.font = 'bold 14px "Microsoft YaHei", sans-serif';
     ctx.fillText(contestant.fullName, cx, ty);
-    ty += 22;
+    ty += 20;
 
     // 武器 + 护甲
     const info = this.arena.getContestantInfo(idx);
-    ctx.font = '13px "Microsoft YaHei", sans-serif';
+    ctx.font = '12px "Microsoft YaHei", sans-serif';
     ctx.fillStyle = contestant.color || '#aaa';
     ctx.fillText(`${info.weaponIcon} ${info.weaponName}  ${info.armorIcon} ${info.armorName}`, cx, ty);
-    ty += 20;
+    ty += 18;
 
-    // 难度
+    // 难度星级
     ctx.fillStyle = '#aaa';
     ctx.font = '12px "Microsoft YaHei", sans-serif';
     const stars = '★'.repeat(contestant.difficulty) + '☆'.repeat(5 - contestant.difficulty);
     ctx.fillText(`实力: ${stars}`, cx, ty);
-    ty += 18;
+    ty += 16;
 
-    // 难度名称
-    ctx.fillStyle = '#777';
-    ctx.fillText(DIFF_NAMES[contestant.difficulty - 1] || `D${contestant.difficulty}`, cx, ty);
+    // 武器属性雷达图（小型条形图）
+    const ws = WEAPON_STATS[contestant.weaponId];
+    if (ws) {
+      const barLabels = ['攻', '防', '速', '范'];
+      const barValues = [ws.atk, ws.def, ws.spd, ws.rng];
+      const barColors = ['#ff6644', '#4488ff', '#44cc44', '#ffcc44'];
+      const barW = 32, barH = 4, barGap = 2;
+      const totalBarW = barLabels.length * (barW + 18 + barGap);
+      let bx = cx - totalBarW / 2;
+      for (let i = 0; i < barLabels.length; i++) {
+        ctx.fillStyle = '#666';
+        ctx.font = '9px "Microsoft YaHei", sans-serif';
+        ctx.textAlign = 'right';
+        ctx.fillText(barLabels[i], bx + 14, ty + 3);
+        // 背景
+        ctx.fillStyle = 'rgba(255,255,255,0.08)';
+        ctx.fillRect(bx + 16, ty - 2, barW, barH);
+        // 填充
+        ctx.fillStyle = barColors[i];
+        ctx.fillRect(bx + 16, ty - 2, barW * (barValues[i] / 5), barH);
+        bx += barW + 18 + barGap;
+      }
+      ty += 12;
+      // 武器类型标签
+      ctx.textAlign = 'center';
+      ctx.fillStyle = '#777';
+      ctx.font = '10px "Microsoft YaHei", sans-serif';
+      ctx.fillText(`[${ws.type}型] ${DIFF_NAMES[contestant.difficulty - 1] || ''}`, cx, ty);
+    }
   },
 
   _drawTeamCard(ctx, rect, team, label, idx, selected, mx, my) {
@@ -1028,7 +1366,7 @@ export const arenaModeMethods = {
     ctx.fillStyle = '#e8e0d0';
     ctx.font = 'bold 26px "Microsoft YaHei", sans-serif';
     const winnerName = a.winner ? a.winner.name : '平局';
-    ctx.fillText(`🏆 ${winnerName} 获胜！`, cx, lh * 0.2);
+    ctx.fillText(`🏆 ${winnerName} 获胜！`, cx, lh * 0.15);
 
     // 下注结果
     const betColor = a._lastBetWon ? '#44ff44' : '#ff4444';
@@ -1037,19 +1375,42 @@ export const arenaModeMethods = {
       : `❌ 押错！失去 ${Math.abs(a._lastGoldChange)} 金`;
     ctx.fillStyle = betColor;
     ctx.font = 'bold 20px "Microsoft YaHei", sans-serif';
-    ctx.fillText(betText, cx, lh * 0.32);
+    ctx.fillText(betText, cx, lh * 0.25);
 
-    // 当前金币
+    // 连胜加成提示
+    if (a._lastBetWon && a._lastStreakBonus > 0) {
+      ctx.fillStyle = '#ffcc44';
+      ctx.font = '13px "Microsoft YaHei", sans-serif';
+      ctx.fillText(`🔥 连胜加成 +${a._lastStreakBonus}%`, cx, lh * 0.30);
+    }
+
+    // 当前金币 + 连胜状态
     ctx.fillStyle = '#ffcc44';
     ctx.font = '16px "Microsoft YaHei", sans-serif';
-    ctx.fillText(`💰 当前金币: ${a.gold}`, cx, lh * 0.42);
+    let statusText = `💰 当前金币: ${a.gold}`;
+    if (a.streak > 1) statusText += `  🔥${a.streak}连赢`;
+    else if (a.streak < -1) statusText += `  ❄️${Math.abs(a.streak)}连输`;
+    ctx.fillText(statusText, cx, lh * 0.38);
 
     // 战况回顾
     if (a.winner) {
       ctx.fillStyle = '#888';
       ctx.font = '13px "Microsoft YaHei", sans-serif';
       const hpPct = Math.round(a.winnerHp / a.winner.maxHp * 100);
-      ctx.fillText(`胜者剩余 ${hpPct}% 血量  战斗时长 ${a.gameTime.toFixed(1)}s`, cx, lh * 0.5);
+      ctx.fillText(`胜者剩余 ${hpPct}% 血量  战斗时长 ${a.gameTime.toFixed(1)}s`, cx, lh * 0.46);
+    }
+
+    // 综合战绩
+    ctx.fillStyle = '#666';
+    ctx.font = '12px "Microsoft YaHei", sans-serif';
+    ctx.fillText(`押中 ${a.totalBetWins} 次 / 押错 ${a.totalBetLosses} 次  最高连赢 ${a.maxStreak}  峰值金币 ${a.peakGold}`, cx, lh * 0.53);
+
+    // 里程碑进度
+    const nextMilestone = a.milestones.find(m => !a.milestonesReached.includes(m));
+    if (nextMilestone) {
+      ctx.fillStyle = '#555';
+      ctx.font = '11px "Microsoft YaHei", sans-serif';
+      ctx.fillText(`下一里程碑: ${nextMilestone}金 (还差${Math.max(0, nextMilestone - a.gold)})`, cx, lh * 0.58);
     }
 
     // 下一轮按钮
@@ -1072,13 +1433,24 @@ export const arenaModeMethods = {
     ctx.textAlign = 'center';
     ctx.fillStyle = '#ff4444';
     ctx.font = 'bold 30px "Microsoft YaHei", sans-serif';
-    ctx.fillText('💀 破产！', cx, lh * 0.3);
+    ctx.fillText('💀 破产！', cx, lh * 0.22);
     ctx.fillStyle = '#aaa';
     ctx.font = '16px "Microsoft YaHei", sans-serif';
-    ctx.fillText(`坚持了 ${a.round} 轮`, cx, lh * 0.42);
+    ctx.fillText(`坚持了 ${a.round} 轮`, cx, lh * 0.34);
+
+    // 详细统计
+    const rating = a.getRating();
+    ctx.fillStyle = rating.color;
+    ctx.font = 'bold 24px "Microsoft YaHei", sans-serif';
+    ctx.fillText(`评级: ${rating.grade} - ${rating.label}`, cx, lh * 0.44);
+
+    ctx.fillStyle = '#888';
+    ctx.font = '13px "Microsoft YaHei", sans-serif';
+    ctx.fillText(`押中 ${a.totalBetWins}次  最高连赢 ${a.maxStreak}  峰值金币 ${a.peakGold}`, cx, lh * 0.52);
+
     ctx.fillStyle = '#666';
     ctx.font = '13px "Microsoft YaHei", sans-serif';
-    ctx.fillText('点击任意位置返回菜单', cx, lh * 0.55);
+    ctx.fillText('点击任意位置返回菜单', cx, lh * 0.64);
   },
 
   _drawArenaVictory(ctx, lw, lh) {
@@ -1087,20 +1459,43 @@ export const arenaModeMethods = {
     ctx.fillStyle = 'rgba(0,0,0,0.85)';
     ctx.fillRect(0, 0, lw, lh);
     ctx.textAlign = 'center';
-    ctx.fillStyle = '#ffcc44';
-    ctx.font = 'bold 30px "Microsoft YaHei", sans-serif';
-    ctx.fillText('🏆 擂台通关！', cx, lh * 0.25);
-    ctx.fillStyle = '#e8e0d0';
+
+    // 评级
+    const rating = a.getRating();
+    ctx.fillStyle = rating.color;
+    ctx.font = 'bold 36px "Microsoft YaHei", sans-serif';
+    ctx.fillText(`🏆 擂台通关！`, cx, lh * 0.18);
+
+    // 评级大字
+    ctx.font = 'bold 60px "Microsoft YaHei", sans-serif';
+    ctx.fillStyle = rating.color;
+    ctx.fillText(rating.grade, cx, lh * 0.32);
     ctx.font = '18px "Microsoft YaHei", sans-serif';
-    ctx.fillText(`最终金币: ${a.gold}`, cx, lh * 0.38);
-    // 战绩
-    const wins = a.roundHistory.filter(r => r.betWon).length;
+    ctx.fillText(`称号: ${rating.label}`, cx, lh * 0.38);
+
+    // 详细战绩
+    ctx.fillStyle = '#e8e0d0';
+    ctx.font = '15px "Microsoft YaHei", sans-serif';
+    ctx.fillText(`最终金币: ${a.gold}`, cx, lh * 0.46);
+
+    const wins = a.totalBetWins;
+    const losses = a.totalBetLosses;
+    const winRate = wins + losses > 0 ? Math.round(wins / (wins + losses) * 100) : 0;
     ctx.fillStyle = '#aaa';
-    ctx.font = '14px "Microsoft YaHei", sans-serif';
-    ctx.fillText(`${a.maxRounds}轮 押中${wins}次 胜率${Math.round(wins / a.maxRounds * 100)}%`, cx, lh * 0.48);
+    ctx.font = '13px "Microsoft YaHei", sans-serif';
+    ctx.fillText(`${a.maxRounds}轮 押中${wins}次 胜率${winRate}%`, cx, lh * 0.52);
+    ctx.fillText(`最高连赢: ${a.maxStreak}  峰值金币: ${a.peakGold}`, cx, lh * 0.57);
+
+    // 里程碑成就
+    if (a.milestonesReached.length > 0) {
+      ctx.fillStyle = '#ffcc44';
+      ctx.font = '12px "Microsoft YaHei", sans-serif';
+      ctx.fillText(`已达成里程碑: ${a.milestonesReached.join(' > ')}`, cx, lh * 0.63);
+    }
+
     ctx.fillStyle = '#666';
     ctx.font = '13px "Microsoft YaHei", sans-serif';
-    ctx.fillText('点击任意位置返回菜单', cx, lh * 0.6);
+    ctx.fillText('点击任意位置返回菜单', cx, lh * 0.72);
   },
 
   _drawArenaCommentary(ctx, lw, lh) {
