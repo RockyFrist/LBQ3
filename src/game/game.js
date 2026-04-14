@@ -14,6 +14,8 @@ import { jianghuModeMethods } from './jianghu-mode.js';
 import { settingsPanelMethods } from './settings-panel.js';
 import { effectsMethods } from './effects.js';
 import { tutorialModeMethods } from './tutorial-mode.js';
+import { arenaModeMethods } from './arena-mode.js';
+import { horseRacingModeMethods } from './horse-racing-mode.js';
 import { JIANGHU_MAX_LIVES, JIANGHU_STAGES } from './jianghu-stages.js';
 import { Fighter } from '../combat/fighter.js';
 import { snapshotFighter, applyFighterSnapshot, serializeEvent, deserializeEvent } from '../net/net-sync.js';
@@ -155,6 +157,16 @@ export class Game {
     if (this.mode === 'tutorial') {
       this._TutorialEnemyClass = Enemy;
       this._setupTutorial(opts.tutorialStep || 0);
+    }
+
+    // ===== 比武擂台初始化 =====
+    if (this.mode === 'arena') {
+      this._setupArenaMode();
+    }
+
+    // ===== 田忌赛马初始化 =====
+    if (this.mode === 'horseracing') {
+      this._setupHorseRacing();
     }
   }
 
@@ -476,6 +488,18 @@ export class Game {
     // 江湖行模式
     if (this.mode === 'jianghu') {
       this._updateJianghu(dt);
+      return;
+    }
+
+    // 比武擂台
+    if (this.mode === 'arena') {
+      this._updateArena(dt);
+      return;
+    }
+
+    // 田忌赛马
+    if (this.mode === 'horseracing') {
+      this._updateHorseRacing(dt);
       return;
     }
 
@@ -972,6 +996,18 @@ export class Game {
       ctx.fillStyle = '#0a0a14';
       ctx.fillRect(0, 0, lw, lh);
       this._drawTestResults();
+      return;
+    }
+
+    // 比武擂台模式: 独立渲染
+    if (this.mode === 'arena') {
+      this._renderArena();
+      return;
+    }
+
+    // 田忌赛马模式: 独立渲染
+    if (this.mode === 'horseracing') {
+      this._renderHorseRacing();
       return;
     }
 
@@ -1887,3 +1923,5 @@ Object.assign(Game.prototype, jianghuModeMethods);
 Object.assign(Game.prototype, settingsPanelMethods);
 Object.assign(Game.prototype, effectsMethods);
 Object.assign(Game.prototype, tutorialModeMethods);
+Object.assign(Game.prototype, arenaModeMethods);
+Object.assign(Game.prototype, horseRacingModeMethods);

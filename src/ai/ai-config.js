@@ -3,9 +3,34 @@
 
 /**
  * 根据难度等级返回 AI 配置参数
- * @param {number} d - 难度等级 1-5(对战) 6-7(训练)
+ * @param {number} d - 难度等级 1-5(对战) 6-7(训练) 99(神级)
  */
 export function buildAIConfig(d) {
+  // 神级难度99: 参数拉满但仍合理，仅限对战/斗蛐蛐/擂台挑战
+  if (d === 99) return {
+    reactChance: 0.96,
+    dodgeChance: 0.22,
+    thinkCD: 0.01,
+    attackRate: 0.50,
+    heavyRate: 0.50,
+    maxCombo: 5,
+    blockDurBase: 0.45,
+    retreatWhenLow: 0.20,
+    approachDist: 38,
+    heavyReactMult: 0.98,
+    heavyReactDist: 180,
+    punishRate: 0.98,
+    feintChance: 0.15,
+    blockChance: 0.20,
+    perfectDodgeChance: 0.92,
+    heavyReactDelay: 0.01,
+    heavyCooldown: 0,
+    blockCooldownBase: 1.5,
+    // 神级AI额外能力
+    patternReadSpeed: 2.0,     // 读取玩家模式速度翻倍
+    counterAdaptRate: 0.80,    // 针对性变招概率
+  };
+
   // 训练模式6: 拼刀训练 — 只用轻击，有节奏地对攻（不再无脑spam）
   if (d === 6) return {
     reactChance: 0.05, dodgeChance: 0, thinkCD: 0.15,

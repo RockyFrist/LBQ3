@@ -159,7 +159,7 @@ function startGame(result) {
   });
   if (game.mode !== 'test' && game.mode !== 'jianghu' && game.mode !== 'training'
       && game.mode !== 'online_host' && game.mode !== 'online_guest' && game.mode !== 'tutorial'
-      && game.mode !== 'local2p') {
+      && game.mode !== 'local2p' && game.mode !== 'arena' && game.mode !== 'horseracing') {
     game.spawnEnemy();
   }
 }

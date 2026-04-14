@@ -1,6 +1,6 @@
 // ===================== 开始菜单（多页设计） =====================
 import { WEAPON_LIST, WEAPONS, getWeapon } from '../weapons/weapon-defs.js';
-const GAME_VERSION = 'v0.11.7';
+const GAME_VERSION = 'v0.12.0';
 
 export class Menu {
   constructor(canvas, input) {
@@ -971,6 +971,16 @@ export class Menu {
       this._clickCooldown = 0.2;
       return;
     }
+    if (this._hit(mx, my, L.arenaBtn.x, L.arenaBtn.y, L.arenaBtn.w, L.arenaBtn.h)) {
+      this.result = { mode: 'arena' };
+      this._clickCooldown = 0.3;
+      return;
+    }
+    if (this._hit(mx, my, L.horseBtn.x, L.horseBtn.y, L.horseBtn.w, L.horseBtn.h)) {
+      this.result = { mode: 'horseracing' };
+      this._clickCooldown = 0.3;
+      return;
+    }
     if (this._hit(mx, my, L.trainingBtn.x, L.trainingBtn.y, L.trainingBtn.w, L.trainingBtn.h)) {
       this.result = { mode: 'training', diffA: 1, diffB: 3, rounds: 0, simOnly: false };
       this._clickCooldown = 0.3;
@@ -998,6 +1008,8 @@ export class Menu {
     this._drawActionBtn(ctx, L.jianghuBtn, '🏔 江湖行', '#ffcc44', mx, my);
     this._drawActionBtn(ctx, L.wushengBtn, '🏆 挑战武圣', '#ff00ff', mx, my);
     this._drawActionBtn(ctx, L.chainBtn, '⚔ 连战模式', '#ff6633', mx, my);
+    this._drawActionBtn(ctx, L.arenaBtn, '🎲 比武擂台', '#ff9944', mx, my);
+    this._drawActionBtn(ctx, L.horseBtn, '🐎 田忌赛马', '#88cc44', mx, my);
     this._drawActionBtn(ctx, L.trainingBtn, '🎯 自由训练', '#66ccff', mx, my);
     this._drawActionBtn(ctx, L.local2pBtn, '🎮 本地双人', '#44dd88', mx, my);
 
@@ -1006,7 +1018,7 @@ export class Menu {
     ctx.font = '12px "Microsoft YaHei", sans-serif';
     ctx.textAlign = 'center';
     const descY = L.local2pBtn.y + L.local2pBtn.h + 16;
-    ctx.fillText('江湖行: 十关爬塔  |  武圣: 对战神经网络  |  连战: 无尽挑战  |  双人: 键盘+手柄', cw / 2, descY);
+    ctx.fillText('擂台: AI对战押注  |  赛马: 策略排兵  |  连战: 无尽挑战  |  江湖行: 十关爬塔', cw / 2, descY);
 
     this._drawActionBtn(ctx, L.backBtn, '← 返回', '#666', mx, my);
   }
@@ -1016,16 +1028,18 @@ export class Menu {
     const ch = this.canvas._logicH || this.canvas.height;
     const cx = cw / 2;
     const btnW = 280;
-    const btnH = 44;
-    const gap = 14;
-    const startY = ch * 0.28;
+    const btnH = 38;
+    const gap = 10;
+    const startY = ch * 0.22;
     return {
       jianghuBtn:  { x: cx - btnW / 2, y: startY, w: btnW, h: btnH },
       wushengBtn:  { x: cx - btnW / 2, y: startY + (btnH + gap), w: btnW, h: btnH },
       chainBtn:    { x: cx - btnW / 2, y: startY + (btnH + gap) * 2, w: btnW, h: btnH },
-      trainingBtn: { x: cx - btnW / 2, y: startY + (btnH + gap) * 3, w: btnW, h: btnH },
-      local2pBtn:  { x: cx - btnW / 2, y: startY + (btnH + gap) * 4, w: btnW, h: btnH },
-      backBtn:     { x: cx - 60, y: startY + (btnH + gap) * 5 + 16, w: 120, h: 34 },
+      arenaBtn:    { x: cx - btnW / 2, y: startY + (btnH + gap) * 3, w: btnW, h: btnH },
+      horseBtn:    { x: cx - btnW / 2, y: startY + (btnH + gap) * 4, w: btnW, h: btnH },
+      trainingBtn: { x: cx - btnW / 2, y: startY + (btnH + gap) * 5, w: btnW, h: btnH },
+      local2pBtn:  { x: cx - btnW / 2, y: startY + (btnH + gap) * 6, w: btnW, h: btnH },
+      backBtn:     { x: cx - 60, y: startY + (btnH + gap) * 7 + 12, w: 120, h: 34 },
     };
   }
 

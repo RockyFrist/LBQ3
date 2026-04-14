@@ -1,6 +1,7 @@
 import * as C from '../core/constants.js';
 import { clamp, normalizeAngle, angleDiff } from '../core/utils.js';
 import { WEAPON_DAO } from '../weapons/weapon-defs.js';
+import { ARMOR_NONE } from '../weapons/armor-defs.js';
 
 /*
   状态列表:
@@ -10,21 +11,22 @@ import { WEAPON_DAO } from '../weapons/weapon-defs.js';
 */
 
 export class Fighter {
-  constructor(x, y, { color = '#4488ff', team = 0, name = '', scale = 1, hpMult = 1, weapon = null } = {}) {
+  constructor(x, y, { color = '#4488ff', team = 0, name = '', scale = 1, hpMult = 1, weapon = null, armor = null } = {}) {
     this.x = x;
     this.y = y;
     this.facing = 0;
     this.vx = 0;
     this.vy = 0;
     this.weapon = weapon || WEAPON_DAO;
+    this.armor = armor || ARMOR_NONE;
     this.color = color;
     this.team = team;
     this.name = name;
     this.scale = scale;
     this.radius = C.FIGHTER_RADIUS * scale;
 
-    // 生命
-    this.maxHp = Math.round(C.MAX_HP * hpMult);
+    // 生命（含护甲加成）
+    this.maxHp = Math.round(C.MAX_HP * hpMult) + (this.armor.hpBonus || 0);
     this.hp = this.maxHp;
     this.alive = true;
 
@@ -207,7 +209,7 @@ export class Fighter {
           return;
         }
         {
-          const dodgeSpd = (this.weapon.dodgeSpeed || C.DODGE_SPEED) * this.speedMult;
+          const dodgeSpd = (this.weapon.dodgeSpeed || C.DODGE_SPEED) * this.speedMult * (this.armor.dodgeSpeedMult || 1);
           this.vx = Math.cos(this.dodgeAngle) * dodgeSpd;
           this.vy = Math.sin(this.dodgeAngle) * dodgeSpd;
         }
@@ -597,7 +599,7 @@ export class Fighter {
 
   update_dodging(dt, cmd) {
     const t = this.stateTimer;
-    const dodgeSpd = (this.weapon.dodgeSpeed || C.DODGE_SPEED) * this.speedMult;
+    const dodgeSpd = (this.weapon.dodgeSpeed || C.DODGE_SPEED) * this.speedMult * (this.armor.dodgeSpeedMult || 1);
     this.vx = Math.cos(this.dodgeAngle) * dodgeSpd;
     this.vy = Math.sin(this.dodgeAngle) * dodgeSpd;
 
@@ -883,10 +885,11 @@ export class Fighter {
         // 体型越大移速越慢: scale 1.5 → ×0.88
         const scaleSpdMult = 1 / Math.pow(this.scale, 0.3);
         const weaponSpdMult = this.weapon.speedMult || 1;
+        const armorSpdMult = this.armor.speedMult || 1;
         // 盾行：格挡中可移动
         const blockMoveMult = (this.state === 'blocking' && this.weapon.canMoveWhileBlocking)
           ? (this.weapon.blockMoveSpeedMult || 0) : 1;
-        const spd = C.FIGHTER_SPEED * this.speedMult * scaleSpdMult * weaponSpdMult * blockMoveMult;
+        const spd = C.FIGHTER_SPEED * this.speedMult * scaleSpdMult * weaponSpdMult * armorSpdMult * blockMoveMult;
         this.vx = (cmd.moveX || 0) * spd;
         this.vy = (cmd.moveY || 0) * spd;
       } else if (this.state !== 'dodging') {

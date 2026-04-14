@@ -38,6 +38,11 @@ export class Enemy {
     this._strafeTimer = 0;
     this._footsiePhase = 0; // 0=前进 1=后退
 
+    // 防二人转：追踪绕圈时间，超时强制出手
+    this._circlingTimer = 0;
+    this._lastAngleToOpp = 0;
+    this._circlingThreshold = 1.8; // 绕圈超过1.8秒强制出手
+
     // HTN 计划系统（多步策略链）
     this._plan = [];
     this._planIdx = 0;
@@ -144,12 +149,22 @@ export class Enemy {
         this._heavyReleases++;
       }
 
-      // 通用行为追踪
+      // 通用行为追踪（扩展历史窗口）
+      const readSpeed = this._cfg.patternReadSpeed || 1.0;
+      const histLen = Math.round(12 * readSpeed); // D99=24，普通=12
       if (stateChanged) {
         if (pf.state === 'heavyAttack' || pf.state === 'lightAttack' ||
             pf.state === 'blocking' || pf.state === 'dodging') {
           this._playerHistory.push(pf.state);
-          if (this._playerHistory.length > 8) this._playerHistory.shift();
+          if (this._playerHistory.length > histLen) this._playerHistory.shift();
+        }
+        // 追踪闪避方向偏好
+        if (pf.state === 'dodging') {
+          this._playerDodgeCount = (this._playerDodgeCount || 0) + 1;
+        }
+        // 追踪格挡频率
+        if (pf.state === 'blocking') {
+          this._playerBlockCount = (this._playerBlockCount || 0) + 1;
         }
       }
     }
@@ -159,6 +174,18 @@ export class Enemy {
     const attacks = this._playerHistory.filter(s => s === 'heavyAttack' || s === 'lightAttack');
     if (attacks.length < 3) return 0;
     return attacks.filter(s => s === 'heavyAttack').length / attacks.length;
+  }
+
+  /** 获取玩家格挡偏好率 (0~1) */
+  _getPlayerBlockRate() {
+    if (this._playerHistory.length < 4) return 0.2;
+    return this._playerHistory.filter(s => s === 'blocking').length / this._playerHistory.length;
+  }
+
+  /** 获取玩家闪避偏好率 (0~1) */
+  _getPlayerDodgeRate() {
+    if (this._playerHistory.length < 4) return 0.15;
+    return this._playerHistory.filter(s => s === 'dodging').length / this._playerHistory.length;
   }
 
   _getPlayerHeavyFeintRate() {
@@ -486,6 +513,45 @@ export class Enemy {
       this._idleTimer += dt;
     } else if (f.state === 'lightAttack' || f.state === 'heavyAttack') {
       this._idleTimer = 0;
+    }
+
+    // ===== 防二人转：检测双方持续绕圈不出手 =====
+    if (f.state === 'idle' && this.aiState === 'approach' && d < cfg.approachDist + 60) {
+      // 检测角度变化速率（绕圈时角度持续变化）
+      const angleDelta = Math.abs(normalizeAngle(ang - this._lastAngleToOpp));
+      if (angleDelta > 0.02 && angleDelta < Math.PI) {
+        // 角度在变化但没有在攻击 = 绕圈
+        this._circlingTimer += dt;
+      } else {
+        this._circlingTimer = Math.max(0, this._circlingTimer - dt * 0.5);
+      }
+      this._lastAngleToOpp = ang;
+
+      // 绕圈超时：强制出手打破僵局
+      if (this._circlingTimer > this._circlingThreshold) {
+        this._circlingTimer = 0;
+        if (d < 80) {
+          // 近距离直接攻击
+          cmd.lightAttack = true;
+          this.comboTarget = Math.min(2, cfg.maxCombo);
+          this.comboCount = 1;
+          this.aiState = 'recover';
+          this.aiTimer = 0.5;
+          this.attackCooldown = C.AI_MIN_ATTACK_INTERVAL;
+          this._logDecision(this._gameTime, 'anti_spin', 'force_attack', { dist: +d.toFixed(0) });
+          return cmd;
+        } else {
+          // 中距离直线冲锋
+          this._strafeDir = 0; // 暂停横移，直线接近
+          this.aiTimer = 0;
+          this.thinkCD = 0;
+        }
+      }
+    } else {
+      // 脱离绕圈状态，重置计时
+      if (f.state === 'lightAttack' || f.state === 'heavyAttack') {
+        this._circlingTimer = 0;
+      }
     }
 
     // ===== 特殊状态处理 =====

@@ -95,6 +95,9 @@ export class Renderer {
     ctx.arc(0, 0, r, 0, Math.PI * 2);
     ctx.fill();
 
+    // ==== 护甲渲染 ====
+    this._drawArmor(ctx, f, r, bodyColor);
+
     // 肩甲高光（上半弧）
     const hlGrad = ctx.createRadialGradient(-r * 0.3, -r * 0.3, 0, 0, 0, r);
     hlGrad.addColorStop(0, 'rgba(255,255,255,0.25)');
@@ -512,6 +515,106 @@ export class Renderer {
     ctx.strokeStyle = `rgba(100, 180, 255, ${Math.min(1, intensity * 3)})`;
     ctx.lineWidth = 3;
     ctx.strokeRect(2, 2, w - 4, h - 4);
+    ctx.restore();
+  }
+
+  /** 护甲渲染 — 在身体圆上叠绘护甲层 */
+  _drawArmor(ctx, f, r, bodyColor) {
+    const armor = f.armor;
+    if (!armor || armor.renderLayer === 'none') return;
+
+    const t = armor.thickness || 2;
+    const ac = armor.armorColor || '#666';
+
+    ctx.save();
+    if (armor.renderLayer === 'light') {
+      // 布甲: 半透明外环 + 交叉纹理
+      ctx.strokeStyle = ac;
+      ctx.lineWidth = t;
+      ctx.globalAlpha = 0.35;
+      ctx.beginPath();
+      ctx.arc(0, 0, r - 1, 0, Math.PI * 2);
+      ctx.stroke();
+      // 交叉布纹
+      ctx.lineWidth = 0.5;
+      ctx.globalAlpha = 0.15;
+      for (let a = 0; a < Math.PI * 2; a += Math.PI / 4) {
+        ctx.beginPath();
+        ctx.moveTo(Math.cos(a) * r * 0.3, Math.sin(a) * r * 0.3);
+        ctx.lineTo(Math.cos(a) * r * 0.85, Math.sin(a) * r * 0.85);
+        ctx.stroke();
+      }
+    } else if (armor.renderLayer === 'medium') {
+      // 皮甲: 较宽的半弧甲片（胸前+肩部）
+      ctx.strokeStyle = ac;
+      ctx.lineWidth = t;
+      ctx.globalAlpha = 0.45;
+      // 胸甲弧
+      ctx.beginPath();
+      ctx.arc(0, 0, r - 1, -Math.PI * 0.7, Math.PI * 0.7);
+      ctx.stroke();
+      // 肩部片
+      ctx.fillStyle = ac;
+      ctx.globalAlpha = 0.25;
+      ctx.beginPath();
+      ctx.arc(0, -r * 0.5, r * 0.35, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(0, r * 0.5, r * 0.35, 0, Math.PI * 2);
+      ctx.fill();
+    } else if (armor.renderLayer === 'heavy') {
+      // 铁甲: 厚实外环 + 金属纹 + 铆钉
+      ctx.strokeStyle = ac;
+      ctx.lineWidth = t;
+      ctx.globalAlpha = 0.55;
+      ctx.beginPath();
+      ctx.arc(0, 0, r - 1, 0, Math.PI * 2);
+      ctx.stroke();
+      // 金属光泽条
+      ctx.strokeStyle = 'rgba(200,200,220,0.3)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.arc(0, 0, r - 3, -Math.PI * 0.3, Math.PI * 0.3);
+      ctx.stroke();
+      // 铆钉
+      ctx.fillStyle = 'rgba(180,180,200,0.5)';
+      for (let a = 0; a < Math.PI * 2; a += Math.PI / 3) {
+        ctx.beginPath();
+        ctx.arc(Math.cos(a) * (r - 2), Math.sin(a) * (r - 2), 1.2, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    } else if (armor.renderLayer === 'plate') {
+      // 板甲: 最厚层 + 分段甲片 + 金属反光
+      ctx.strokeStyle = ac;
+      ctx.lineWidth = t + 1;
+      ctx.globalAlpha = 0.65;
+      ctx.beginPath();
+      ctx.arc(0, 0, r, 0, Math.PI * 2);
+      ctx.stroke();
+      // 分段甲片
+      ctx.lineWidth = 1.5;
+      ctx.strokeStyle = 'rgba(100,110,130,0.5)';
+      for (let a = 0; a < Math.PI * 2; a += Math.PI / 3) {
+        ctx.beginPath();
+        ctx.moveTo(Math.cos(a) * r * 0.5, Math.sin(a) * r * 0.5);
+        ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r);
+        ctx.stroke();
+      }
+      // 反光带
+      ctx.strokeStyle = 'rgba(220,220,240,0.25)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(0, 0, r - 2, -Math.PI * 0.4, Math.PI * 0.1);
+      ctx.stroke();
+      // 大铆钉
+      ctx.fillStyle = 'rgba(160,165,180,0.6)';
+      for (let a = 0; a < Math.PI * 2; a += Math.PI / 3) {
+        ctx.beginPath();
+        ctx.arc(Math.cos(a) * (r - 1), Math.sin(a) * (r - 1), 1.8, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+    ctx.globalAlpha = 1;
     ctx.restore();
   }
 

@@ -1,5 +1,6 @@
 import * as C from '../core/constants.js';
 import { dist, angleBetween, isInArc, normalizeAngle } from '../core/utils.js';
+import { applyArmorReduction } from '../weapons/armor-defs.js';
 
 export class CombatSystem {
   constructor(particles, camera) {
@@ -309,8 +310,14 @@ export class CombatSystem {
     // 轻攻击自带硬直覆写
     const lightStagger = atkInfo.hitStagger || stagger;
 
+    // 护甲减伤
+    dmg = applyArmorReduction(target.armor, dmg, atkInfo.type);
+    // 护甲硬直缩减
+    const armorStaggerResist = target.armor?.staggerResist || 0;
+
     target.takeDamage(dmg);
-    target.setState('staggered', { duration: atkInfo.type === 'light' ? lightStagger : stagger });
+    const finalStagger = atkInfo.type === 'light' ? lightStagger : stagger;
+    target.setState('staggered', { duration: Math.max(0.10, finalStagger - armorStaggerResist) });
     const baseKb = atkInfo.type === 'heavy' ? (attacker.weapon.heavy.knockback || C.HEAVY_HIT_KNOCKBACK) : C.HIT_KNOCKBACK;
     // 体型缩放
     const scaleRatio = (attacker.scale || 1) / (target.scale || 1);
