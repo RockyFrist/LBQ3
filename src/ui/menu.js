@@ -1,7 +1,7 @@
 // ===================== 开始菜单（多页设计） =====================
 import { WEAPON_LIST, WEAPONS, getWeapon } from '../weapons/weapon-defs.js';
 import { ARMOR_LIST, getArmor } from '../weapons/armor-defs.js';
-const GAME_VERSION = 'v0.17.0';
+const GAME_VERSION = 'v0.17.1';
 
 // 武器详情面板数据
 const WEAPON_INFO = {
@@ -1401,7 +1401,7 @@ export class Menu {
       ],
       [
         { icon: '🎮', name: '本地双人', desc: '键鼠 vs 手柄 · 同屏对战', accent: '#44dd88', page: 'local2p' },
-        { icon: '🎲', name: '比武擂台', desc: 'AI对战 · 下注竞猜', accent: '#ff9944', result: { mode: 'arena' } },
+        { icon: '�️', name: '武林大会', desc: '16人锦标赛 · 下注竞猜', accent: '#ff9944', result: { mode: 'arena' } },
         { icon: '🐎', name: '田忌赛马', desc: '策略排兵 · 以弱胜强', accent: '#88cc44', result: { mode: 'horseracing' } },
       ],
       [
