@@ -90,8 +90,8 @@ export class SectUI {
     this._defeatedImgAnim = 0;  // 战败立绘动画时间戳（0=未启动）
     // 预加载女敌人立绘（3套 × 正常/战败 = 6张）
     for (let i = 1; i <= 3; i++) {
-      this._getImg(`/assets/enemies/f_${i}_normal.png`);
-      this._getImg(`/assets/enemies/f_${i}_defeated.png`);
+      this._getImg(`${import.meta.env.BASE_URL}assets/enemies/f_${i}_normal.png`);
+      this._getImg(`${import.meta.env.BASE_URL}assets/enemies/f_${i}_defeated.png`);
     }
   }
 
@@ -1349,7 +1349,7 @@ export class SectUI {
     const imgH = narrow ? 147 : 200;
     const x = (cw - imgW) / 2;
     const y = ch - imgH - 44;
-    const imgKey = `/assets/enemies/f_${quest.enemyImgId}_normal.png`;
+    const imgKey = `${import.meta.env.BASE_URL}assets/enemies/f_${quest.enemyImgId}_normal.png`;
     const img = this._getImg(imgKey);
 
     ctx.save();
@@ -1395,7 +1395,7 @@ export class SectUI {
     const cx2 = imgX + imgW / 2;
     const cy2 = imgY + imgH / 2;
 
-    const imgKey = `/assets/enemies/f_${result.enemyImgId}_defeated.png`;
+    const imgKey = `${import.meta.env.BASE_URL}assets/enemies/f_${result.enemyImgId}_defeated.png`;
     const img = this._getImg(imgKey);
 
     ctx.save();

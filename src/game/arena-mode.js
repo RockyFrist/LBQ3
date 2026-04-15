@@ -1145,6 +1145,7 @@ export const arenaModeMethods = {
   _setupArenaMode() {
     this.arena = new ArenaMode();
     this._arenaClickCd = 0;
+    this._arenaSettingsCd = 0;    // 独立的设置按钮冷却
     this._arenaShowSettings = false; // 设置面板
   },
 
@@ -1152,6 +1153,7 @@ export const arenaModeMethods = {
     const a = this.arena;
     const input = this.input;
     this._arenaClickCd -= dt;
+    this._arenaSettingsCd -= dt;
 
     // ESC 切换设置面板
     if (input.pressed('Escape') || input.touchBack) {
@@ -1159,21 +1161,21 @@ export const arenaModeMethods = {
       return;
     }
 
-    // ⚙ 设置按钮点击（顶栏右侧）
-    if (input.mouseLeftDown && this._arenaClickCd <= 0) {
+    // ⚙ 设置按钮点击—使用独立冷却，不受游戏点击影响
+    if (input.mouseLeftDown && this._arenaSettingsCd <= 0) {
       const _lw = this.canvas._logicW || this.canvas.width;
-      const sb = { x: _lw - 44, y: 4, w: 40, h: 28 };
+      const sb = { x: _lw - 50, y: 2, w: 48, h: 32 };
       if (input.mouseX >= sb.x && input.mouseX <= sb.x + sb.w &&
           input.mouseY >= sb.y && input.mouseY <= sb.y + sb.h) {
-        this._arenaShowSettings = true;
-        this._arenaClickCd = 0.2;
+        this._arenaShowSettings = !this._arenaShowSettings;
+        this._arenaSettingsCd = 0.3;
         return;
       }
     }
 
     // 设置面板交互
     if (this._arenaShowSettings) {
-      if (input.mouseLeftDown && this._arenaClickCd <= 0) {
+      if (input.mouseLeftDown && this._arenaSettingsCd <= 0) {
         const _lw = this.canvas._logicW || this.canvas.width;
         const _lh = this.canvas._logicH || this.canvas.height;
         const pw = Math.min(280, _lw - 32);
@@ -1185,7 +1187,7 @@ export const arenaModeMethods = {
         const mx = input.mouseX, my = input.mouseY;
         if (mx >= bx && mx <= bx + bw && my >= b1y && my <= b1y + bh) {
           this._arenaShowSettings = false;
-          this._arenaClickCd = 0.3;
+          this._arenaSettingsCd = 0.3;
         } else if (mx >= bx && mx <= bx + bw && my >= b2y && my <= b2y + bh) {
           if (this.onExit) this.onExit();
         }
@@ -1582,7 +1584,7 @@ export const arenaModeMethods = {
     }
 
     // ⚙ 设置按钮（替代 ESC 退出）
-    const sbx = lw - 44, sby = 4, sbw = 40, sbh = 28;
+    const sbx = lw - 50, sby = 2, sbw = 48, sbh = 32;
     const settingsHover = this.input
       && this.input.mouseX >= sbx && this.input.mouseX <= sbx + sbw
       && this.input.mouseY >= sby && this.input.mouseY <= sby + sbh;

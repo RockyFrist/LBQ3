@@ -24,10 +24,13 @@ export class AudioManager {
     return this._ctx;
   }
 
-  /** 恢复挂起的 AudioContext（iOS / autoplay policy） */
+  /** 恢复挂起的 AudioContext（iOS / autoplay policy）
+   *  必须在用户手势回调中调用 — 同时负责首次创建 Context
+   */
   resume() {
-    if (this._ctx && this._ctx.state === 'suspended') {
-      this._ctx.resume();
+    const ctx = this._ensureCtx(); // 首次调用时在用户手势内创建
+    if (ctx && ctx.state === 'suspended') {
+      ctx.resume();
     }
   }
 

@@ -16,8 +16,9 @@ const controlsHelp = document.getElementById('controls-help');
 const helpOverlay = document.getElementById('help-overlay');
 const audio = new AudioManager();
 
-// 首次用户交互后恢复 AudioContext
+// 首次用户交互后恢复 AudioContext（touchstart 覆盖移动端）
 const resumeAudio = () => { audio.resume(); };
+window.addEventListener('touchstart', resumeAudio, { once: true });
 window.addEventListener('click', resumeAudio, { once: true });
 window.addEventListener('keydown', resumeAudio, { once: true });
 
