@@ -8,6 +8,7 @@ import {
   FAME_TIERS, getFameTier, SHOP_POOL,
   PERSONALITY_TYPES, LEADER_BONUSES,
   isBuildingUnlocked,
+  getCurrentGoal,
 } from './sect-data.js';
 import { getDialogueFlags } from './sect-dialogues.js';
 import { isAutoSaveOn } from './sect-save.js';
@@ -255,7 +256,20 @@ export class SectUI {
       const ic = iconBtns[i];
       const bx = 10 + i * (iconBtnW + gap);
       const rect = { x: bx, y: barY + 7, w: iconBtnW, h: btnH };
-      drawBtn(ctx, rect, ic.label, '#888', mx, my, { fontSize: narrow ? 16 : 18 });
+      const _icoLabels = { '🏗': '建造', '🛒': '商店', '📦': '背包', '⚔': '切磋' };
+      const hovered = hit(mx, my, rect.x, rect.y, rect.w, rect.h);
+      ctx.fillStyle = hovered ? 'rgba(255,255,255,0.10)' : 'rgba(255,255,255,0.04)';
+      ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
+      ctx.strokeStyle = hovered ? '#aaa' : 'rgba(255,255,255,0.12)';
+      ctx.lineWidth = hovered ? 1.5 : 1;
+      ctx.strokeRect(rect.x, rect.y, rect.w, rect.h);
+      ctx.textAlign = 'center';
+      ctx.font = `${narrow ? 14 : 16}px ${FONT}`;
+      ctx.fillStyle = hovered ? '#fff' : '#ccc';
+      ctx.fillText(ic.label, rect.x + rect.w / 2, rect.y + (narrow ? 17 : 21));
+      ctx.font = `${narrow ? 9 : 10}px ${FONT}`;
+      ctx.fillStyle = hovered ? '#ddd' : '#888';
+      ctx.fillText(_icoLabels[ic.label] || '', rect.x + rect.w / 2, rect.y + (narrow ? 30 : 36));
       const action = ic.page ? { type: 'nav', page: ic.page } : ic.action;
       this._buttons.push({ ...rect, action });
     }
@@ -291,6 +305,28 @@ export class SectUI {
         this._buttons.push({ ...bRect, action: { type: 'action', id: 'cycleLeader' } });
       }
       cy += lH + 4;
+    }
+
+    // ── 弟子列表 ──
+    // ── 当前目标进度 ──
+    {
+      const _cg = getCurrentGoal(state);
+      const goalH = narrow ? 22 : 26;
+      ctx.fillStyle = _cg ? 'rgba(255,204,68,0.06)' : 'rgba(68,221,136,0.06)';
+      ctx.fillRect(x, cy, w, goalH);
+      ctx.strokeStyle = _cg ? 'rgba(255,204,68,0.22)' : 'rgba(68,221,136,0.22)';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(x, cy, w, goalH);
+      ctx.textAlign = 'left';
+      ctx.font = `${narrow ? 10 : 11}px ${FONT}`;
+      if (_cg) {
+        ctx.fillStyle = COL_ACCENT;
+        ctx.fillText(`🎯 ${_cg.icon} ${_cg.name}：${_cg.desc}`, x + 8, cy + (narrow ? 15 : 18));
+      } else {
+        ctx.fillStyle = COL_SUCCESS;
+        ctx.fillText('👑 所有目标已完成！', x + 8, cy + (narrow ? 15 : 18));
+      }
+      cy += goalH + 4;
     }
 
     // ── 弟子列表 ──
@@ -1053,9 +1089,12 @@ export class SectUI {
     ctx.fillRect(0, 0, cw, ch);
 
     const pw = Math.min(cw - 40, narrow ? 300 : 400);
-    const ph = narrow ? 200 : 240;
+    const _btnHEvt = narrow ? 34 : 40;
+    const _btnGapEvt = 6;
+    const _choicesH = evt.choices.length * (_btnHEvt + _btnGapEvt) - _btnGapEvt;
+    const ph = Math.max(narrow ? 180 : 220, (narrow ? 130 : 160) + _choicesH);
     const px = (cw - pw) / 2;
-    const py = (ch - ph) / 2;
+    const py = Math.max(8, (ch - ph) / 2);
 
     // 面板
     ctx.fillStyle = '#1a1a2e';
@@ -1079,18 +1118,17 @@ export class SectUI {
     }
 
     // 选择按钮
-    const btnH = narrow ? 32 : 38;
-    const btnGap = 8;
-    const totalW = evt.choices.length * 120 + (evt.choices.length - 1) * btnGap;
-    let bx = (cw - totalW) / 2;
-    const by = py + ph - btnH - (narrow ? 16 : 24);
+    // 选择按钮（竖排全宽，防止长文字溢出）
+    const bwEvt = pw - 40;
+    const bxEvt = px + 20;
+    let byEvt = py + ph - _choicesH - (narrow ? 12 : 14);
 
     for (let i = 0; i < evt.choices.length; i++) {
       const c = evt.choices[i];
-      const rect = { x: bx, y: by, w: 120, h: btnH };
+      const rect = { x: bxEvt, y: byEvt, w: bwEvt, h: _btnHEvt };
       drawBtn(ctx, rect, c.label, COL_ACCENT, mx, my, { fontSize: narrow ? 12 : 14 });
       this._buttons.push({ ...rect, action: { type: 'eventChoice', choiceIndex: i } });
-      bx += 120 + btnGap;
+      byEvt += _btnHEvt + _btnGapEvt;
     }
   }
 
@@ -1390,12 +1428,13 @@ export class SectUI {
     ctx.fillRect(0, 0, cw, ch);
 
     const isArmor = equipType === 'armor';
-    const invItems = (inventory || []).filter(i => i.type === equipType);
+    const invItems = (inventory || []).filter(i =>
+      i.type === equipType && (isArmor || i.id === disciple.baseWeaponId));
 
-    // 基础可用选项（普通品质，无限）
+    // 基础可用选项（武器只能选本命兵器类型；护甲不限）
     const baseOptions = isArmor
       ? availArmors.map(id => ({ type: 'armor', id, quality: 'normal', isBase: true }))
-      : ['dao', 'daggers', 'hammer', 'spear', 'shield'].map(id => ({ type: 'weapon', id, quality: 'normal', isBase: true }));
+      : [disciple.baseWeaponId].filter(Boolean).map(id => ({ type: 'weapon', id, quality: 'normal', isBase: true }));
 
     const allOptions = [...baseOptions, ...invItems.map((item, i) => ({ ...item, isBase: false, inventoryIdx: (inventory || []).indexOf(item) }))];
     const listH = Math.min(allOptions.length * 40 + 100, ch - 80);
@@ -1414,7 +1453,13 @@ export class SectUI {
     ctx.font = `bold ${narrow ? 14 : 16}px ${FONT}`;
     ctx.fillText(isArmor ? `🛡 选择护甲 — ${disciple.name}` : `⚔ 选择武器 — ${disciple.name}`, cw / 2, py + (narrow ? 22 : 28));
 
-    let cy = py + 38;
+    if (!isArmor && disciple.baseWeaponId) {
+      ctx.fillStyle = COL_DIM;
+      ctx.font = `${narrow ? 10 : 11}px ${FONT}`;
+      ctx.fillText(`本命: ${WEAPON_NAMES[disciple.baseWeaponId] || '?'}（只可配备本命兵器）`, cw / 2, py + (narrow ? 36 : 44));
+    }
+
+    let cy = py + (!isArmor && disciple.baseWeaponId ? (narrow ? 50 : 58) : 38);
     for (const opt of allOptions) {
       const rowH = 34;
       const qInfo = ITEM_QUALITY[opt.quality] || ITEM_QUALITY.normal;
@@ -1444,10 +1489,14 @@ export class SectUI {
         ctx.fillStyle = COL_DIM;
         ctx.font = `${narrow ? 9 : 10}px ${FONT}`;
         ctx.fillText(`背包 · HP+${bonus}%`, px + 16, cy + 27);
-      } else {
+      } else if (isArmor) {
         ctx.fillStyle = COL_DIM;
         ctx.font = `${narrow ? 9 : 10}px ${FONT}`;
         ctx.fillText('基础装备（无限使用）', px + 16, cy + 27);
+      } else {
+        ctx.fillStyle = COL_ACCENT;
+        ctx.font = `bold ${narrow ? 9 : 10}px ${FONT}`;
+        ctx.fillText('⚔ 本命兵器（无限使用）', px + 16, cy + 27);
       }
 
       if (!isCurrent) {
@@ -2302,5 +2351,114 @@ export class SectUI {
       drawBtn(ctx, nextRect, '下一页 →', '#aa8844', mx, my, { fontSize: narrow ? 12 : 13 });
       this._buttons.push({ ...nextRect, action: { type: 'storyNext' } });
     }
+  }
+
+  // ===== 战役结果弹窗（胜利/失败）=====
+  drawCampaignResult(ctx, cw, ch, result, mx, my, narrow) {
+    this._buttons = this._buttons || [];
+    ctx.fillStyle = 'rgba(0,0,0,0.88)';
+    ctx.fillRect(0, 0, cw, ch);
+
+    const pw = Math.min(cw - 30, narrow ? 300 : 400);
+    const ph = narrow ? 270 : 320;
+    const px = (cw - pw) / 2;
+    const py = (ch - ph) / 2;
+
+    const isWin = result.type === 'win';
+    ctx.fillStyle = '#0d0d1e';
+    ctx.fillRect(px, py, pw, ph);
+    ctx.strokeStyle = isWin ? COL_ACCENT : COL_DANGER;
+    ctx.lineWidth = 2;
+    ctx.strokeRect(px, py, pw, ph);
+
+    ctx.textAlign = 'center';
+    ctx.fillStyle = isWin ? COL_GOLD : COL_DANGER;
+    ctx.font = `bold ${narrow ? 22 : 28}px ${FONT}`;
+    ctx.fillText(isWin ? '👑 武林盟主' : '💀 门派覆灭', cw / 2, py + (narrow ? 42 : 52));
+
+    ctx.fillStyle = COL_TEXT;
+    ctx.font = `${narrow ? 12 : 14}px ${FONT}`;
+    const subtitle = result.reason || (isWin ? '一统江湖，称霸武林！' : '弟子尽失，宗门消亡。');
+    ctx.fillText(subtitle, cw / 2, py + (narrow ? 62 : 76));
+
+    if (result.stats) {
+      const s = result.stats;
+      const statLines = [
+        `坚持了 ${s.day} 天`,
+        `累计胜利 ${s.totalWins} 场`,
+        `最终声望 ${s.fame}`,
+        `最终金币 ${s.gold}`,
+      ];
+      for (let i = 0; i < statLines.length; i++) {
+        ctx.fillStyle = i % 2 === 0 ? '#aaa' : '#777';
+        ctx.font = `${narrow ? 11 : 13}px ${FONT}`;
+        ctx.fillText(statLines[i], cw / 2, py + (narrow ? 84 : 104) + i * (narrow ? 18 : 22));
+      }
+    }
+
+    const btnH = narrow ? 34 : 40;
+    const btnW = pw - 40;
+    const btnX = px + 20;
+    const btnY1 = py + ph - (narrow ? 84 : 100);
+    const btnY2 = btnY1 + btnH + 8;
+
+    const restartRect = { x: btnX, y: btnY1, w: btnW, h: btnH };
+    drawBtn(ctx, restartRect, '🔄 再来一局', COL_SUCCESS, mx, my, { fontSize: narrow ? 13 : 15 });
+    this._buttons.push({ ...restartRect, action: { type: 'restartCampaign' } });
+
+    const menuRect = { x: btnX, y: btnY2, w: btnW, h: btnH };
+    drawBtn(ctx, menuRect, '← 返回主菜单', '#888', mx, my, { fontSize: narrow ? 13 : 15 });
+    this._buttons.push({ ...menuRect, action: { type: 'quitCampaign' } });
+  }
+
+  // ===== 切磋确认弹窗 =====
+  drawSparConfirm(ctx, cw, ch, disciples, mx, my, narrow) {
+    this._buttons = this._buttons || [];
+    ctx.fillStyle = 'rgba(0,0,0,0.7)';
+    ctx.fillRect(0, 0, cw, ch);
+
+    const pw = Math.min(cw - 40, narrow ? 290 : 380);
+    const ph = narrow ? 210 : 250;
+    const px = (cw - pw) / 2;
+    const py = (ch - ph) / 2;
+
+    ctx.fillStyle = '#1a1a2e';
+    ctx.fillRect(px, py, pw, ph);
+    ctx.strokeStyle = COL_ACCENT;
+    ctx.lineWidth = 2;
+    ctx.strokeRect(px, py, pw, ph);
+
+    ctx.textAlign = 'center';
+    ctx.fillStyle = COL_ACCENT;
+    ctx.font = `bold ${narrow ? 16 : 20}px ${FONT}`;
+    ctx.fillText('⚔ 门派切磋', cw / 2, py + (narrow ? 32 : 40));
+
+    ctx.fillStyle = COL_TEXT;
+    ctx.font = `${narrow ? 12 : 13}px ${FONT}`;
+    ctx.fillText('从空闲弟子中随机选2人进行切磋练习', cw / 2, py + (narrow ? 54 : 66));
+
+    ctx.fillStyle = COL_DIM;
+    ctx.font = `${narrow ? 11 : 12}px ${FONT}`;
+    ctx.fillText('双方各得 8 经验，消耗 10 体力', cw / 2, py + (narrow ? 72 : 86));
+
+    const freeD = disciples.filter(d => !d.onQuest && !d.questedToday && d.injury < 50);
+    const canSpar = freeD.length >= 2;
+    ctx.fillStyle = canSpar ? COL_SUCCESS : COL_DANGER;
+    ctx.font = `${narrow ? 11 : 12}px ${FONT}`;
+    ctx.fillText(`可参与弟子: ${freeD.length} 人${canSpar ? '' : '（需 ≥2）'}`, cw / 2, py + (narrow ? 92 : 110));
+
+    const btnH = narrow ? 34 : 40;
+    const btnW = (pw - 50) / 2;
+    const btnY = py + ph - btnH - (narrow ? 16 : 20);
+
+    const confirmRect = { x: px + 15, y: btnY, w: btnW, h: btnH };
+    drawBtn(ctx, confirmRect, '✓ 确认切磋', COL_SUCCESS, mx, my, { fontSize: narrow ? 12 : 14, disabled: !canSpar });
+    if (canSpar) {
+      this._buttons.push({ ...confirmRect, action: { type: 'action', id: 'sparConfirmYes' } });
+    }
+
+    const cancelRect = { x: px + pw - 15 - btnW, y: btnY, w: btnW, h: btnH };
+    drawBtn(ctx, cancelRect, '✗ 取消', '#888', mx, my, { fontSize: narrow ? 12 : 14 });
+    this._buttons.push({ ...cancelRect, action: { type: 'cancelSpar' } });
   }
 }

@@ -358,6 +358,7 @@ export function createDisciple(opts = {}) {
     stamina: 100,
     injury: 0,
     weaponId,
+    baseWeaponId: opts.baseWeaponId || weaponId,
     weaponQuality: 'normal',
     armorId: 'none',
     armorQuality: 'normal',
@@ -368,6 +369,7 @@ export function createDisciple(opts = {}) {
     losses: 0,
     joinDay: opts.joinDay || 1,
     onQuest: false, // 是否在执行任务
+    questedToday: false,
   };
 }
 
@@ -429,6 +431,7 @@ export function createInitialState() {
       shopBuys: 0,
     },
     achievements: [],  // 已解锁成就ID列表
+    completedGoals: [],
     leaderId: d1.id,     // 领头弟子ID（默认第一个弟子）
     pendingEvent: null,  // 当前待处理事件
     pendingFightResult: null, // 战斗观看结果
@@ -453,6 +456,41 @@ export function getFameTier(fame) {
     else break;
   }
   return tier;
+}
+
+// ===== 宗门目标系统（阶段性目标 + 胜利条件）=====
+export const SECT_GOALS = [
+  { id: 'survive3',  name: '立足江湖', desc: '坚持到第3天',    icon: '🌱', reward: { gold: 100 } },
+  { id: 'firstWin',  name: '初战告捷', desc: '赢得第一场战斗', icon: '⚔',  reward: { gold: 200 } },
+  { id: 'fame20',    name: '崭露头角', desc: '声望达到20',     icon: '🏅', reward: { gold: 300 } },
+  { id: 'fame50',    name: '小有名气', desc: '声望达到50',     icon: '🏆', reward: { gold: 500 } },
+  { id: 'wins10',    name: '身经百战', desc: '累计10场胜利',   icon: '🗡', reward: { gold: 500, fame: 10 } },
+  { id: 'fame100',   name: '一方豪强', desc: '声望达到100',    icon: '🏰', reward: { gold: 1000 } },
+  { id: 'fame150',   name: '威震武林', desc: '声望达到150',    icon: '⭐', reward: { gold: 2000 } },
+  { id: 'fame250',   name: '武林盟主', desc: '声望达到250',    icon: '👑', reward: { gold: 5000 }, isFinal: true },
+];
+
+export function checkGoalMet(goalId, state) {
+  switch (goalId) {
+    case 'survive3':  return state.day >= 3;
+    case 'firstWin':  return state.stats.totalWins >= 1;
+    case 'fame20':    return state.fame >= 20;
+    case 'fame50':    return state.fame >= 50;
+    case 'wins10':    return state.stats.totalWins >= 10;
+    case 'fame100':   return state.fame >= 100;
+    case 'fame150':   return state.fame >= 150;
+    case 'fame250':   return state.fame >= 250;
+    default: return false;
+  }
+}
+
+/** 获取当前目标（第一个未完成的） */
+export function getCurrentGoal(state) {
+  const done = state.completedGoals || [];
+  for (const g of SECT_GOALS) {
+    if (!done.includes(g.id)) return g;
+  }
+  return null;
 }
 
 // ===== 宗门商店商品池 =====
