@@ -383,6 +383,7 @@ export const horseRacingModeMethods = {
     this._hrDragIdx = -1;       // 拖拽中的武者索引
     this._hrSlots = [];         // 玩家出战槽位
     this._hrReady = false;      // 排阵完成
+    this._hrShowSettings = false; // 设置面板
   },
 
   _updateHorseRacing(dt) {
@@ -390,8 +391,43 @@ export const horseRacingModeMethods = {
     const input = this.input;
     this._hrClickCd -= dt;
 
-    if ((input.pressed('Escape') || input.touchBack) && this.onExit) {
-      this.onExit();
+    // ESC 切换设置面板
+    if (input.pressed('Escape') || input.touchBack) {
+      this._hrShowSettings = !this._hrShowSettings;
+      return;
+    }
+
+    // ⚙ 设置按钮点击（顶栏右侧）
+    if (input.mouseLeftDown && this._hrClickCd <= 0) {
+      const _lw = this.canvas._logicW || this.canvas.width;
+      const sb = { x: _lw - 44, y: 4, w: 40, h: 28 };
+      if (input.mouseX >= sb.x && input.mouseX <= sb.x + sb.w &&
+          input.mouseY >= sb.y && input.mouseY <= sb.y + sb.h) {
+        this._hrShowSettings = true;
+        this._hrClickCd = 0.2;
+        return;
+      }
+    }
+
+    // 设置面板交互
+    if (this._hrShowSettings) {
+      if (input.mouseLeftDown && this._hrClickCd <= 0) {
+        const _lw = this.canvas._logicW || this.canvas.width;
+        const _lh = this.canvas._logicH || this.canvas.height;
+        const pw = Math.min(280, _lw - 32);
+        const ph = 180;
+        const bw = pw - 32, bh = 40;
+        const bx = _lw / 2 - bw / 2;
+        const py = (_lh - ph) / 2;
+        const b1y = py + 55, b2y = py + 110;
+        const mx = input.mouseX, my = input.mouseY;
+        if (mx >= bx && mx <= bx + bw && my >= b1y && my <= b1y + bh) {
+          this._hrShowSettings = false;
+          this._hrClickCd = 0.3;
+        } else if (mx >= bx && mx <= bx + bw && my >= b2y && my <= b2y + bh) {
+          if (this.onExit) this.onExit();
+        }
+      }
       return;
     }
 
@@ -471,8 +507,10 @@ export const horseRacingModeMethods = {
     const ch = this.canvas._logicH || this.canvas.height;
     const cx = cw / 2;
     const hr = this.horseRacing;
-    const cardW = 150, cardH = 120;
-    const gap = 16;
+    const narrow = cw < 500;
+    const cardW = narrow ? 90 : 150;
+    const cardH = narrow ? 90 : 120;
+    const gap = narrow ? 8 : 16;
 
     // 玩家队伍卡牌
     const playerCards = [];
@@ -523,10 +561,11 @@ export const horseRacingModeMethods = {
     }
 
     // 顶部栏
-    this._drawHRTopBar(ctx, lw);
+    const narrow = lw < 500;
+    this._drawHRTopBar(ctx, lw, narrow);
 
     if (hr.phase === 'pick') {
-      this._drawHRPick(ctx, lw, lh);
+      this._drawHRPick(ctx, lw, lh, narrow);
     } else if (hr.phase === 'roundResult') {
       this._drawHRRoundResult(ctx, lw, lh);
     } else if (hr.phase === 'stageResult') {
@@ -536,9 +575,14 @@ export const horseRacingModeMethods = {
     } else if (hr.phase === 'defeat') {
       this._drawHRDefeat(ctx, lw, lh);
     }
+
+    // 设置面板浮层
+    if (this._hrShowSettings) {
+      this._drawHRSettings(ctx, lw, lh);
+    }
   },
 
-  _drawHRTopBar(ctx, lw) {
+  _drawHRTopBar(ctx, lw, narrow) {
     const hr = this.horseRacing;
     ctx.fillStyle = 'rgba(0,0,0,0.7)';
     ctx.fillRect(0, 0, lw, 36);
@@ -548,24 +592,37 @@ export const horseRacingModeMethods = {
     ctx.fillText(`💰 ${hr.gold}`, 12, 24);
     ctx.textAlign = 'center';
     ctx.fillStyle = '#e8e0d0';
-    ctx.fillText(`🐎 田忌赛马 · 第 ${hr.stage + 1}/${hr.maxStages} 关 · 胜${hr.wins} 负${hr.losses}`, lw / 2, 24);
-    ctx.textAlign = 'right';
-    ctx.fillStyle = '#888';
-    ctx.fillText('ESC 退出', lw - 12, 24);
+    const title = narrow
+      ? `第${hr.stage + 1}/${hr.maxStages}关 胜${hr.wins}负${hr.losses}`
+      : `🐎 田忌赛马 · 第 ${hr.stage + 1}/${hr.maxStages} 关 · 胜${hr.wins} 负${hr.losses}`;
+    ctx.fillText(title, lw / 2, 24);
+    // ⚙ 设置按钮（改代原 ESC 退出文字）
+    const sbx = lw - 44, sby = 4, sbw = 40, sbh = 28;
+    const settingsHover = this.input
+      && this.input.mouseX >= sbx && this.input.mouseX <= sbx + sbw
+      && this.input.mouseY >= sby && this.input.mouseY <= sby + sbh;
+    ctx.fillStyle = settingsHover ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.07)';
+    ctx.fillRect(sbx, sby, sbw, sbh);
+    ctx.fillStyle = '#aaa';
+    ctx.font = '18px "Microsoft YaHei", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('⚙', sbx + sbw / 2, sby + sbh / 2 + 7);
   },
 
-  _drawHRPick(ctx, lw, lh) {
+  _drawHRPick(ctx, lw, lh, narrow) {
     const hr = this.horseRacing;
     const mx = this.input.mouseX;
     const my = this.input.mouseY;
     const L = this._layoutHRPick();
     const cx = lw / 2;
+    const fs = narrow ? 13 : 16;
 
     // AI队伍标题
     ctx.textAlign = 'center';
     ctx.fillStyle = '#ff6644';
-    ctx.font = 'bold 16px "Microsoft YaHei", sans-serif';
-    ctx.fillText(`对手阵容（AI策略: ${hr.aiStrategyName}）`, cx, lh * 0.06);
+    ctx.font = `bold ${fs}px "Microsoft YaHei", sans-serif`;
+    const aiTitle = narrow ? `对手阵容 (AI: ${hr.aiStrategyName})` : `对手阵容（AI策略: ${hr.aiStrategyName}）`;
+    ctx.fillText(aiTitle, cx, lh * 0.06);
 
     // AI卡牌
     for (let i = 0; i < hr.teamSize; i++) {
@@ -573,28 +630,36 @@ export const horseRacingModeMethods = {
       this._drawHRCard(ctx, L.aiCards[i], hr.aiTeam[aIdx], '#ff4444', -1, false, mx, my);
       // 出战序号
       ctx.fillStyle = '#ff6644';
-      ctx.font = 'bold 12px "Microsoft YaHei", sans-serif';
+      ctx.font = `bold ${fs - 3}px "Microsoft YaHei", sans-serif`;
       ctx.textAlign = 'center';
       ctx.fillText(`第${i + 1}场`, L.aiCards[i].x + L.aiCards[i].w / 2, L.aiCards[i].y - 6);
     }
 
     // 玩家队伍标题
     ctx.fillStyle = '#4488ff';
-    ctx.font = 'bold 16px "Microsoft YaHei", sans-serif';
-    ctx.fillText('你的阵容（点击选择出战顺序）', cx, lh * 0.32);
+    ctx.font = `bold ${fs}px "Microsoft YaHei", sans-serif`;
+    ctx.fillText(narrow ? '你的阵容（点击选顺序）' : '你的阵容（点击选择出战顺序）', cx, lh * 0.32);
 
     // 策略提示框
+    const tipW = Math.min(440, lw - 16);
+    const tipX = cx - tipW / 2;
+    const tipY = lh * 0.54;
     ctx.fillStyle = 'rgba(68,136,255,0.08)';
-    ctx.fillRect(cx - 220, lh * 0.54, 440, 52);
+    ctx.fillRect(tipX, tipY, tipW, 52);
     ctx.strokeStyle = 'rgba(68,136,255,0.2)';
-    ctx.strokeRect(cx - 220, lh * 0.54, 440, 52);
+    ctx.strokeRect(tipX, tipY, tipW, 52);
     ctx.fillStyle = '#4488ff';
-    ctx.font = 'bold 11px "Microsoft YaHei", sans-serif';
-    ctx.fillText('💡 田忌赛马策略', cx, lh * 0.56 + 10);
+    ctx.font = `bold 11px "Microsoft YaHei", sans-serif`;
+    ctx.fillText('💡 田忌赛马策略', cx, tipY + 14);
     ctx.fillStyle = '#aaa';
     ctx.font = '10px "Microsoft YaHei", sans-serif';
-    ctx.fillText('核心：用弱马对强马，用强马对弱马 | 注意武器克制：枪克刀，匕克锤，锤克盾，盾克枪/匕', cx, lh * 0.56 + 26);
-    ctx.fillText(`对手策略: ${hr.aiStrategyName} — 利用这个信息安排出战顺序！`, cx, lh * 0.56 + 40);
+    if (narrow) {
+      ctx.fillText('用弱挡强，用强打弱 | 武器克制: 枪>刀,匕>锤,锤>盾', cx, tipY + 28);
+      ctx.fillText(`对手策略: ${hr.aiStrategyName}`, cx, tipY + 42);
+    } else {
+      ctx.fillText('核心：用弱马对强马，用强马对弱马 | 注意武器克制：枪克刀，匕克锤，锤克盾，盾克枪/匕', cx, tipY + 28);
+      ctx.fillText(`对手策略: ${hr.aiStrategyName} — 利用这个信息安排出战顺序！`, cx, tipY + 42);
+    }
 
     // 玩家卡牌
     for (let i = 0; i < hr.teamSize; i++) {
@@ -605,15 +670,15 @@ export const horseRacingModeMethods = {
     // 出战顺序预览
     if (this._hrSlots.length > 0) {
       ctx.fillStyle = '#aaa';
-      ctx.font = '13px "Microsoft YaHei", sans-serif';
+      ctx.font = `${narrow ? 11 : 13}px "Microsoft YaHei", sans-serif`;
       ctx.textAlign = 'center';
       const orderStr = this._hrSlots.map((idx, i) => `${i + 1}.${hr.playerTeam[idx].fullName}`).join('  →  ');
-      ctx.fillText(`出战顺序: ${orderStr}`, cx, lh * 0.70);
+      ctx.fillText(`出战: ${orderStr}`, cx, lh * 0.70);
     }
 
-    // 对阵预测（增强版：显示胜率和克制关系）
+    // 对阵预测
     if (this._hrSlots.length === hr.teamSize) {
-      ctx.font = '12px "Microsoft YaHei", sans-serif';
+      ctx.font = `${narrow ? 11 : 12}px "Microsoft YaHei", sans-serif`;
       let previewY = lh * 0.74;
       for (let i = 0; i < hr.teamSize; i++) {
         const pIdx = this._hrSlots[i];
@@ -622,21 +687,33 @@ export const horseRacingModeMethods = {
         const aw = hr.aiTeam[aIdx];
         const winRate = estimateWinRate(pw, aw);
         const matchup = getMatchupLabel(pw.weaponId, aw.weaponId);
-        // 胜率颜色编码
         const wrColor = winRate >= 60 ? '#44cc44' : winRate >= 45 ? '#cccc44' : '#ff6644';
         const muColor = matchup === '克制' ? '#44cc44' : matchup === '被克' ? '#ff6644' : '#888';
-        ctx.fillStyle = '#888';
-        ctx.textAlign = 'left';
-        const lineX = cx - 200;
-        ctx.fillText(`第${i + 1}场: ${pw.fullName}(${pw.weapon.icon}) vs ${aw.fullName}(${aw.weapon.icon})`, lineX, previewY);
-        ctx.fillStyle = wrColor;
-        ctx.textAlign = 'right';
-        ctx.fillText(`胜率${winRate}%`, cx + 160, previewY);
-        ctx.fillStyle = muColor;
-        ctx.fillText(`[${matchup}]`, cx + 200, previewY);
-        previewY += 18;
+
+        if (narrow) {
+          // 窄屏：单行紧凑格式
+          ctx.textAlign = 'left';
+          ctx.fillStyle = '#888';
+          ctx.fillText(`第${i + 1}: ${pw.fullName}${pw.weapon.icon} vs ${aw.fullName}${aw.weapon.icon}`, 8, previewY);
+          ctx.fillStyle = wrColor;
+          ctx.textAlign = 'right';
+          ctx.fillText(`${winRate}%`, cx - 4, previewY);
+          ctx.fillStyle = muColor;
+          ctx.fillText(`[${matchup}]`, lw - 8, previewY);
+        } else {
+          ctx.fillStyle = '#888';
+          ctx.textAlign = 'left';
+          const lineX = cx - 200;
+          ctx.fillText(`第${i + 1}场: ${pw.fullName}(${pw.weapon.icon}) vs ${aw.fullName}(${aw.weapon.icon})`, lineX, previewY);
+          ctx.fillStyle = wrColor;
+          ctx.textAlign = 'right';
+          ctx.fillText(`胜率${winRate}%`, cx + 160, previewY);
+          ctx.fillStyle = muColor;
+          ctx.fillText(`[${matchup}]`, cx + 200, previewY);
+        }
+        previewY += narrow ? 16 : 18;
       }
-      // 总体胜率建议
+      // 总体建议
       let favorCount = 0;
       for (let i = 0; i < hr.teamSize; i++) {
         const pIdx = this._hrSlots[i];
@@ -664,7 +741,7 @@ export const horseRacingModeMethods = {
       ctx.fillStyle = hover ? '#44dd88' : '#228855';
       ctx.fillRect(b.x, b.y, b.w, b.h);
       ctx.fillStyle = '#fff';
-      ctx.font = 'bold 16px "Microsoft YaHei", sans-serif';
+      ctx.font = `bold ${narrow ? 14 : 16}px "Microsoft YaHei", sans-serif`;
       ctx.textAlign = 'center';
       ctx.fillText('开始对决！', b.x + b.w / 2, b.y + b.h / 2 + 5);
     }
@@ -682,59 +759,62 @@ export const horseRacingModeMethods = {
     // 选中序号
     if (selected) {
       ctx.fillStyle = '#ffcc44';
-      ctx.font = 'bold 20px "Microsoft YaHei", sans-serif';
+      ctx.font = `bold ${rect.w < 110 ? 16 : 20}px "Microsoft YaHei", sans-serif`;
       ctx.textAlign = 'right';
-      ctx.fillText(`${slotIdx + 1}`, rect.x + rect.w - 8, rect.y + 22);
+      ctx.fillText(`${slotIdx + 1}`, rect.x + rect.w - 6, rect.y + (rect.w < 110 ? 16 : 22));
     }
 
     const cx = rect.x + rect.w / 2;
-    let ty = rect.y + 18;
+    let ty = rect.y + (rect.w < 110 ? 14 : 18);
     ctx.textAlign = 'center';
+    const narrow = rect.w < 110;
 
     // 名字
     ctx.fillStyle = '#e8e0d0';
-    ctx.font = 'bold 13px "Microsoft YaHei", sans-serif';
+    ctx.font = `bold ${narrow ? 11 : 13}px "Microsoft YaHei", sans-serif`;
     ctx.fillText(warrior.fullName, cx, ty);
-    ty += 17;
+    ty += narrow ? 13 : 17;
 
     // 武器
     ctx.fillStyle = warrior.color || '#aaa';
-    ctx.font = '12px "Microsoft YaHei", sans-serif';
+    ctx.font = `${narrow ? 11 : 12}px "Microsoft YaHei", sans-serif`;
     ctx.fillText(`${warrior.weapon.icon} ${warrior.weapon.name}`, cx, ty);
-    ty += 15;
+    ty += narrow ? 12 : 15;
 
     // 难度星级
     const stars = '★'.repeat(warrior.difficulty) + '☆'.repeat(5 - warrior.difficulty);
     ctx.fillStyle = '#aaa';
-    ctx.font = '11px "Microsoft YaHei", sans-serif';
+    ctx.font = `${narrow ? 10 : 11}px "Microsoft YaHei", sans-serif`;
     ctx.fillText(stars, cx, ty);
-    ty += 14;
+    ty += narrow ? 12 : 14;
 
-    // 护甲
-    ctx.fillStyle = '#777';
-    ctx.font = '11px "Microsoft YaHei", sans-serif';
-    ctx.fillText(`${warrior.armor.icon} ${warrior.armor.name}`, cx, ty);
-    ty += 14;
+    if (!narrow) {
+      // 护甲（宽屏才显示）
+      ctx.fillStyle = '#777';
+      ctx.font = '11px "Microsoft YaHei", sans-serif';
+      ctx.fillText(`${warrior.armor.icon} ${warrior.armor.name}`, cx, ty);
+      ty += 14;
 
-    // 武器属性条形图
-    const ws = warrior.stats || WEAPON_STATS[warrior.weaponId];
-    if (ws) {
-      const barLabels = ['攻', '防', '速', '范'];
-      const barValues = [ws.atk, ws.def, ws.spd, ws.rng];
-      const barColors = ['#ff6644', '#4488ff', '#44cc44', '#ffcc44'];
-      const barW = 24, barH = 3;
-      const totalBarW = barLabels.length * (barW + 14 + 2);
-      let bx = cx - totalBarW / 2;
-      for (let i = 0; i < barLabels.length; i++) {
-        ctx.fillStyle = '#555';
-        ctx.font = '8px "Microsoft YaHei", sans-serif';
-        ctx.textAlign = 'right';
-        ctx.fillText(barLabels[i], bx + 11, ty + 2);
-        ctx.fillStyle = 'rgba(255,255,255,0.06)';
-        ctx.fillRect(bx + 13, ty - 2, barW, barH);
-        ctx.fillStyle = barColors[i];
-        ctx.fillRect(bx + 13, ty - 2, barW * (barValues[i] / 5), barH);
-        bx += barW + 14 + 2;
+      // 武器属性条形图
+      const ws = warrior.stats || WEAPON_STATS[warrior.weaponId];
+      if (ws) {
+        const barLabels = ['攻', '防', '速', '范'];
+        const barValues = [ws.atk, ws.def, ws.spd, ws.rng];
+        const barColors = ['#ff6644', '#4488ff', '#44cc44', '#ffcc44'];
+        const barW = 24, barH = 3;
+        const totalBarW = barLabels.length * (barW + 14 + 2);
+        let bx = cx - totalBarW / 2;
+        for (let i = 0; i < barLabels.length; i++) {
+          ctx.fillStyle = '#555';
+          ctx.font = '8px "Microsoft YaHei", sans-serif';
+          ctx.textAlign = 'right';
+          ctx.fillText(barLabels[i], bx + 11, ty + 2);
+          ctx.fillStyle = 'rgba(255,255,255,0.06)';
+          ctx.fillRect(bx + 13, ty - 2, barW, barH);
+          ctx.fillStyle = barColors[i];
+          ctx.fillRect(bx + 13, ty - 2, barW * (barValues[i] / 5), barH);
+          bx += barW + 14 + 2;
+        }
       }
     }
   },
@@ -935,5 +1015,48 @@ export const horseRacingModeMethods = {
     ctx.fillStyle = '#666';
     ctx.font = '13px "Microsoft YaHei", sans-serif';
     ctx.fillText('点击返回菜单', lw / 2, lh * 0.66);
+  },
+
+  _drawHRSettings(ctx, lw, lh) {
+    // 半透明蒙层
+    ctx.fillStyle = 'rgba(0,0,0,0.72)';
+    ctx.fillRect(0, 0, lw, lh);
+
+    const pw = Math.min(280, lw - 32);
+    const ph = 180;
+    const px = (lw - pw) / 2;
+    const py = (lh - ph) / 2;
+
+    // 面板背景
+    ctx.fillStyle = '#1a1a2e';
+    ctx.fillRect(px, py, pw, ph);
+    ctx.strokeStyle = '#445';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(px, py, pw, ph);
+
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#e8e0d0';
+    ctx.font = 'bold 16px "Microsoft YaHei", sans-serif';
+    ctx.fillText('⚙ 设置', lw / 2, py + 30);
+
+    const bw = pw - 32, bh = 40;
+    const bx = lw / 2 - bw / 2;
+    const b1y = py + 50, b2y = py + 105;
+    const mx = this.input.mouseX, my = this.input.mouseY;
+
+    // 继续游戏
+    const h1 = mx >= bx && mx <= bx + bw && my >= b1y && my <= b1y + bh;
+    ctx.fillStyle = h1 ? '#3a7a4a' : '#226633';
+    ctx.fillRect(bx, b1y, bw, bh);
+    ctx.fillStyle = '#fff';
+    ctx.font = '14px "Microsoft YaHei", sans-serif';
+    ctx.fillText('继续游戏', lw / 2, b1y + bh / 2 + 5);
+
+    // 返回主菜单
+    const h2 = mx >= bx && mx <= bx + bw && my >= b2y && my <= b2y + bh;
+    ctx.fillStyle = h2 ? '#7a3a3a' : '#662233';
+    ctx.fillRect(bx, b2y, bw, bh);
+    ctx.fillStyle = '#fff';
+    ctx.fillText('返回主菜单', lw / 2, b2y + bh / 2 + 5);
   },
 };

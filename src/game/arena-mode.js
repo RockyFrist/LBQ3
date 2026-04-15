@@ -1145,6 +1145,7 @@ export const arenaModeMethods = {
   _setupArenaMode() {
     this.arena = new ArenaMode();
     this._arenaClickCd = 0;
+    this._arenaShowSettings = false; // 设置面板
   },
 
   _updateArena(dt) {
@@ -1152,8 +1153,43 @@ export const arenaModeMethods = {
     const input = this.input;
     this._arenaClickCd -= dt;
 
-    if ((input.pressed('Escape') || input.touchBack) && this.onExit) {
-      this.onExit();
+    // ESC 切换设置面板
+    if (input.pressed('Escape') || input.touchBack) {
+      this._arenaShowSettings = !this._arenaShowSettings;
+      return;
+    }
+
+    // ⚙ 设置按钮点击（顶栏右侧）
+    if (input.mouseLeftDown && this._arenaClickCd <= 0) {
+      const _lw = this.canvas._logicW || this.canvas.width;
+      const sb = { x: _lw - 44, y: 4, w: 40, h: 28 };
+      if (input.mouseX >= sb.x && input.mouseX <= sb.x + sb.w &&
+          input.mouseY >= sb.y && input.mouseY <= sb.y + sb.h) {
+        this._arenaShowSettings = true;
+        this._arenaClickCd = 0.2;
+        return;
+      }
+    }
+
+    // 设置面板交互
+    if (this._arenaShowSettings) {
+      if (input.mouseLeftDown && this._arenaClickCd <= 0) {
+        const _lw = this.canvas._logicW || this.canvas.width;
+        const _lh = this.canvas._logicH || this.canvas.height;
+        const pw = Math.min(280, _lw - 32);
+        const ph = 180;
+        const bw = pw - 32, bh = 40;
+        const bx = _lw / 2 - bw / 2;
+        const py = (_lh - ph) / 2;
+        const b1y = py + 55, b2y = py + 110;
+        const mx = input.mouseX, my = input.mouseY;
+        if (mx >= bx && mx <= bx + bw && my >= b1y && my <= b1y + bh) {
+          this._arenaShowSettings = false;
+          this._arenaClickCd = 0.3;
+        } else if (mx >= bx && mx <= bx + bw && my >= b2y && my <= b2y + bh) {
+          if (this.onExit) this.onExit();
+        }
+      }
       return;
     }
 
@@ -1319,26 +1355,42 @@ export const arenaModeMethods = {
     const ch = this.canvas._logicH || this.canvas.height;
     const cx = cw / 2;
     const a = this.arena;
-    const result = { contestantBtns: [] };
+    const narrow = cw < 500;
+    const result = { contestantBtns: [], narrow };
 
     if (a.matchType === 'duel') {
-      const cardW = 200, cardH = 160;
-      const gap = 60;
-      result.contestantBtns = [
-        { x: cx - cardW - gap / 2, y: ch * 0.22, w: cardW, h: cardH, idx: 0 },
-        { x: cx + gap / 2, y: ch * 0.22, w: cardW, h: cardH, idx: 1 },
-      ];
+      if (narrow) {
+        // 竖屏：两张卡牌上下排列
+        const cardW = Math.min(cw - 20, 280), cardH = 110;
+        const startY = 58;
+        result.contestantBtns = [
+          { x: cx - cardW / 2, y: startY, w: cardW, h: cardH, idx: 0 },
+          { x: cx - cardW / 2, y: startY + cardH + 8, w: cardW, h: cardH, idx: 1 },
+        ];
+      } else {
+        const cardW = 200, cardH = 160;
+        const gap = 60;
+        result.contestantBtns = [
+          { x: cx - cardW - gap / 2, y: ch * 0.22, w: cardW, h: cardH, idx: 0 },
+          { x: cx + gap / 2, y: ch * 0.22, w: cardW, h: cardH, idx: 1 },
+        ];
+      }
     } else if (a.matchType === 'brawl') {
-      const cardW = 120, cardH = 120;
+      const cardW = narrow ? 80 : 120, cardH = narrow ? 80 : 120;
       const count = a.contestants.length;
-      const totalW = count * cardW + (count - 1) * 10;
-      let sx = cx - totalW / 2;
+      const gap = narrow ? 6 : 10;
+      const totalW = count * cardW + (count - 1) * gap;
+      const sx = cx - totalW / 2;
+      const yPos = narrow ? 58 : ch * 0.22;
       for (let i = 0; i < count; i++) {
-        result.contestantBtns.push({ x: sx + i * (cardW + 10), y: ch * 0.22, w: cardW, h: cardH, idx: i });
+        result.contestantBtns.push({ x: sx + i * (cardW + gap), y: yPos, w: cardW, h: cardH, idx: i });
       }
     }
 
-    const betY = ch * 0.62;
+    // betY: after the card area
+    const lastBtn = result.contestantBtns[result.contestantBtns.length - 1] || { y: ch * 0.22, h: 160 };
+    const betY = narrow ? (lastBtn.y + lastBtn.h + 14) : ch * 0.62;
+
     const betAmounts = [
       { label: '10', value: 10 },
       { label: '50', value: 50 },
@@ -1347,7 +1399,7 @@ export const arenaModeMethods = {
       { label: '半数', value: Math.max(10, Math.floor(a.gold / 2)) },
       { label: '全押', value: a.gold },
     ];
-    const btnW = 52, btnH = 28, btnGap = 6;
+    const btnW = narrow ? 44 : 52, btnH = 28, btnGap = narrow ? 4 : 6;
     const totalBetW = betAmounts.length * btnW + (betAmounts.length - 1) * btnGap;
     const betSx = cx - totalBetW / 2;
     result.betAmountBtns = betAmounts.map((b, i) => ({
@@ -1361,12 +1413,25 @@ export const arenaModeMethods = {
         { id: 'hp_high', label: '完胜(>50%HP) 1.5x' },
         { id: 'hp_low', label: '险胜(<30%HP) 2.5x' },
       ];
-      result.betTypeBtns = types.map((t, i) => ({
-        x: cx - 180 + i * 130, y: betY + 38, w: 120, h: 28, id: t.id, label: t.label,
-      }));
+      if (narrow) {
+        // 竖屏：每行一个
+        result.betTypeBtns = types.map((t, i) => ({
+          x: cx - (cw - 20) / 2, y: betY + 38 + i * 34, w: cw - 20, h: 28, id: t.id, label: t.label,
+        }));
+      } else {
+        result.betTypeBtns = types.map((t, i) => ({
+          x: cx - 180 + i * 130, y: betY + 38, w: 120, h: 28, id: t.id, label: t.label,
+        }));
+      }
     }
 
-    result.fightBtn = { x: cx - 70, y: ch * 0.86, w: 140, h: 42 };
+    // fightBtn: after betTypeBtns or betAmounts
+    const lastBetTypeY = result.betTypeBtns
+      ? result.betTypeBtns[result.betTypeBtns.length - 1].y + result.betTypeBtns[result.betTypeBtns.length - 1].h
+      : betY + btnH;
+    result.fightBtn = narrow
+      ? { x: cx - 70, y: lastBetTypeY + 14, w: 140, h: 42 }
+      : { x: cx - 70, y: ch * 0.86, w: 140, h: 42 };
     return result;
   },
 
@@ -1434,10 +1499,11 @@ export const arenaModeMethods = {
       ctx.fillRect(0, 0, lw, lh);
     }
 
-    this._drawArenaTopBar(ctx, lw);
+    const narrow = lw < 500;
+    this._drawArenaTopBar(ctx, lw, narrow);
 
     if (a.phase === 'opening') {
-      this._drawArenaOpening(ctx, lw, lh);
+      this._drawArenaOpening(ctx, lw, lh, narrow);
     } else if (a.phase === 'bracket') {
       this._drawArenaBracket(ctx, lw, lh);
     } else if (a.phase === 'betting') {
@@ -1453,10 +1519,15 @@ export const arenaModeMethods = {
     }
 
     this._drawArenaCommentary(ctx, lw, lh);
+
+    // 设置面板浮层
+    if (this._arenaShowSettings) {
+      this._drawArenaSettings(ctx, lw, lh);
+    }
   },
 
   // ===== 顶部栏 =====
-  _drawArenaTopBar(ctx, lw) {
+  _drawArenaTopBar(ctx, lw, narrow) {
     const a = this.arena;
     const prog = a.getTournamentProgress();
 
@@ -1468,76 +1539,93 @@ export const arenaModeMethods = {
     ctx.fillStyle = '#ffcc44';
     ctx.fillText(`💰 ${a.gold}`, 12, 18);
 
-    if (a.streak > 0) {
-      ctx.fillStyle = '#44ff44';
-      ctx.fillText(`🔥${a.streak}连赢`, 100, 18);
-    } else if (a.streak < 0) {
-      ctx.fillStyle = '#ff6644';
-      ctx.fillText(`❄️${Math.abs(a.streak)}连输`, 100, 18);
+    if (!narrow) {
+      if (a.streak > 0) {
+        ctx.fillStyle = '#44ff44';
+        ctx.fillText(`🔥${a.streak}连赢`, 100, 18);
+      } else if (a.streak < 0) {
+        ctx.fillStyle = '#ff6644';
+        ctx.fillText(`❄️${Math.abs(a.streak)}连输`, 100, 18);
+      }
     }
 
     ctx.textAlign = 'center';
     ctx.fillStyle = '#e8e0d0';
-    ctx.fillText(`第${a.edition}届武林大会 · ${prog.roundName} ${prog.matchProgress}`, lw / 2, 18);
+    const topTitle = narrow
+      ? `${prog.roundName} ${prog.matchProgress}`
+      : `第${a.edition}届武林大会 · ${prog.roundName} ${prog.matchProgress}`;
+    ctx.fillText(topTitle, lw / 2, 18);
 
     ctx.fillStyle = '#888';
     ctx.font = '11px "Microsoft YaHei", sans-serif';
-    ctx.fillText(`存活 ${prog.alive}/${prog.total} 人`, lw / 2, 34);
+    ctx.fillText(`存活 ${prog.alive}/${prog.total}`, lw / 2, 34);
 
-    // 晋级进度条
-    const stages = ['16强', '8强', '4强', '决赛', '盟主'];
-    const stageW = 50;
-    const stageGap = 4;
-    const totalStageW = stages.length * stageW + (stages.length - 1) * stageGap;
-    const stageX = lw / 2 - totalStageW / 2;
-    const stageY = 42;
-    for (let i = 0; i < stages.length; i++) {
-      const x = stageX + i * (stageW + stageGap);
-      const active = i < a.tournamentRound;
-      const current = i === a.tournamentRound - 1;
-      ctx.fillStyle = current ? 'rgba(255,204,68,0.3)' : active ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.03)';
-      ctx.fillRect(x, stageY, stageW, 6);
-      if (current) {
-        ctx.fillStyle = '#ffcc44';
+    if (!narrow) {
+      // 晋级进度条
+      const stages = ['16强', '8强', '4强', '决赛', '盟主'];
+      const stageW = 50;
+      const stageGap = 4;
+      const totalStageW = stages.length * stageW + (stages.length - 1) * stageGap;
+      const stageX = lw / 2 - totalStageW / 2;
+      const stageY = 42;
+      for (let i = 0; i < stages.length; i++) {
+        const x = stageX + i * (stageW + stageGap);
+        const active = i < a.tournamentRound;
+        const current = i === a.tournamentRound - 1;
+        ctx.fillStyle = current ? 'rgba(255,204,68,0.3)' : active ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.03)';
         ctx.fillRect(x, stageY, stageW, 6);
+        if (current) {
+          ctx.fillStyle = '#ffcc44';
+          ctx.fillRect(x, stageY, stageW, 6);
+        }
       }
     }
 
-    ctx.textAlign = 'right';
-    ctx.fillStyle = '#888';
-    ctx.font = '12px "Microsoft YaHei", sans-serif';
-    ctx.fillText('ESC 退出', lw - 12, 18);
+    // ⚙ 设置按钮（替代 ESC 退出）
+    const sbx = lw - 44, sby = 4, sbw = 40, sbh = 28;
+    const settingsHover = this.input
+      && this.input.mouseX >= sbx && this.input.mouseX <= sbx + sbw
+      && this.input.mouseY >= sby && this.input.mouseY <= sby + sbh;
+    ctx.fillStyle = settingsHover ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.07)';
+    ctx.fillRect(sbx, sby, sbw, sbh);
+    ctx.fillStyle = '#aaa';
+    ctx.font = '18px "Microsoft YaHei", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('⚙', sbx + sbw / 2, sby + sbh / 2 + 7);
 
-    // 冠军预测
-    if (a.predictedChampion) {
+    // 冠军预测（寛屏才显示）
+    if (!narrow && a.predictedChampion) {
       const pc = a.predictedChampion;
       const predColor = pc.eliminated ? '#664444' : '#44cc44';
       ctx.fillStyle = predColor;
       ctx.font = '11px "Microsoft YaHei", sans-serif';
       ctx.textAlign = 'right';
-      ctx.fillText(`🎯 ${pc.displayName}${pc.eliminated ? '(已淘汰)' : ''}`, lw - 12, 34);
+      ctx.fillText(`🎯 ${pc.displayName}${pc.eliminated ? '(已淘汰)' : ''}`, lw - 52, 34);
     }
   },
 
   // ===== 开幕式 =====
-  _drawArenaOpening(ctx, lw, lh) {
+  _drawArenaOpening(ctx, lw, lh, narrow) {
     const a = this.arena;
     const cx = lw / 2;
     const mx = this.input.mouseX, my = this.input.mouseY;
 
     ctx.textAlign = 'center';
     ctx.fillStyle = '#ffcc44';
-    ctx.font = 'bold 28px "Microsoft YaHei", sans-serif';
+    ctx.font = `bold ${narrow ? 20 : 28}px "Microsoft YaHei", sans-serif`;
     ctx.fillText(`⚔ 第${a.edition}届武林大会 ⚔`, cx, lh * 0.1);
 
     ctx.fillStyle = '#888';
-    ctx.font = '14px "Microsoft YaHei", sans-serif';
+    ctx.font = `${narrow ? 12 : 14}px "Microsoft YaHei", sans-serif`;
     ctx.fillText('十六路豪杰齐聚，一决雌雄', cx, lh * 0.15);
 
     // 16人名单（4列4行）
     const cols = 4, rows = 4;
-    const cardW = 115, cardH = 52;
-    const gapX = 10, gapY = 6;
+    // 自适应卡牌大小：确保占满屏幕宽度
+    const gapX = narrow ? 6 : 10;
+    const gapY = narrow ? 4 : 6;
+    const cardW = Math.floor((lw - 16 - (cols - 1) * gapX) / cols);
+    const cardH = narrow ? 42 : 52;
     const gridW = cols * cardW + (cols - 1) * gapX;
     const startX = cx - gridW / 2;
     const startY = lh * 0.2;
@@ -1572,36 +1660,38 @@ export const arenaModeMethods = {
       ctx.fillText(`#${i + 1}`, x + 4, y + 14);
 
       ctx.fillStyle = c.isSeed ? '#ffcc44' : '#ccc';
-      ctx.font = `${c.isSeed ? 'bold ' : ''}12px "Microsoft YaHei", sans-serif`;
+      ctx.font = `${narrow ? (c.isSeed ? 'bold 10px' : '10px') : (c.isSeed ? 'bold 12px' : '12px')} "Microsoft YaHei", sans-serif`;
       ctx.textAlign = 'center';
-      ctx.fillText(c.displayName, x + cardW / 2, y + 16);
+      ctx.fillText(c.displayName, x + cardW / 2, y + (narrow ? 12 : 16));
 
       ctx.fillStyle = c.color || '#888';
-      ctx.font = '11px "Microsoft YaHei", sans-serif';
-      ctx.fillText(`${c.weapon.icon} ${c.weapon.name}`, x + cardW / 2, y + 32);
+      ctx.font = `${narrow ? 10 : 11}px "Microsoft YaHei", sans-serif`;
+      ctx.fillText(`${c.weapon.icon} ${c.weapon.name}`, x + cardW / 2, y + (narrow ? 24 : 32));
 
-      const stars = '★'.repeat(c.difficulty) + '☆'.repeat(5 - c.difficulty);
-      ctx.fillStyle = '#666';
-      ctx.font = '9px "Microsoft YaHei", sans-serif';
-      ctx.fillText(stars, x + cardW / 2, y + 44);
+      if (!narrow) {
+        const stars = '★'.repeat(c.difficulty) + '☆'.repeat(5 - c.difficulty);
+        ctx.fillStyle = '#666';
+        ctx.font = '9px "Microsoft YaHei", sans-serif';
+        ctx.fillText(stars, x + cardW / 2, y + 44);
+      }
 
       if (c.isChampion) {
         ctx.fillStyle = '#ff4444';
         ctx.font = 'bold 9px "Microsoft YaHei", sans-serif';
         ctx.textAlign = 'right';
-        ctx.fillText('👑卫冕', x + cardW - 4, y + 44);
+        ctx.fillText('👑', x + cardW - 2, y + (narrow ? 12 : 14));
       } else if (c.isSeed && !isPredicted) {
         ctx.fillStyle = '#ffcc44';
         ctx.font = 'bold 9px "Microsoft YaHei", sans-serif';
         ctx.textAlign = 'right';
-        ctx.fillText('⭐种子', x + cardW - 4, y + 44);
+        ctx.fillText('⭐', x + cardW - 2, y + (narrow ? 12 : 14));
       }
     }
 
     // 冠军预测提示
     const hintY = startY + rows * (cardH + gapY) + 12;
     ctx.textAlign = 'center';
-    ctx.font = '13px "Microsoft YaHei", sans-serif';
+    ctx.font = `${narrow ? 11 : 13}px "Microsoft YaHei", sans-serif`;
     if (a.predictedChampion) {
       ctx.fillStyle = '#44ff44';
       ctx.fillText(`🎯 预测冠军: ${a.predictedChampion.displayName}（猜中奖励 3 倍金币！）`, cx, hintY);
@@ -1610,10 +1700,12 @@ export const arenaModeMethods = {
       ctx.fillText('🎯 点击选手预测冠军（可选，猜中奖励 3 倍金币！）', cx, hintY);
     }
 
-    // 门票提示
-    ctx.fillStyle = '#888';
-    ctx.font = '11px "Microsoft YaHei", sans-serif';
-    ctx.fillText('💰 注意：进入后续轮次需缴纳门票（八强200·半决赛500·决赛1000）', cx, hintY + 18);
+    if (!narrow) {
+      // 门票提示
+      ctx.fillStyle = '#888';
+      ctx.font = '11px "Microsoft YaHei", sans-serif';
+      ctx.fillText('💰 注意：进入后续轮次需缴纳门票（八强200·半决赛500·决赛1000）', cx, hintY + 18);
+    }
 
     // "开始比赛"按钮
     const btnW = 160, btnH = 38;
@@ -1634,17 +1726,18 @@ export const arenaModeMethods = {
   _drawArenaBracket(ctx, lw, lh) {
     const a = this.arena;
     const cx = lw / 2;
+    const narrow = lw < 500;
     const prog = a.getTournamentProgress();
 
     ctx.textAlign = 'center';
     ctx.fillStyle = '#e8e0d0';
-    ctx.font = 'bold 22px "Microsoft YaHei", sans-serif';
+    ctx.font = `bold ${narrow ? 18 : 22}px "Microsoft YaHei", sans-serif`;
     ctx.fillText(`${prog.roundName} · 对阵表`, cx, lh * 0.1);
 
     const bracket = a.bracket;
     const matchH = 38;
     const matchGap = 8;
-    const matchW = 300;
+    const matchW = Math.min(300, lw - 40);
     const startY = lh * 0.16;
 
     for (let i = 0; i < bracket.length; i++) {
@@ -2183,5 +2276,48 @@ export const arenaModeMethods = {
     ctx.textAlign = 'center';
     ctx.fillText(`📢 ${a.currentComment}`, lw / 2, lh - 14);
     ctx.restore();
+  },
+
+  _drawArenaSettings(ctx, lw, lh) {
+    // 半透明蒙层
+    ctx.fillStyle = 'rgba(0,0,0,0.72)';
+    ctx.fillRect(0, 0, lw, lh);
+
+    const pw = Math.min(280, lw - 32);
+    const ph = 180;
+    const px = (lw - pw) / 2;
+    const py = (lh - ph) / 2;
+
+    // 面板背景
+    ctx.fillStyle = '#1a1a2e';
+    ctx.fillRect(px, py, pw, ph);
+    ctx.strokeStyle = '#445';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(px, py, pw, ph);
+
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#e8e0d0';
+    ctx.font = 'bold 16px "Microsoft YaHei", sans-serif';
+    ctx.fillText('⚙ 设置', lw / 2, py + 30);
+
+    const bw = pw - 32, bh = 40;
+    const bx = lw / 2 - bw / 2;
+    const b1y = py + 50, b2y = py + 105;
+    const mx = this.input.mouseX, my = this.input.mouseY;
+
+    // 继续游戏
+    const h1 = mx >= bx && mx <= bx + bw && my >= b1y && my <= b1y + bh;
+    ctx.fillStyle = h1 ? '#3a7a4a' : '#226633';
+    ctx.fillRect(bx, b1y, bw, bh);
+    ctx.fillStyle = '#fff';
+    ctx.font = '14px "Microsoft YaHei", sans-serif';
+    ctx.fillText('继续游戏', lw / 2, b1y + bh / 2 + 5);
+
+    // 返回主菜单
+    const h2 = mx >= bx && mx <= bx + bw && my >= b2y && my <= b2y + bh;
+    ctx.fillStyle = h2 ? '#7a3a3a' : '#662233';
+    ctx.fillRect(bx, b2y, bw, bh);
+    ctx.fillStyle = '#fff';
+    ctx.fillText('返回主菜单', lw / 2, b2y + bh / 2 + 5);
   },
 };
