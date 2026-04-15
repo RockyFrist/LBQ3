@@ -335,12 +335,8 @@ export class SectUI {
     const hasFought = state.stats.totalFights > 0; // 有过战斗
 
     const actions = [];
-    // 训练按钮（每天最多3次）
-    const trainsToday = state.trainsToday || 0;
-    const maxTrains = 3;
-    const trainLabel = `⚔ 训练 (${trainsToday}/${maxTrains})`;
-    const trainDisabled = trainsToday >= maxTrains;
-    actions.push({ label: trainLabel, action: { type: 'action', id: 'train' }, color: trainDisabled ? '#555' : '#4499ff', disabled: trainDisabled });
+    // 训练按钮（体力门控，无次数限制）
+    actions.push({ label: '⚔ 训练', action: { type: 'action', id: 'train' }, color: '#4499ff' });
     actions.push({ label: '🌙 进入下一天', action: { type: 'action', id: 'nextDay' }, color: COL_ACCENT });
     // 第2天起解锁建造
     if (day >= 2) {
@@ -397,8 +393,8 @@ export class SectUI {
 
     const dList = state.disciples.slice(0, 5);
     for (const d of dList) {
-      this._drawDiscipleMini(ctx, x, cy, w, d, narrow, state);
-      cy += narrow ? 32 : 38;
+      this._drawDiscipleMini(ctx, x, cy, w, d, narrow, state, mx, my);
+      cy += narrow ? 52 : 60;
     }
     if (state.disciples.length > 5) {
       ctx.fillStyle = COL_DIM;
@@ -429,8 +425,8 @@ export class SectUI {
   }
 
   // ===== 弟子迷你卡片 =====
-  _drawDiscipleMini(ctx, x, y, w, d, narrow, state) {
-    const h = narrow ? 28 : 34;
+  _drawDiscipleMini(ctx, x, y, w, d, narrow, state, mx, my) {
+    const h = narrow ? 48 : 56;
     ctx.fillStyle = COL_PANEL;
     ctx.fillRect(x, y, w, h);
 
@@ -438,70 +434,88 @@ export class SectUI {
     ctx.fillStyle = d.color || '#888';
     ctx.fillRect(x, y, 3, h);
 
-    // 领头星标
+    // === 第1行：名字 + 个性 + 右侧状态条 ===
     const isLeader = state && state.leaderId === d.id;
-
     ctx.textAlign = 'left';
     ctx.fillStyle = COL_TEXT;
     ctx.font = `bold ${narrow ? 11 : 13}px ${FONT}`;
     const nameStr = `${isLeader ? '⭐' : ''}${d.name}`;
-    ctx.fillText(nameStr, x + 8, y + (narrow ? 12 : 14));
-    // 个性图标
+    ctx.fillText(nameStr, x + 8, y + (narrow ? 13 : 15));
     const _pMini = PERSONALITY_TYPES[d.personality];
     if (_pMini) {
       const _nw = ctx.measureText(nameStr).width;
       ctx.fillStyle = _pMini.color;
       ctx.font = `${narrow ? 9 : 10}px ${FONT}`;
-      ctx.fillText(_pMini.icon, x + 8 + _nw + 3, y + (narrow ? 12 : 14));
+      ctx.fillText(_pMini.icon, x + 8 + _nw + 3, y + (narrow ? 13 : 15));
     }
 
-    // 训练档位图标
-    const tMode = TRAINING_MODES[d.trainingMode || 'normal'];
-    if (tMode) {
-      ctx.textAlign = 'right';
-      ctx.fillStyle = '#aaa';
-      ctx.font = `${narrow ? 9 : 10}px ${FONT}`;
-      ctx.fillText(tMode.icon + tMode.name, x + w - 6, y + (narrow ? 12 : 14));
-      ctx.textAlign = 'left';
-    }
-
-    ctx.fillStyle = COL_DIM;
-    ctx.font = `${narrow ? 9 : 11}px ${FONT}`;
-    const weaponName = WEAPON_NAMES[d.weaponId] || '?';
-    // 品质颜色
-    const wQColor = ITEM_QUALITY[d.weaponQuality || 'normal']?.color || COL_DIM;
-    const staminaIcon = d.stamina >= 70 ? '\u26A1' : d.stamina >= 35 ? '\uD83D\uDCAB' : d.stamina >= 15 ? '\uD83D\uDE05' : '\uD83D\uDCA4';
-    const statusStr = d.onQuest ? '\uD83D\uDCDC任务中' : d.injury > 30 ? '\uD83E\uDD15受伤' : d.stamina < 15 ? `${staminaIcon}体乏` : d.stamina < 40 ? `${staminaIcon}疲劳` : '\u2705待命';
-    ctx.fillStyle = COL_DIM;
-    ctx.fillText(`Lv${d.level} `, x + 8, y + (narrow ? 24 : 28));
-    const lvW = ctx.measureText(`Lv${d.level} `).width;
-    ctx.fillStyle = wQColor;
-    ctx.fillText(weaponName, x + 8 + lvW, y + (narrow ? 24 : 28));
-    const wW = ctx.measureText(weaponName).width;
-    ctx.fillStyle = COL_DIM;
-    ctx.fillText(` ${starsText(d.talent)} ${statusStr}`, x + 8 + lvW + wW, y + (narrow ? 24 : 28));
-
-    // 经验条
-    const expNeed = expToLevel(d.level);
+    // 右侧：经验条 + 血条 + 体力条
     const barW = narrow ? 50 : 70;
     const barX = x + w - barW - 6;
-    drawBar(ctx, barX, y + 4, barW, 5, d.exp / expNeed, '#4499ff');
-
-    // HP条
+    const expNeed = expToLevel(d.level);
+    drawBar(ctx, barX, y + 4, barW, 4, d.exp / expNeed, '#4499ff');
     const hpRatio = (100 - d.injury) / 100;
-    drawBar(ctx, barX, y + 12, barW, 5, hpRatio, hpRatio > 0.5 ? COL_HP_OK : COL_HP_HURT);
-
-    // 体力条（新增）
+    drawBar(ctx, barX, y + 10, barW, 4, hpRatio, hpRatio > 0.5 ? COL_HP_OK : COL_HP_HURT);
     const staRatio = (d.stamina || 0) / 100;
     const staColor = staRatio >= 0.7 ? '#ffcc44' : staRatio >= 0.35 ? '#ff9944' : '#ff4444';
-    drawBar(ctx, barX, y + 20, barW, 5, staRatio, staColor);
-
-    // 体力小标签
+    drawBar(ctx, barX, y + 16, barW, 4, staRatio, staColor);
+    // 体力数字
     ctx.textAlign = 'right';
     ctx.fillStyle = staColor;
     ctx.font = `${narrow ? 8 : 9}px ${FONT}`;
-    ctx.fillText(`体${d.stamina}`, x + w - barW - 9, y + (narrow ? 25 : 27));
+    ctx.fillText(`体${d.stamina}`, barX - 3, y + (narrow ? 18 : 19));
     ctx.textAlign = 'left';
+
+    // === 第2行：Lv + 武器 + 天赋 + 状态 ===
+    const row2Y = y + (narrow ? 26 : 30);
+    ctx.fillStyle = COL_DIM;
+    ctx.font = `${narrow ? 9 : 11}px ${FONT}`;
+    const weaponName = WEAPON_NAMES[d.weaponId] || '?';
+    const wQColor = ITEM_QUALITY[d.weaponQuality || 'normal']?.color || COL_DIM;
+    const staminaIcon = d.stamina >= 70 ? '\u26A1' : d.stamina >= 35 ? '\uD83D\uDCAB' : d.stamina >= 15 ? '\uD83D\uDE05' : '\uD83D\uDCA4';
+    const statusStr = d.onQuest ? '\uD83D\uDCDC任务中' : d.injury > 30 ? '\uD83E\uDD15受伤' : d.stamina < 15 ? `${staminaIcon}体乏` : d.stamina < 40 ? `${staminaIcon}疲劳` : '\u2705待命';
+    ctx.fillText(`Lv${d.level} `, x + 8, row2Y);
+    const lvW = ctx.measureText(`Lv${d.level} `).width;
+    ctx.fillStyle = wQColor;
+    ctx.fillText(weaponName, x + 8 + lvW, row2Y);
+    const wW = ctx.measureText(weaponName).width;
+    ctx.fillStyle = COL_DIM;
+    ctx.fillText(` ${starsText(d.talent)} ${statusStr}`, x + 8 + lvW + wW, row2Y);
+
+    // === 第3行：训练档位（4个小按钮，直接多选一）===
+    const row3Y = y + (narrow ? 34 : 40);
+    const currentMode = d.trainingMode || 'normal';
+    if (!d.onQuest) {
+      const mBtnGap = 2;
+      const mBtnW = Math.floor((w - 8 - mBtnGap * 3) / 4);
+      const mBtnH = narrow ? 13 : 15;
+      for (let i = 0; i < TRAINING_MODE_ORDER.length; i++) {
+        const mId = TRAINING_MODE_ORDER[i];
+        const mode = TRAINING_MODES[mId];
+        const bx = x + 4 + i * (mBtnW + mBtnGap);
+        const selected = currentMode === mId;
+        // 背景
+        ctx.fillStyle = selected ? 'rgba(255,204,68,0.3)' : 'rgba(60,60,60,0.5)';
+        ctx.fillRect(bx, row3Y, mBtnW, mBtnH);
+        if (selected) {
+          ctx.strokeStyle = '#ffcc44';
+          ctx.lineWidth = 1;
+          ctx.strokeRect(bx, row3Y, mBtnW, mBtnH);
+        }
+        // 文字
+        ctx.fillStyle = selected ? '#ffcc44' : '#999';
+        ctx.font = `${selected ? 'bold ' : ''}${narrow ? 9 : 10}px ${FONT}`;
+        ctx.textAlign = 'center';
+        ctx.fillText(mode.icon + mode.name, bx + mBtnW / 2, row3Y + (narrow ? 10 : 12));
+        // 点击区
+        this._buttons.push({ x: bx, y: row3Y, w: mBtnW, h: mBtnH, action: { type: 'action', id: 'setTrainingMode', discipleId: d.id, mode: mId } });
+      }
+      ctx.textAlign = 'left';
+    } else {
+      ctx.fillStyle = '#777';
+      ctx.font = `${narrow ? 9 : 10}px ${FONT}`;
+      ctx.fillText('📜 任务中', x + 8, row3Y + (narrow ? 10 : 12));
+    }
   }
 
   // ===== 弟子列表面板 =====

@@ -1,7 +1,7 @@
 // ===================== 开始菜单（多页设计） =====================
 import { WEAPON_LIST, WEAPONS, getWeapon } from '../weapons/weapon-defs.js';
 import { ARMOR_LIST, getArmor } from '../weapons/armor-defs.js';
-const GAME_VERSION = 'v0.19.4';
+const GAME_VERSION = 'v0.19.6';
 
 // 武器详情面板数据
 const WEAPON_INFO = {

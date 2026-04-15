@@ -89,7 +89,7 @@ export const sectModeMethods = {
     if (!this.sect.achievements) this.sect.achievements = [];
     if (this.sect.leaderId === undefined) this.sect.leaderId = null;
     if (this.sect.trainedToday !== undefined) delete this.sect.trainedToday;
-    if (this.sect.trainsToday === undefined) this.sect.trainsToday = 0;
+    if (this.sect.trainsToday !== undefined) delete this.sect.trainsToday;
     if (!this.sect.stats.totalTrains) this.sect.stats.totalTrains = 0;
     if (!this.sect.stats.totalQuests) this.sect.stats.totalQuests = 0;
     if (this.sect.stats.talentScrollsUsed === undefined) this.sect.stats.talentScrollsUsed = 0;
@@ -1261,19 +1261,14 @@ export const sectModeMethods = {
 
   // ===== 训练（每天最多3次）=====
   _sectDoTraining() {
-    const maxTrains = 3;
-    if ((this.sect.trainsToday || 0) >= maxTrains) {
-      this._sectShowToast(`今日训练已达上限(${maxTrains}次)`, '#ff9944');
-      return;
-    }
-
-    // ===== 训练结算（档位系统）=====
+    // ===== 训练结算（体力门控）=====
     const dojoMul = trainExpMul(this.sect.buildings.dojo);
     const libLv = this.sect.buildings.library;
     const leader = this.sect.disciples.find(d => d.id === this.sect.leaderId);
     const leaderBonus = leader ? LEADER_BONUSES[leader.personality] : null;
     let trainedCount = 0;
     let totalExpGained = 0;
+    let skippedCount = 0;
     const animDisciples = []; // 训练动画数据
 
     for (const d of this.sect.disciples) {
@@ -1287,6 +1282,15 @@ export const sectModeMethods = {
         animDisciples.push({ disciple: d, oldStamina: oldSta, newStamina: d.stamina, expGain: 0 });
         continue;
       }
+
+      // 体力门控：体力不足以支撑训练则跳过
+      const staminaCost = -mode.stamina; // mode.stamina 是负数
+      if (d.stamina < staminaCost) {
+        skippedCount++;
+        animDisciples.push({ disciple: d, oldStamina: d.stamina, newStamina: d.stamina, expGain: 0, skipped: true });
+        continue;
+      }
+
       const oldStamina = d.stamina;
       let staminaDelta = mode.stamina;
       let expGain = Math.floor(mode.exp * dojoMul);
@@ -1358,13 +1362,14 @@ export const sectModeMethods = {
       }
     }
 
-    this.sect.trainsToday = (this.sect.trainsToday || 0) + 1;
-
     if (trainedCount > 0) {
       this.sect.stats.totalTrains++;
-      this._sectAddLog(`📊 训练(${this.sect.trainsToday}/${maxTrains})：${trainedCount}人修炼，共+${totalExpGained}exp`, '#4499ff');
+      const skipNote = skippedCount > 0 ? `，${skippedCount}人体力不足` : '';
+      this._sectAddLog(`📊 训练：${trainedCount}人修炼，共+${totalExpGained}exp${skipNote}`, '#4499ff');
+    } else if (skippedCount > 0) {
+      this._sectAddLog(`📊 全员体力不足，无法训练`, '#ff9944');
     } else {
-      this._sectAddLog(`📊 训练(${this.sect.trainsToday}/${maxTrains})：全员休养`, '#88aacc');
+      this._sectAddLog(`📊 训练：全员休养`, '#88aacc');
     }
 
     // 如果有弟子，播放训练动画
@@ -1396,7 +1401,6 @@ export const sectModeMethods = {
   _sectNextDay() {
     this.sect.day++;
     this.sect.stats.totalDays++;
-    this.sect.trainsToday = 0; // 重置训练次数
 
     // 被动收入
     const income = dailyIncome(this.sect.buildings.bank);
@@ -1984,7 +1988,8 @@ export const sectModeMethods = {
       const fA = this.player.fighter;
       const fB = this.enemies[0]?.fighter;
       if (fA && fB) {
-        ttx.globalAlpha = 0.6
+        this.ui.draw(fA, fB, [fB], 0);
+      }
 
       // ===== 战斗对话气泡渲染 =====
       if (this.sectSpeechBubbles.length > 0) {

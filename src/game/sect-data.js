@@ -644,10 +644,10 @@ export function randomPersonality() {
 
 // ===== 训练档位系统 =====
 export const TRAINING_MODES = {
-  rest:    { id: 'rest',    name: '休养', icon: '🌙', stamina: 50,  exp: 0,  risk: 0,    loyaltyMod: 0,  desc: '养精蓄锐，恢复体力' },
-  normal:  { id: 'normal',  name: '日常', icon: '📖', stamina: 10,  exp: 12, risk: 0,    loyaltyMod: 0,  desc: '日常修炼，稳步提升' },
-  intense: { id: 'intense', name: '强化', icon: '⚔',  stamina: -20, exp: 25, risk: 0,    loyaltyMod: 0,  desc: '加强训练，消耗体力' },
-  extreme: { id: 'extreme', name: '极限', icon: '🔥', stamina: -45, exp: 40, risk: 0.10, loyaltyMod: -1, desc: '拼命苦练，有受伤风险' },
+  rest:    { id: 'rest',    name: '休养', icon: '🌙', stamina: 40,  exp: 0,  risk: 0,    loyaltyMod: 0,  desc: '养精蓄锐，恢复体力' },
+  normal:  { id: 'normal',  name: '日常', icon: '📖', stamina: -15, exp: 12, risk: 0,    loyaltyMod: 0,  desc: '日常修炼，稳步提升' },
+  intense: { id: 'intense', name: '强化', icon: '⚔',  stamina: -35, exp: 25, risk: 0,    loyaltyMod: 0,  desc: '加强训练，消耗体力' },
+  extreme: { id: 'extreme', name: '极限', icon: '🔥', stamina: -55, exp: 40, risk: 0.10, loyaltyMod: -1, desc: '拼命苦练，有受伤风险' },
 };
 export const TRAINING_MODE_ORDER = ['rest', 'normal', 'intense', 'extreme'];
 
