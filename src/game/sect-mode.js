@@ -1015,7 +1015,7 @@ export const sectModeMethods = {
       maxTimer: 2.5,
       color: pType?.color || '#ffcc44',
     });
-    this._sectSpeechCd[team] = 3.0; // 3秒冷却
+    this._sectSpeechCd[team] = 5.0; // 5秒冷却
   },
 
   _sectUpdateSpeechBubbles(dt) {
@@ -1043,22 +1043,22 @@ export const sectModeMethods = {
     for (const evt of this.combat.events) {
       switch (evt.type) {
         case 'hit':
-          // 命中方说话 (15%)
-          if (Math.random() < 0.15) {
+          // 命中方说话 (8%)
+          if (Math.random() < 0.08) {
             const isOurs = evt.attacker === fA;
             this._sectAddSpeechBubble(evt.attacker, isOurs ? pA : 'diligent',
               'combat_hit');
           }
-          // 被击方大伤说话 (30% if damage >= 20)
-          if (evt.damage >= 20 && Math.random() < 0.30) {
+          // 被击方大伤说话 (20% if damage >= 20)
+          if (evt.damage >= 20 && Math.random() < 0.20) {
             const isOurs = evt.target === fA;
             this._sectAddSpeechBubble(evt.target, isOurs ? pA : 'diligent',
               'combat_hurt');
           }
           break;
         case 'perfectDodge':
-          // 完美闪避 (25%)
-          if (Math.random() < 0.25) {
+          // 完美闪避 (15%)
+          if (Math.random() < 0.15) {
             const isOurs = evt.target === fA;
             this._sectAddSpeechBubble(evt.target, isOurs ? pA : 'diligent',
               'combat_dodge');
