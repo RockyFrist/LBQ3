@@ -25,14 +25,23 @@ import { resetDialogueMemory, pickCombatLine, pickLifeLine, isDialogueEnabled, s
 
 export const sectModeMethods = {
 
-  // ===== 初始化 =====
+  // ===== 初始化（显示标题画面）=====
   _setupSectMode(savedState) {
-    // 尝试读取自动存档（未手动指定存档时）
-    if (!savedState && isAutoSaveOn()) {
-      savedState = loadAutoSave();
-    }
-    this.sect = savedState || createInitialState();
     this.sectUI = new SectUI();
+    this.sectSubPage = 'title'; // title 标题画面
+    this.sectPopup = null;
+    this.sectSaveMode = 'load';
+    this.sect = null; // 尚未创建游戏状态
+    // 检查是否有可继续的存档
+    this._sectHasAutoSave = !!loadAutoSave();
+    this._sectHasManualSave = getSaveSlots().some(s => s.exists);
+    // Toast通知
+    this.sectToast = null;
+  },
+
+  // ===== 从存档或新游戏进入 =====
+  _sectStartGame(savedState) {
+    this.sect = savedState || createInitialState();
     this.sectSubPage = 'main'; // main | disciples | buildings | quests | market | log | disciple_detail
     this.sectPopup = null;     // null | 'event' | 'discipleSelect' | 'fightResult' | 'saveSlots' | 'armorSelect'
     this.sectSaveMode = 'save';
@@ -110,6 +119,50 @@ export const sectModeMethods = {
   _updateSect(dt) {
     const input = this.input;
 
+    // ===== 标题画面处理 =====
+    if (this.sectSubPage === 'title') {
+      // 存档槽位弹窗
+      if (this.sectPopup === 'saveSlots') {
+        if (input.pressed('Escape') || input.touchBack) {
+          this.sectPopup = null;
+          return;
+        }
+        if (input.mouseLeftDown) {
+          const action = this.sectUI.handleClick(input.mouseX, input.mouseY);
+          if (action) {
+            if (action.type === 'saveSlot' && action.mode === 'load') {
+              const loaded = loadSect(action.slot);
+              if (loaded) this._sectStartGame(loaded);
+            } else if (action.type === 'cancelSave') {
+              this.sectPopup = null;
+            }
+          }
+        }
+        return;
+      }
+      if (input.pressed('Escape') || input.touchBack) {
+        if (this.onExit) this.onExit();
+        return;
+      }
+      if (input.mouseLeftDown) {
+        const action = this.sectUI.handleClick(input.mouseX, input.mouseY);
+        if (action) {
+          if (action.id === 'continueGame') {
+            const save = loadAutoSave();
+            if (save) this._sectStartGame(save);
+          } else if (action.id === 'newGame') {
+            this._sectStartGame(null);
+          } else if (action.id === 'loadGame') {
+            this.sectPopup = 'saveSlots';
+            this.sectSaveMode = 'load';
+          } else if (action.id === 'backToMenu') {
+            if (this.onExit) this.onExit();
+          }
+        }
+      }
+      return;
+    }
+
     // ESC / 触屏返回 — 如果有弹窗先关弹窗
     if (input.pressed('Escape') || input.touchBack) {
       if (this.sectPopup === 'story' && this.sect.pendingStory) {
@@ -145,9 +198,9 @@ export const sectModeMethods = {
         this.sectSubPage = 'disciples';
         return;
       }
-      // 无弹窗在主页则退出
-      if (this.sectSubPage === 'main' && this.onExit) {
-        this.onExit();
+      // 无弹窗在主页则回到标题画面
+      if (this.sectSubPage === 'main') {
+        this._sectReturnToTitle();
         return;
       }
       this.sectSubPage = 'main';
@@ -602,7 +655,7 @@ export const sectModeMethods = {
       }
 
       case 'exitSect':
-        if (this.onExit) this.onExit();
+        this._sectReturnToTitle();
         break;
 
       case 'buyShopItem':
@@ -1902,6 +1955,21 @@ export const sectModeMethods = {
     this.sectPopup = 'settings';
   },
 
+  // ===== 返回标题画面 =====
+  _sectReturnToTitle() {
+    // 自动存档当前进度
+    if (this.sect && isAutoSaveOn()) {
+      autoSaveSect(this.sect);
+    }
+    this.sectSubPage = 'title';
+    this.sectPopup = null;
+    this.sectWatchingFight = false;
+    this.sectTrainAnim = false;
+    // 刷新存档状态
+    this._sectHasAutoSave = !!loadAutoSave();
+    this._sectHasManualSave = getSaveSlots().some(s => s.exists);
+  },
+
   // ===== 成就检查 =====
   _sectCheckAchievements() {
     const newly = checkNewAchievements(this.sect);
@@ -1961,6 +2029,32 @@ export const sectModeMethods = {
     const mx = this.input.mouseX;
     const my = this.input.mouseY;
     const narrow = lw < 500;
+
+    // ===== 标题画面 =====
+    if (this.sectSubPage === 'title') {
+      this.sectUI._buttons = [];
+      this.sectUI.drawTitleScreen(ctx, lw, lh, mx, my, narrow, this._sectHasAutoSave, this._sectHasManualSave);
+      if (this.sectPopup === 'saveSlots') {
+        const slots = getSaveSlots();
+        this.sectUI.drawSaveSlots(ctx, lw, lh, slots, 'load', mx, my, narrow);
+      }
+      // Toast
+      if (this.sectToast) {
+        const t = this.sectToast;
+        ctx.globalAlpha = Math.min(1, t.timer * 3);
+        const tw = ctx.measureText(t.text).width + 24;
+        const tx = (lw - tw) / 2;
+        const ty = narrow ? 70 : 80;
+        ctx.fillStyle = 'rgba(0,0,0,0.8)';
+        ctx.fillRect(tx, ty, tw, 32);
+        ctx.fillStyle = t.color;
+        ctx.font = `bold ${narrow ? 12 : 14}px "Microsoft YaHei", sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.fillText(t.text, lw / 2, ty + 20);
+        ctx.globalAlpha = 1;
+      }
+      return;
+    }
 
     // 如果在观战模式
     if (this.sectWatchingFight) {

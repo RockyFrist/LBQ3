@@ -1679,6 +1679,88 @@ export class SectUI {
     this._buttons.push({ ...confirmRect3, action: { type: 'action', id: 'confirmDismiss' } });
   }
 
+  // ===== 标题画面（新游戏/继续/读档/返回）=====
+  drawTitleScreen(ctx, cw, ch, mx, my, narrow, hasAutoSave, hasManualSave) {
+    this._buttons = this._buttons || [];
+
+    // 背景
+    ctx.fillStyle = '#080818';
+    ctx.fillRect(0, 0, cw, ch);
+
+    // 装饰线条
+    ctx.strokeStyle = 'rgba(255,204,68,0.15)';
+    ctx.lineWidth = 1;
+    for (let i = 0; i < 5; i++) {
+      const yy = ch * 0.15 + i * (ch * 0.14);
+      ctx.beginPath();
+      ctx.moveTo(cw * 0.1, yy);
+      ctx.lineTo(cw * 0.9, yy);
+      ctx.stroke();
+    }
+
+    // 标题
+    const titleY = narrow ? ch * 0.18 : ch * 0.22;
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#ffcc44';
+    ctx.font = `bold ${narrow ? 28 : 36}px ${FONT}`;
+    ctx.fillText('宗门风云', cw / 2, titleY);
+
+    // 副标题
+    ctx.fillStyle = '#887744';
+    ctx.font = `${narrow ? 12 : 14}px ${FONT}`;
+    ctx.fillText('门派养成 · 弟子培养 · 江湖争锋', cw / 2, titleY + (narrow ? 24 : 30));
+
+    // 按钮区域
+    const btnW = narrow ? 180 : 220;
+    const btnH = narrow ? 40 : 48;
+    const gap = narrow ? 10 : 14;
+    let by = titleY + (narrow ? 60 : 80);
+    const bx = (cw - btnW) / 2;
+
+    const buttons = [];
+
+    // 继续游戏（仅在有自动存档时显示）
+    if (hasAutoSave) {
+      buttons.push({ label: '▶ 继续游戏', id: 'continueGame', color: '#ffcc44', fontSize: narrow ? 15 : 17 });
+    }
+
+    buttons.push({ label: '✦ 新的游戏', id: 'newGame', color: '#44aaff', fontSize: narrow ? 14 : 16 });
+
+    // 读取存档（仅在有手动存档时显示）
+    if (hasManualSave) {
+      buttons.push({ label: '📂 读取存档', id: 'loadGame', color: '#88aacc', fontSize: narrow ? 14 : 16 });
+    }
+
+    buttons.push({ label: '← 返回', id: 'backToMenu', color: '#666', fontSize: narrow ? 13 : 14 });
+
+    for (const btn of buttons) {
+      const rect = { x: bx, y: by, w: btnW, h: btnH };
+      const hovered = hit(mx, my, bx, by, btnW, btnH);
+
+      // 按钮背景
+      ctx.fillStyle = hovered ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.03)';
+      ctx.fillRect(bx, by, btnW, btnH);
+      ctx.strokeStyle = hovered ? btn.color : 'rgba(255,255,255,0.12)';
+      ctx.lineWidth = hovered ? 2 : 1;
+      ctx.strokeRect(bx, by, btnW, btnH);
+
+      // 文字
+      ctx.fillStyle = hovered ? '#fff' : btn.color;
+      ctx.font = `bold ${btn.fontSize}px ${FONT}`;
+      ctx.textAlign = 'center';
+      ctx.fillText(btn.label, bx + btnW / 2, by + btnH / 2 + (narrow ? 5 : 6));
+
+      this._buttons.push({ ...rect, action: { type: 'action', id: btn.id } });
+      by += btnH + gap;
+    }
+
+    // 底部版本信息
+    ctx.fillStyle = '#444';
+    ctx.font = `${narrow ? 9 : 10}px ${FONT}`;
+    ctx.textAlign = 'center';
+    ctx.fillText('ESC 返回主菜单', cw / 2, ch - 20);
+  }
+
   // ===== 设置弹窗（含存/读档、退出） =====
   drawSettings(ctx, cw, ch, mx, my, narrow) {
     this._buttons = this._buttons || [];
@@ -1709,7 +1791,7 @@ export class SectUI {
     const settingsActions = [
       { label: '💾 存档', action: { type: 'action', id: 'save' }, color: '#4488ff' },
       { label: '📂 读档', action: { type: 'action', id: 'load' }, color: '#44aaff' },
-      { label: '🚪 退出游戏', action: { type: 'action', id: 'exitSect' }, color: COL_DANGER },
+      { label: '🚪 返回主菜单', action: { type: 'action', id: 'exitSect' }, color: COL_DANGER },
     ];
 
     for (const sa of settingsActions) {
