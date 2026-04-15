@@ -450,8 +450,9 @@ export class Game {
         this.settingsOpen = !this.settingsOpen;
       }
     }
-    // 设置按钮点击检测
-    if (this.mode !== 'test' && input.mouseLeftDown && this._settingsClickCd <= 0) {
+    // 设置按钮点击检测（排除有自己设置按钮的模式，避免幽灵点击消耗）
+    const _hasOwnSettings = this.mode === 'sect' || this.mode === 'horseracing' || this.mode === 'arena';
+    if (this.mode !== 'test' && !_hasOwnSettings && input.mouseLeftDown && this._settingsClickCd <= 0) {
       const r = this._getSettingsBtnRect();
       if (input.mouseX >= r.x && input.mouseX <= r.x + r.w &&
           input.mouseY >= r.y && input.mouseY <= r.y + r.h) {
