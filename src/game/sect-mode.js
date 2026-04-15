@@ -21,7 +21,7 @@ import {
   TRAINING_MODES, TRAINING_MODE_ORDER, LEADER_BONUSES,
 } from './sect-data.js';
 import { checkNewAchievements, getAchievement } from './sect-achievements.js';
-import { resetDialogueMemory } from './sect-dialogues.js';
+import { resetDialogueMemory, pickCombatLine, pickLifeLine, isDialogueEnabled, setDialogueFlags, getDialogueFlags } from './sect-dialogues.js';
 
 export const sectModeMethods = {
 
@@ -53,6 +53,11 @@ export const sectModeMethods = {
     // 成就系统
     this.sectAchievementQueue = [];  // 待展示的成就ID队列
     this.sectAchievementCurrent = null; // 当前展示的成就ID
+
+    // 战斗对话气泡系统
+    this.sectSpeechBubbles = [];     // { fighter, text, timer, maxTimer, personality, color }
+    this._sectSpeechCd = {};         // 每个fighter的冷却 { [team]: number }
+    this._sectLowHpSpoken = {};      // 低血量台词是否已触发 { [team]: bool }
 
     // 剧情系统
     this.sectStoryPageIdx = 0;
@@ -152,6 +157,10 @@ export const sectModeMethods = {
       // 正常战斗 tick（含 hitFreeze / 慢动作 / combat.resolve / 粒子 / 浮文字）
       this._tick(dt);
 
+      // 战斗对话气泡：检查事件触发 + 更新计时
+      this._sectCheckCombatSpeechTriggers();
+      this._sectUpdateSpeechBubbles(dt);
+
       // 45秒超时强制结束
       if (this._victoryTimer < 0 && this.gameTime > 45) {
         const fA = this.player.fighter;
@@ -166,6 +175,34 @@ export const sectModeMethods = {
       if (this._victoryTimer >= 0) {
         if (!this.sectFightResult) {
           this.sectFightResult = this._sectSettleFightResult(this.player.fighter?.alive);
+          // 胜利/失败台词
+          if (isDialogueEnabled('combat') && this.sectFightResult) {
+            const pAA = this.sectPendingDisciple?.personality || 'diligent';
+            const fAA = this.player.fighter;
+            // 清除冷却，确保结算台词能出
+            this._sectSpeechCd = { 0: 0, 1: 0 };
+            this.sectSpeechBubbles = [];
+            if (this.sectFightResult.won && fAA) {
+              // 胜利时强制显示（跳过alive检查）
+              const line = pickCombatLine(pAA, 'combat_win', 'f0');
+              if (line && line !== '……') {
+                const pType = PERSONALITY_TYPES[pAA];
+                this.sectSpeechBubbles.push({
+                  fighter: fAA, text: line, timer: 2.5, maxTimer: 2.5,
+                  color: pType?.color || '#ffcc44',
+                });
+              }
+            } else if (!this.sectFightResult.won && fAA) {
+              const line = pickCombatLine(pAA, 'combat_lose', 'f0');
+              if (line && line !== '……') {
+                const pType = PERSONALITY_TYPES[pAA];
+                this.sectSpeechBubbles.push({
+                  fighter: fAA, text: line, timer: 2.5, maxTimer: 2.5,
+                  color: pType?.color || '#ffcc44',
+                });
+              }
+            }
+          }
         }
         // 女敌人胜利：先显示立绘 2.5s，非女敌人/败北：1.5s 直接结算
         const resultDelay = (this.sectFightResult?.won && this.sectFightResult?.enemyFemale) ? 2.5 : 1.5;
@@ -527,6 +564,15 @@ export const sectModeMethods = {
         // 取消资质秘籍选择
         this.sectPopup = null;
         break;
+
+      case 'toggleDialogue': {
+        const flags = getDialogueFlags();
+        flags[action.key] = !flags[action.key];
+        setDialogueFlags(flags);
+        const label = { training: '训练', combat: '战斗', life: '日常' }[action.key] || action.key;
+        this._sectShowToast(`${label}对话 ${flags[action.key] ? '✅ 开启' : '❌ 关闭'}`, flags[action.key] ? '#44cc88' : '#aa4444');
+        break;
+      }
     }
   },
 
@@ -710,6 +756,15 @@ export const sectModeMethods = {
 
     // 直接进入战斗观看（不再headless预模拟）
     this._sectStartQuestFight(d, quest);
+
+    // 出征台词
+    if (isDialogueEnabled('life')) {
+      const line = pickLifeLine(d.personality || 'diligent', 'quest_send', d.id);
+      if (line && line !== '……') {
+        const pType = PERSONALITY_TYPES[d.personality];
+        this._sectAddLog(`💬 ${d.name}：「${line}」`, pType?.color || '#aaa');
+      }
+    }
   },
 
   // ===== 任务战斗（直接观看，使用正常战斗循环）=====
@@ -798,6 +853,182 @@ export const sectModeMethods = {
     this.particles.particles = [];
     this.camera.x = C.ARENA_W / 2;
     this.camera.y = C.ARENA_H / 2;
+
+    // 初始化战斗对话气泡
+    this.sectSpeechBubbles = [];
+    this._sectSpeechCd = { 0: 0, 1: 0 };
+    this._sectLowHpSpoken = { 0: false, 1: false };
+
+    // 开场台词（延迟 0.3s 后出现）
+    if (isDialogueEnabled('combat')) {
+      const pA = this.sectPendingDisciple?.personality || 'diligent';
+      setTimeout(() => {
+        this._sectAddSpeechBubble(fA, pA, 'combat_start');
+      }, 300);
+      setTimeout(() => {
+        this._sectAddSpeechBubble(enemies[0].fighter, 'diligent', 'combat_start');
+      }, 600);
+    }
+  },
+
+  // ===== 战斗对话气泡 =====
+  _sectAddSpeechBubble(fighter, personality, context) {
+    if (!fighter || !fighter.alive) return;
+    if (!isDialogueEnabled('combat')) return;
+    // 冷却检查（同一 team 每 3 秒最多 1 句）
+    const team = fighter.team ?? 0;
+    if ((this._sectSpeechCd[team] || 0) > 0) return;
+    // 最多同时显示 2 个气泡
+    if (this.sectSpeechBubbles.length >= 2) return;
+
+    const line = pickCombatLine(personality, context, `f${team}`);
+    if (!line || line === '……') return;
+
+    const pType = PERSONALITY_TYPES[personality];
+    this.sectSpeechBubbles.push({
+      fighter,
+      text: line,
+      timer: 2.5,
+      maxTimer: 2.5,
+      color: pType?.color || '#ffcc44',
+    });
+    this._sectSpeechCd[team] = 3.0; // 3秒冷却
+  },
+
+  _sectUpdateSpeechBubbles(dt) {
+    // 冷却递减
+    for (const k of Object.keys(this._sectSpeechCd)) {
+      if (this._sectSpeechCd[k] > 0) this._sectSpeechCd[k] -= dt;
+    }
+    // 气泡计时
+    for (let i = this.sectSpeechBubbles.length - 1; i >= 0; i--) {
+      this.sectSpeechBubbles[i].timer -= dt;
+      if (this.sectSpeechBubbles[i].timer <= 0) {
+        this.sectSpeechBubbles.splice(i, 1);
+      }
+    }
+  },
+
+  _sectCheckCombatSpeechTriggers() {
+    if (!isDialogueEnabled('combat')) return;
+    if (!this.combat?.events) return;
+    const pA = this.sectPendingDisciple?.personality || 'diligent';
+    const fA = this.player.fighter;
+    const fB = this.enemies[0]?.fighter;
+    if (!fA || !fB) return;
+
+    for (const evt of this.combat.events) {
+      switch (evt.type) {
+        case 'hit':
+          // 命中方说话 (15%)
+          if (Math.random() < 0.15) {
+            const isOurs = evt.attacker === fA;
+            this._sectAddSpeechBubble(evt.attacker, isOurs ? pA : 'diligent',
+              'combat_hit');
+          }
+          // 被击方大伤说话 (30% if damage >= 20)
+          if (evt.damage >= 20 && Math.random() < 0.30) {
+            const isOurs = evt.target === fA;
+            this._sectAddSpeechBubble(evt.target, isOurs ? pA : 'diligent',
+              'combat_hurt');
+          }
+          break;
+        case 'perfectDodge':
+          // 完美闪避 (25%)
+          if (Math.random() < 0.25) {
+            const isOurs = evt.target === fA;
+            this._sectAddSpeechBubble(evt.target, isOurs ? pA : 'diligent',
+              'combat_dodge');
+          }
+          break;
+        case 'execution':
+          // 处决：被处决方说话
+          if (Math.random() < 0.5) {
+            const isOurs = evt.target === fA;
+            this._sectAddSpeechBubble(evt.target, isOurs ? pA : 'diligent',
+              'combat_hurt');
+          }
+          break;
+      }
+    }
+
+    // 低血量触发（一次性）
+    if (fA.alive && fA.hp / fA.maxHp < 0.3 && !this._sectLowHpSpoken[0]) {
+      this._sectLowHpSpoken[0] = true;
+      this._sectAddSpeechBubble(fA, pA, 'combat_lowHp');
+    }
+    if (fB.alive && fB.hp / fB.maxHp < 0.3 && !this._sectLowHpSpoken[1]) {
+      this._sectLowHpSpoken[1] = true;
+      this._sectAddSpeechBubble(fB, 'diligent', 'combat_lowHp');
+    }
+  },
+
+  // ===== 战斗对话气泡绘制（屏幕空间） =====
+  _sectDrawSpeechBubbles(ctx, lw, lh, narrow) {
+    const FONT = '"Microsoft YaHei", sans-serif';
+    for (const b of this.sectSpeechBubbles) {
+      if (!b.fighter) continue;
+      const lifeRatio = b.timer / b.maxTimer;
+      // 淡入淡出
+      let alpha;
+      if (lifeRatio > 0.9) alpha = (1 - lifeRatio) / 0.1; // 淡入
+      else if (lifeRatio < 0.2) alpha = lifeRatio / 0.2;   // 淡出
+      else alpha = 1;
+
+      // 将世界坐标转换为屏幕坐标
+      const cam = this.camera;
+      const sx = cam.viewX + (b.fighter.x + cam.offsetX) * cam.viewScale;
+      const sy = cam.viewY + (b.fighter.y + cam.offsetY) * cam.viewScale;
+
+      // 气泡位置：角色头顶上方，避开名字标签和HP条
+      const bubbleY = sy - (narrow ? 72 : 88);
+      const maxBW = Math.min(lw - 20, narrow ? 180 : 240);
+      ctx.font = `${narrow ? 11 : 13}px ${FONT}`;
+      const textW = ctx.measureText(b.text).width;
+      const bw = Math.min(maxBW, textW + (narrow ? 20 : 28));
+      const bh = narrow ? 26 : 32;
+      const bx = Math.max(4, Math.min(lw - bw - 4, sx - bw / 2));
+      const by = Math.max(50, bubbleY);
+
+      ctx.save();
+      ctx.globalAlpha = alpha;
+
+      // 背景
+      ctx.fillStyle = 'rgba(10,10,30,0.88)';
+      ctx.beginPath();
+      ctx.roundRect(bx, by, bw, bh, 7);
+      ctx.fill();
+
+      // 边框
+      ctx.strokeStyle = b.color;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.roundRect(bx, by, bw, bh, 7);
+      ctx.stroke();
+
+      // 小三角指向角色
+      const tipX = Math.max(bx + 10, Math.min(bx + bw - 10, sx));
+      ctx.fillStyle = b.color;
+      ctx.beginPath();
+      ctx.moveTo(tipX - 4, by + bh);
+      ctx.lineTo(tipX + 4, by + bh);
+      ctx.lineTo(tipX, by + bh + 6);
+      ctx.closePath();
+      ctx.fill();
+
+      // 文字（超长截断）
+      ctx.fillStyle = '#eee';
+      ctx.font = `${narrow ? 11 : 13}px ${FONT}`;
+      ctx.textAlign = 'center';
+      let line = b.text;
+      if (ctx.measureText(line).width > bw - (narrow ? 14 : 20)) {
+        while (ctx.measureText(line + '…').width > bw - (narrow ? 14 : 20) && line.length > 0) line = line.slice(0, -1);
+        line += '…';
+      }
+      ctx.fillText(line, bx + bw / 2, by + bh / 2 + 4);
+
+      ctx.restore();
+    }
   },
 
   // ===== 战斗结束：恢复正常游戏状态 =====
@@ -881,12 +1112,22 @@ export const sectModeMethods = {
       d.injury = Math.min(100, d.injury + 5 + Math.floor(Math.random() * 10));
       d.loyalty = Math.min(100, d.loyalty + 3);
       this._sectAddLog(`✅ ${d.name} 完成${quest.name}！+${result.goldGain}💰 +${result.fameGain}🏆`, '#44dd88');
+      // 胜利归来台词
+      if (isDialogueEnabled('life')) {
+        const line = pickLifeLine(d.personality || 'diligent', 'quest_return_win', d.id);
+        if (line && line !== '……') this._sectAddLog(`💬 ${d.name}：「${line}」`, PERSONALITY_TYPES[d.personality]?.color || '#aaa');
+      }
     } else {
       d.losses++;
       result.injuryGain = 20 + Math.floor(Math.random() * 25);
       d.injury = Math.min(100, d.injury + result.injuryGain);
       d.loyalty = Math.max(0, d.loyalty - 3);
       this._sectAddLog(`❌ ${d.name} 任务失败，受伤+${result.injuryGain}`, '#ff6644');
+      // 失败归来台词
+      if (isDialogueEnabled('life')) {
+        const line = pickLifeLine(d.personality || 'diligent', 'quest_return_lose', d.id);
+        if (line && line !== '……') this._sectAddLog(`💬 ${d.name}：「${line}」`, PERSONALITY_TYPES[d.personality]?.color || '#aaa');
+      }
     }
 
     d.onQuest = false;
@@ -1113,6 +1354,25 @@ export const sectModeMethods = {
     }
 
     this._sectAddLog(`━ 第${this.sect.day}天 ━ ${income > 0 ? `收入+${income}💰` : ''}`, '#888');
+
+    // 日常对话（新的一天，随机一名弟子说话）
+    if (isDialogueEnabled('life') && this.sect.disciples.length > 0) {
+      const pool = this.sect.disciples.filter(d => !d.onQuest);
+      if (pool.length > 0) {
+        const d = pool[Math.floor(Math.random() * pool.length)];
+        const p = d.personality || 'diligent';
+        // 根据弟子状态选择日常情境
+        let ctx = 'dawn';
+        if (d.injury > 40) ctx = 'injured_rest';
+        else if (d.loyalty >= 85) ctx = 'loyal_high';
+        else if (d.loyalty <= 30) ctx = 'loyal_low';
+        const line = pickLifeLine(p, ctx, d.id);
+        if (line && line !== '……') {
+          const pType = PERSONALITY_TYPES[p];
+          this._sectAddLog(`💬 ${d.name}：「${line}」`, pType?.color || '#aaa');
+        }
+      }
+    }
 
     // 检查剧情触发（仅在没有事件弹窗时）
     if (!this.sectPopup) {
@@ -1442,6 +1702,22 @@ export const sectModeMethods = {
 
     this.sect.pendingEvent = null;
     this.sectPopup = null;
+
+    // 事件反应台词
+    if (isDialogueEnabled('life') && this.sect.disciples.length > 0) {
+      const pool2 = this.sect.disciples.filter(d => !d.onQuest);
+      if (pool2.length > 0) {
+        const rd = pool2[Math.floor(Math.random() * pool2.length)];
+        // 根据事件正面/负面选择情境
+        const isGood = evt && ['wanderer','prodigy','merchant','treasure','friendship','tourneyInvite','herbGarden','secretManual'].includes(evt.id);
+        const ctx2 = isGood ? 'event_good' : 'event_bad';
+        const line2 = pickLifeLine(rd.personality || 'diligent', ctx2, rd.id);
+        if (line2 && line2 !== '……') {
+          this._sectAddLog(`💬 ${rd.name}：「${line2}」`, PERSONALITY_TYPES[rd.personality]?.color || '#aaa');
+        }
+      }
+    }
+
     // 事件处理后检查剧情
     this._sectCheckStory();
   },
@@ -1578,6 +1854,11 @@ export const sectModeMethods = {
       const fB = this.enemies[0]?.fighter;
       if (fA && fB) {
         this.ui.draw(fA, fB, [fB], 0);
+      }
+
+      // ===== 战斗对话气泡渲染 =====
+      if (this.sectSpeechBubbles.length > 0) {
+        this._sectDrawSpeechBubbles(ctx, lw, lh, narrow);
       }
 
       // 计时器

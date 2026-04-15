@@ -1,5 +1,9 @@
-// ===== 宗门风云 · 训练台词库 (上下文感知版) =====
-// 按性格 × 状态分档：normal|tired|exhausted|injured|intense|inspired|levelup|mastered
+// ===== 宗门风云 · 台词系统(统一引擎) =====
+// 训练台词按性格 × 状态分档：normal|tired|exhausted|injured|intense|inspired|levelup|mastered
+// 战斗/日常台词分别在 sect-dialogues-combat.js 和 sect-dialogues-life.js
+
+import { COMBAT_DIALOGUES } from './sect-dialogues-combat.js';
+import { LIFE_DIALOGUES } from './sect-dialogues-life.js';
 
 const _D = {
   hotblood: {
@@ -488,3 +492,61 @@ export function pickTrainLine(disciple, context) {
 }
 
 export const TRAIN_DIALOGUES = _D; // 供外部读取总台词数据
+
+// ================================================================
+// ===== 通用台词 API（战斗 / 日常 / 事件） =====
+// ================================================================
+
+/**
+ * 从战斗台词库选取一句
+ * @param {string} personality - 性格 id
+ * @param {string} context - 战斗情境 (combat_start / combat_hit / combat_hurt / combat_dodge / combat_lowHp / combat_win / combat_lose)
+ * @param {string|number} id - 用于去重的唯一标识
+ */
+export function pickCombatLine(personality, context, id) {
+  const bucket = COMBAT_DIALOGUES[personality] || COMBAT_DIALOGUES.diligent;
+  const pool = bucket[context] || [];
+  return _pick(pool, `cb_${id}`, 6);
+}
+
+/**
+ * 从日常台词库选取一句
+ * @param {string} personality - 性格 id
+ * @param {string} context - 日常情境 (dawn / idle / quest_send / quest_return_win / quest_return_lose / event_good / event_bad / injured_rest / loyal_high / loyal_low)
+ * @param {string|number} id - 用于去重的唯一标识
+ */
+export function pickLifeLine(personality, context, id) {
+  const bucket = LIFE_DIALOGUES[personality] || LIFE_DIALOGUES.diligent;
+  const pool = bucket[context] || [];
+  return _pick(pool, `lf_${id}`, 6);
+}
+
+// ===== 对话开关系统 =====
+// 全局对话开关，各子系统独立控制
+const _dialogueFlags = {
+  training: true,   // 训练台词
+  combat: true,     // 战斗台词
+  life: true,       // 日常/事件台词
+};
+
+/** 获取对话开关状态 */
+export function getDialogueFlags() {
+  return { ..._dialogueFlags };
+}
+
+/** 设置对话开关（传入部分 key 即可） */
+export function setDialogueFlags(flags) {
+  if (flags && typeof flags === 'object') {
+    for (const k of Object.keys(_dialogueFlags)) {
+      if (k in flags) _dialogueFlags[k] = !!flags[k];
+    }
+  }
+}
+
+/** 检查某类台词是否启用 */
+export function isDialogueEnabled(category) {
+  return _dialogueFlags[category] !== false;
+}
+
+// 导出台词数据供外部使用
+export { COMBAT_DIALOGUES, LIFE_DIALOGUES };

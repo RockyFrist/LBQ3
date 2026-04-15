@@ -9,6 +9,7 @@ import {
   PERSONALITY_TYPES,
   TRAINING_MODES, TRAINING_MODE_ORDER, LEADER_BONUSES,
 } from './sect-data.js';
+import { getDialogueFlags } from './sect-dialogues.js';
 
 // ===== 颜色常量 =====
 const COL_BG       = '#0a0a14';
@@ -1650,7 +1651,7 @@ export class SectUI {
     ctx.fillRect(0, 0, cw, ch);
 
     const pw = Math.min(cw - 40, narrow ? 260 : 300);
-    const ph = narrow ? 200 : 230;
+    const ph = narrow ? 340 : 390;
     const px = (cw - pw) / 2;
     const py = (ch - ph) / 2;
 
@@ -1682,6 +1683,40 @@ export class SectUI {
       this._buttons.push({ ...rect4, action: sa.action });
       by4 += btnH4 + gap4;
     }
+
+    // ===== 对话开关区域 =====
+    by4 += narrow ? 4 : 8;
+    ctx.fillStyle = COL_DIM;
+    ctx.font = `${narrow ? 11 : 12}px ${FONT}`;
+    ctx.textAlign = 'center';
+    ctx.fillText('💬 对话气泡', cw / 2, by4 + 4);
+    by4 += narrow ? 14 : 18;
+
+    const flags = getDialogueFlags();
+    const toggleW = Math.floor((btnW4 - gap4 * 2) / 3);
+    const toggleH = narrow ? 28 : 32;
+    const toggleItems = [
+      { key: 'training', label: '训练', on: flags.training },
+      { key: 'combat',   label: '战斗', on: flags.combat },
+      { key: 'life',     label: '日常', on: flags.life },
+    ];
+    for (let i = 0; i < toggleItems.length; i++) {
+      const ti = toggleItems[i];
+      const tx = px + 20 + i * (toggleW + gap4);
+      const rect = { x: tx, y: by4, w: toggleW, h: toggleH };
+      const hovered = hit(mx, my, tx, by4, toggleW, toggleH);
+      ctx.fillStyle = hovered ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.04)';
+      ctx.fillRect(tx, by4, toggleW, toggleH);
+      ctx.strokeStyle = ti.on ? '#44cc88' : '#aa4444';
+      ctx.lineWidth = 1.5;
+      ctx.strokeRect(tx, by4, toggleW, toggleH);
+      ctx.fillStyle = hovered ? '#fff' : (ti.on ? '#ccc' : '#777');
+      ctx.font = `${narrow ? 11 : 12}px ${FONT}`;
+      ctx.textAlign = 'center';
+      ctx.fillText(`${ti.on ? '✅' : '❌'} ${ti.label}`, tx + toggleW / 2, by4 + toggleH / 2 + 4);
+      this._buttons.push({ ...rect, action: { type: 'action', id: 'toggleDialogue', key: ti.key } });
+    }
+    by4 += toggleH + gap4;
 
     // 关闭
     const closeRect = { x: cw / 2 - 40, y: by4 + 4, w: 80, h: 26 };
