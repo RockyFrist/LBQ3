@@ -163,6 +163,9 @@ function startGame(result) {
   if (touchControls) {
     if (_isPlayerMode(result.mode)) {
       touchControls.show();
+    } else if (result.mode === 'sect') {
+      // 宗门模式隐藏触控按钮（导航全在Canvas内）
+      touchControls.hide();
     } else {
       // 观战/擂台等只需要返回按钮
       touchControls.showBackOnly();

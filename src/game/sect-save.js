@@ -4,7 +4,44 @@
 import { resetDiscipleIdCounter } from './sect-data.js';
 
 const SAVE_KEY_PREFIX = 'lbq3_sect_';
+const AUTO_SAVE_KEY = 'lbq3_sect_auto';
+const AUTO_SAVE_FLAG_KEY = 'lbq3_sect_autosave_on';
 const MAX_SLOTS = 3;
+
+/** 自动存档（每天结束自动保存） */
+export function autoSaveSect(state) {
+  try {
+    localStorage.setItem(AUTO_SAVE_KEY, JSON.stringify(state));
+    return true;
+  } catch (e) {
+    console.error('自动存档失败:', e);
+    return false;
+  }
+}
+
+/** 读取自动存档 */
+export function loadAutoSave() {
+  try {
+    const raw = localStorage.getItem(AUTO_SAVE_KEY);
+    if (!raw) return null;
+    const state = JSON.parse(raw);
+    const maxId = state.disciples.reduce((m, d) => Math.max(m, d.id || 0), 0);
+    resetDiscipleIdCounter(maxId);
+    return state;
+  } catch (e) {
+    console.error('读取自动存档失败:', e);
+    return null;
+  }
+}
+
+/** 自动存档开关 */
+export function isAutoSaveOn() {
+  return localStorage.getItem(AUTO_SAVE_FLAG_KEY) !== 'off';
+}
+
+export function setAutoSave(on) {
+  localStorage.setItem(AUTO_SAVE_FLAG_KEY, on ? 'on' : 'off');
+}
 
 /** 保存到指定槽位 (0-2) */
 export function saveSect(slot, state) {

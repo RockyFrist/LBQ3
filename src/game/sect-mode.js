@@ -9,7 +9,7 @@ import { Fighter } from '../combat/fighter.js';
 import { getWeapon, WEAPON_LIST } from '../weapons/weapon-defs.js';
 import { getArmor } from '../weapons/armor-defs.js';
 import { SectUI } from './sect-ui.js';
-import { saveSect, loadSect, getSaveSlots } from './sect-save.js';
+import { saveSect, loadSect, getSaveSlots, autoSaveSect, loadAutoSave, isAutoSaveOn, setAutoSave } from './sect-save.js';
 import {
   createInitialState, createDisciple, generateQuest, rollEvent,
   BUILDINGS, maxDisciples, availableArmors, trainExpMul, healMul,
@@ -27,6 +27,10 @@ export const sectModeMethods = {
 
   // ===== 初始化 =====
   _setupSectMode(savedState) {
+    // 尝试读取自动存档（未手动指定存档时）
+    if (!savedState && isAutoSaveOn()) {
+      savedState = loadAutoSave();
+    }
     this.sect = savedState || createInitialState();
     this.sectUI = new SectUI();
     this.sectSubPage = 'main'; // main | disciples | buildings | quests | market | log | disciple_detail
@@ -85,6 +89,7 @@ export const sectModeMethods = {
     if (!this.sect.achievements) this.sect.achievements = [];
     if (this.sect.leaderId === undefined) this.sect.leaderId = null;
     if (this.sect.trainedToday !== undefined) delete this.sect.trainedToday;
+    if (this.sect.trainsToday === undefined) this.sect.trainsToday = 0;
     if (!this.sect.stats.totalTrains) this.sect.stats.totalTrains = 0;
     if (!this.sect.stats.totalQuests) this.sect.stats.totalQuests = 0;
     if (this.sect.stats.talentScrollsUsed === undefined) this.sect.stats.talentScrollsUsed = 0;
@@ -122,11 +127,13 @@ export const sectModeMethods = {
       }
       // 训练动画：ESC跳过动画直接完成
       if (this.sectTrainAnim) {
+        const cb = this._sectTrainAnimCallback;
         this.sectTrainAnim = false;
         this.sectTrainAnimData = null;
         this.sectTrainAnimProgress = 0;
         this.sectTrainAnimWait = false;
-        this._sectFinishDay();
+        this._sectTrainAnimCallback = null;
+        if (cb) cb.call(this);
         return;
       }
       if (this.sectPopup) {
@@ -167,6 +174,20 @@ export const sectModeMethods = {
           this._sectEndFight();
         }
         return;
+      }
+
+      // 点击跳过按钮检查
+      if (input.mouseLeftDown && this._victoryTimer < 0) {
+        const action = this.sectUI.handleClick(input.mouseX, input.mouseY);
+        if (action && action.type === 'skipFight') {
+          // 强制结束战斗
+          const fA = this.player.fighter;
+          const fB = this.enemies[0]?.fighter;
+          if (fA && fB) {
+            if (fA.hp <= fB.hp) { fA.hp = 0; fA.alive = false; }
+            else { fB.hp = 0; fB.alive = false; }
+          }
+        }
       }
 
       // 正常战斗 tick（含 hitFreeze / 慢动作 / combat.resolve / 粒子 / 浮文字）
@@ -242,11 +263,13 @@ export const sectModeMethods = {
       if (this.sectTrainAnimWait) {
         // 等待点击继续
         if (input.mouseLeftDown || input.pressed('Escape') || input.touchBack) {
+          const cb = this._sectTrainAnimCallback;
           this.sectTrainAnim = false;
           this.sectTrainAnimData = null;
           this.sectTrainAnimProgress = 0;
           this.sectTrainAnimWait = false;
-          this._sectFinishDay();
+          this._sectTrainAnimCallback = null;
+          if (cb) cb.call(this);
         }
       } else {
         this.sectTrainAnimProgress += dt * 0.45;
@@ -425,6 +448,10 @@ export const sectModeMethods = {
         this._sectShowToast(`${count}人切换至${mode.icon}${mode.name}`, '#4499ff');
         break;
       }
+
+      case 'train':
+        this._sectDoTraining();
+        break;
 
       case 'setLeader': {
         const d = this.sect.disciples.find(d => d.id === action.discipleId);
@@ -607,6 +634,13 @@ export const sectModeMethods = {
         setDialogueFlags(flags);
         const label = { training: '训练', combat: '战斗', life: '日常' }[action.key] || action.key;
         this._sectShowToast(`${label}对话 ${flags[action.key] ? '✅ 开启' : '❌ 关闭'}`, flags[action.key] ? '#44cc88' : '#aa4444');
+        break;
+      }
+
+      case 'toggleAutoSave': {
+        const nowOn = !isAutoSaveOn();
+        setAutoSave(nowOn);
+        this._sectShowToast(`自动存档 ${nowOn ? '✅ 开启' : '❌ 关闭'}`, nowOn ? '#44cc88' : '#aa4444');
         break;
       }
     }
@@ -1225,22 +1259,17 @@ export const sectModeMethods = {
     this._sectAddLog(`⚔ ${a.name} vs ${b.name} 切磋开始！`, '#ff9944');
   },
 
-  // ===== 下一天 =====
-  _sectNextDay() {
-    this.sect.day++;
-    this.sect.stats.totalDays++;
-
-    // 被动收入
-    const income = dailyIncome(this.sect.buildings.bank);
-    if (income > 0) {
-      this.sect.gold += income;
-      this.sect.stats.totalGold += income;
+  // ===== 训练（每天最多3次）=====
+  _sectDoTraining() {
+    const maxTrains = 3;
+    if ((this.sect.trainsToday || 0) >= maxTrains) {
+      this._sectShowToast(`今日训练已达上限(${maxTrains}次)`, '#ff9944');
+      return;
     }
 
     // ===== 训练结算（档位系统）=====
     const dojoMul = trainExpMul(this.sect.buildings.dojo);
     const libLv = this.sect.buildings.library;
-    const hMul = healMul(this.sect.buildings.clinic);
     const leader = this.sect.disciples.find(d => d.id === this.sect.leaderId);
     const leaderBonus = leader ? LEADER_BONUSES[leader.personality] : null;
     let trainedCount = 0;
@@ -1251,7 +1280,13 @@ export const sectModeMethods = {
       if (d.onQuest) continue;
 
       const mode = TRAINING_MODES[d.trainingMode || 'normal'];
-      // 休养模式也记录动画数据（体力回复）
+      if (mode.id === 'rest') {
+        // 休养模式：仅恢复体力，不计为训练
+        const oldSta = d.stamina;
+        d.stamina = Math.min(100, d.stamina + mode.stamina);
+        animDisciples.push({ disciple: d, oldStamina: oldSta, newStamina: d.stamina, expGain: 0 });
+        continue;
+      }
       const oldStamina = d.stamina;
       let staminaDelta = mode.stamina;
       let expGain = Math.floor(mode.exp * dojoMul);
@@ -1259,22 +1294,16 @@ export const sectModeMethods = {
 
       // 领头加成
       if (leaderBonus && mode.exp > 0) {
-        // 刻苦：体力消耗减少
         if (leaderBonus.teamStaminaSave && staminaDelta < 0)
           staminaDelta += leaderBonus.teamStaminaSave;
-        // 热血：全队经验加成
         if (leaderBonus.teamExpMul)
           expGain = Math.floor(expGain * (1 + leaderBonus.teamExpMul));
-        // 热血：受伤风险增加
         if (leaderBonus.teamRiskAdd)
           riskChance += leaderBonus.teamRiskAdd;
-        // 沉稳：受伤风险减半
         if (leaderBonus.teamRiskMul !== undefined)
           riskChance *= leaderBonus.teamRiskMul;
-        // 傲娇：忠诚低于领头的弟子经验加成
         if (leaderBonus.condExpMul && leader && d.id !== leader.id && d.loyalty < leader.loyalty - 20)
           expGain = Math.floor(expGain * (1 + leaderBonus.condExpMul));
-        // 天然：全员忠诚+1
         if (leaderBonus.teamLoyalty)
           d.loyalty = Math.min(100, d.loyalty + leaderBonus.teamLoyalty);
       }
@@ -1288,7 +1317,6 @@ export const sectModeMethods = {
 
       // 获得经验
       if (expGain > 0 && d.level < d.talent) {
-        const oldLv = d.level;
         this._sectGainExp(d, expGain);
         trainedCount++;
         totalExpGained += expGain;
@@ -1323,13 +1351,6 @@ export const sectModeMethods = {
       if (mode.loyaltyMod)
         d.loyalty = Math.max(0, Math.min(100, d.loyalty + mode.loyaltyMod));
 
-      // 受伤恢复
-      if (d.injury > 0)
-        d.injury = Math.max(0, d.injury - Math.floor(15 * hMul));
-
-      // 忠诚缓慢回升
-      if (d.loyalty < 60) d.loyalty += 1;
-
       // 体力过低自动降档至休养
       if (d.stamina < 10 && d.trainingMode !== 'rest') {
         d.trainingMode = 'rest';
@@ -1337,17 +1358,17 @@ export const sectModeMethods = {
       }
     }
 
+    this.sect.trainsToday = (this.sect.trainsToday || 0) + 1;
+
     if (trainedCount > 0) {
       this.sect.stats.totalTrains++;
-      this._sectAddLog(`📊 训练结算：${trainedCount}人修炼，共+${totalExpGained}exp`, '#4499ff');
+      this._sectAddLog(`📊 训练(${this.sect.trainsToday}/${maxTrains})：${trainedCount}人修炼，共+${totalExpGained}exp`, '#4499ff');
+    } else {
+      this._sectAddLog(`📊 训练(${this.sect.trainsToday}/${maxTrains})：全员休养`, '#88aacc');
     }
 
-    // 保存收入值供 _sectFinishDay 使用
-    this._sectDayIncome = income;
-
-    // 如果有训练弟子，播放训练动画
+    // 如果有弟子，播放训练动画
     if (animDisciples.length > 0) {
-      // 准备台词气泡
       let speakers = [];
       if (isDialogueEnabled('training')) {
         const trainees = animDisciples.map(ad => ad.disciple);
@@ -1361,10 +1382,42 @@ export const sectModeMethods = {
       this.sectTrainAnim = true;
       this.sectTrainAnimProgress = 0;
       this.sectTrainAnimWait = false;
-      return; // 动画结束后由 _sectFinishDay 继续
+      // 动画结束后不调用 _sectFinishDay，训练是独立操作
+      this._sectTrainAnimCallback = null;
     }
 
-    // 无训练弟子，直接完成后续
+    // 自动存档
+    if (isAutoSaveOn()) {
+      autoSaveSect(this.sect);
+    }
+  },
+
+  // ===== 下一天 =====
+  _sectNextDay() {
+    this.sect.day++;
+    this.sect.stats.totalDays++;
+    this.sect.trainsToday = 0; // 重置训练次数
+
+    // 被动收入
+    const income = dailyIncome(this.sect.buildings.bank);
+    if (income > 0) {
+      this.sect.gold += income;
+      this.sect.stats.totalGold += income;
+    }
+
+    // 受伤恢复 + 忠诚回升（每天自动）
+    const hMul = healMul(this.sect.buildings.clinic);
+    for (const d of this.sect.disciples) {
+      if (d.onQuest) continue;
+      if (d.injury > 0)
+        d.injury = Math.max(0, d.injury - Math.floor(15 * hMul));
+      if (d.loyalty < 60) d.loyalty += 1;
+    }
+
+    // 保存收入值供 _sectFinishDay 使用
+    this._sectDayIncome = income;
+
+    // 直接完成后续
     this._sectFinishDay();
   },
 
@@ -1452,6 +1505,11 @@ export const sectModeMethods = {
       this._sectCheckStory();
     }
     this._sectCheckAchievements();
+
+    // 自动存档
+    if (isAutoSaveOn()) {
+      autoSaveSect(this.sect);
+    }
   },
 
   // ===== 事件选择处理 =====
@@ -1926,12 +1984,33 @@ export const sectModeMethods = {
       const fA = this.player.fighter;
       const fB = this.enemies[0]?.fighter;
       if (fA && fB) {
-        this.ui.draw(fA, fB, [fB], 0);
-      }
+        ttx.globalAlpha = 0.6
 
       // ===== 战斗对话气泡渲染 =====
       if (this.sectSpeechBubbles.length > 0) {
         this._sectDrawSpeechBubbles(ctx, lw, lh, narrow);
+      }
+
+      // ===== 返回按钮（Canvas内，替代HTML touchBack）=====
+      if (this._victoryTimer < 0) {
+        const bbW = narrow ? 52 : 60;
+        const bbH = narrow ? 24 : 28;
+        const bbX = 8;
+        const bbY = narrow ? 30 : 36;
+        const bbHovered = hit(this.input.mouseX, this.input.mouseY, bbX, bbY, bbW, bbH);
+        ctx.globalAlpha = bbHovered ? 0.9 : 0.5;
+        ctx.fillStyle = 'rgba(0,0,0,0.6)';
+        ctx.fillRect(bbX, bbY, bbW, bbH);
+        ctx.strokeStyle = '#888';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(bbX, bbY, bbW, bbH);
+        ctx.fillStyle = '#ddd';
+        ctx.font = `${narrow ? 10 : 12}px "Microsoft YaHei", sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.fillText('← 跳过', bbX + bbW / 2, bbY + bbH / 2 + 4);
+        ctx.globalAlpha = 1;
+        // 注册为可点击区域
+        this.sectUI._buttons.push({ x: bbX, y: bbY, w: bbW, h: bbH, action: { type: 'skipFight' } });
       }
 
       // 计时器
@@ -1985,7 +2064,10 @@ export const sectModeMethods = {
       this.sectUI.drawTrainAnim(ctx, lw, lh, this.sectTrainAnimProgress, narrow, this.sectTrainAnimData, this.sectTrainAnimWait);
     }
 
-    // 弹窗层
+    // 弹窗层（清空底层按钮，防止点击穿透）
+    if (this.sectPopup) {
+      this.sectUI._buttons = [];
+    }
     if (this.sectPopup === 'story' && this.sect.pendingStory) {
       this.sectUI.drawStoryPopup(ctx, lw, lh, this.sect.pendingStory, this.sectStoryPageIdx, mx, my, narrow);
     } else if (this.sectPopup === 'event' && this.sect.pendingEvent) {

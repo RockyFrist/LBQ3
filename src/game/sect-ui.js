@@ -10,6 +10,7 @@ import {
   TRAINING_MODES, TRAINING_MODE_ORDER, LEADER_BONUSES,
 } from './sect-data.js';
 import { getDialogueFlags } from './sect-dialogues.js';
+import { isAutoSaveOn } from './sect-save.js';
 
 // ===== 颜色常量 =====
 const COL_BG       = '#0a0a14';
@@ -104,9 +105,10 @@ export class SectUI {
     return this._imgCache.get(path);
   }
 
-  /** 收集按钮点击，返回 action 或 null */
+  /** 收集按钮点击，返回 action 或 null（倒序遍历，后绘制的弹窗优先） */
   handleClick(mx, my) {
-    for (const btn of this._buttons) {
+    for (let i = this._buttons.length - 1; i >= 0; i--) {
+      const btn = this._buttons[i];
       if (hit(mx, my, btn.x, btn.y, btn.w, btn.h)) {
         if (btn.disabled) continue;
         return btn.action;
@@ -333,16 +335,12 @@ export class SectUI {
     const hasFought = state.stats.totalFights > 0; // 有过战斗
 
     const actions = [];
-    // 训练档位概览
-    const modeCounts = { rest: 0, normal: 0, intense: 0, extreme: 0 };
-    for (const d of state.disciples) {
-      if (!d.onQuest) modeCounts[d.trainingMode || 'normal']++;
-    }
-    const modeLabel = TRAINING_MODE_ORDER
-      .filter(m => modeCounts[m] > 0)
-      .map(m => `${TRAINING_MODES[m].icon}${modeCounts[m]}`)
-      .join(' ') || '无弟子';
-    actions.push({ label: `⚔ 全体强化 (${modeLabel})`, action: { type: 'action', id: 'batchMode', mode: 'intense' }, color: '#4499ff' });
+    // 训练按钮（每天最多3次）
+    const trainsToday = state.trainsToday || 0;
+    const maxTrains = 3;
+    const trainLabel = `⚔ 训练 (${trainsToday}/${maxTrains})`;
+    const trainDisabled = trainsToday >= maxTrains;
+    actions.push({ label: trainLabel, action: { type: 'action', id: 'train' }, color: trainDisabled ? '#555' : '#4499ff', disabled: trainDisabled });
     actions.push({ label: '🌙 进入下一天', action: { type: 'action', id: 'nextDay' }, color: COL_ACCENT });
     // 第2天起解锁建造
     if (day >= 2) {
@@ -356,6 +354,8 @@ export class SectUI {
     if (day >= 4 || hasFought) {
       actions.push({ label: '⚔ 门派切磋', action: { type: 'action', id: 'spar' }, color: '#ff6644' });
     }
+    // 全体休养
+    actions.push({ label: '🌙 全体休养', action: { type: 'action', id: 'batchMode', mode: 'rest' }, color: '#88aacc' });
 
     for (let i = 0; i < actions.length; i++) {
       const col = i % 2;
@@ -368,7 +368,25 @@ export class SectUI {
       if (!a.disabled) this._buttons.push({ ...rect, action: a.action });
     }
 
-    cy += Math.ceil(actions.length / 2) * (btnH + btnGap) + 10;
+    cy += Math.ceil(actions.length / 2) * (btnH + btnGap) + 4;
+
+    // 训练档位概览
+    const modeCounts = { rest: 0, normal: 0, intense: 0, extreme: 0 };
+    for (const d of state.disciples) {
+      if (!d.onQuest) modeCounts[d.trainingMode || 'normal']++;
+    }
+    const modeOverview = TRAINING_MODE_ORDER
+      .filter(m => modeCounts[m] > 0)
+      .map(m => `${TRAINING_MODES[m].icon}${TRAINING_MODES[m].name}×${modeCounts[m]}`)
+      .join('  ');
+    if (modeOverview) {
+      ctx.textAlign = 'left';
+      ctx.fillStyle = COL_DIM;
+      ctx.font = `${narrow ? 9 : 10}px ${FONT}`;
+      ctx.fillText(`档位: ${modeOverview}`, x, cy + 8);
+      cy += 14;
+    }
+    cy += 4;
 
     // 弟子概览（前5个）
     ctx.textAlign = 'left';
@@ -724,27 +742,30 @@ export class SectUI {
     }
     cy += leaderH + 8;
 
-    // 操作按钮（2行2列）
+    // 操作按钮（换装）
     const btnH = narrow ? 34 : 38;
     const btnGap = 6;
     const btnW2 = (w - btnGap) / 2;
-    const ops = [
+    const equipOps = [
       { label: '⚔ 换武器', action: { type: 'action', id: 'changeWeapon', discipleId: d.id }, color: '#44aaff',
         disabled: d.onQuest },
       { label: '🛡 换护甲', action: { type: 'action', id: 'changeArmor', discipleId: d.id }, color: '#44dd88',
         disabled: d.onQuest },
-      { label: '🌙 全体休养', action: { type: 'action', id: 'batchMode', mode: 'rest' }, color: '#88aacc' },
-      { label: '开除', action: { type: 'action', id: 'dismiss', discipleId: d.id }, color: COL_DANGER },
     ];
-    for (let i = 0; i < ops.length; i++) {
-      const col = i % 2;
-      const row = Math.floor(i / 2);
-      const bx = x + col * (btnW2 + btnGap);
-      const by = cy + row * (btnH + btnGap);
-      const rect = { x: bx, y: by, w: btnW2, h: btnH };
-      drawBtn(ctx, rect, ops[i].label, ops[i].color, mx, my, { disabled: ops[i].disabled, fontSize: narrow ? 11 : 12 });
-      if (!ops[i].disabled) this._buttons.push({ ...rect, action: ops[i].action });
+    for (let i = 0; i < equipOps.length; i++) {
+      const bx = x + i * (btnW2 + btnGap);
+      const rect = { x: bx, y: cy, w: btnW2, h: btnH };
+      drawBtn(ctx, rect, equipOps[i].label, equipOps[i].color, mx, my, { disabled: equipOps[i].disabled, fontSize: narrow ? 11 : 12 });
+      if (!equipOps[i].disabled) this._buttons.push({ ...rect, action: equipOps[i].action });
     }
+    cy += btnH + 16;
+
+    // 开除按钮（独立一行，较小字体，需二次确认）
+    const dismissW = narrow ? 70 : 80;
+    const dismissH = narrow ? 26 : 30;
+    const dismissRect = { x: x + w - dismissW, y: cy, w: dismissW, h: dismissH };
+    drawBtn(ctx, dismissRect, '开除', COL_DANGER, mx, my, { fontSize: narrow ? 10 : 11 });
+    this._buttons.push({ ...dismissRect, action: { type: 'action', id: 'dismiss', discipleId: d.id } });
   }
 
   // ===== 建造面板 =====
@@ -1651,7 +1672,7 @@ export class SectUI {
     ctx.fillRect(0, 0, cw, ch);
 
     const pw = Math.min(cw - 40, narrow ? 260 : 300);
-    const ph = narrow ? 340 : 390;
+    const ph = narrow ? 400 : 460;
     const px = (cw - pw) / 2;
     const py = (ch - ph) / 2;
 
@@ -1716,6 +1737,22 @@ export class SectUI {
       ctx.fillText(`${ti.on ? '✅' : '❌'} ${ti.label}`, tx + toggleW / 2, by4 + toggleH / 2 + 4);
       this._buttons.push({ ...rect, action: { type: 'action', id: 'toggleDialogue', key: ti.key } });
     }
+    by4 += toggleH + gap4;
+
+    // ===== 自动存档开关 =====
+    const autoOn = isAutoSaveOn();
+    const autoRect = { x: px + 20, y: by4, w: btnW4, h: toggleH };
+    const autoHovered = hit(mx, my, autoRect.x, autoRect.y, autoRect.w, autoRect.h);
+    ctx.fillStyle = autoHovered ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.04)';
+    ctx.fillRect(autoRect.x, by4, btnW4, toggleH);
+    ctx.strokeStyle = autoOn ? '#44cc88' : '#aa4444';
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(autoRect.x, by4, btnW4, toggleH);
+    ctx.fillStyle = autoHovered ? '#fff' : (autoOn ? '#ccc' : '#777');
+    ctx.font = `${narrow ? 11 : 12}px ${FONT}`;
+    ctx.textAlign = 'center';
+    ctx.fillText(`${autoOn ? '✅' : '❌'} 自动存档（每天结束自动保存）`, px + pw / 2, by4 + toggleH / 2 + 4);
+    this._buttons.push({ ...autoRect, action: { type: 'action', id: 'toggleAutoSave' } });
     by4 += toggleH + gap4;
 
     // 关闭
