@@ -19,6 +19,7 @@ import {
   FAME_TIERS, getFameTier, SHOP_POOL, refreshShopItems,
   PERSONALITY_TYPES, pickTrainLine, pickGroupSpeakers,
   TRAINING_MODES, TRAINING_MODE_ORDER, LEADER_BONUSES,
+  AUTO_TRAIN_EXP, isBuildingUnlocked,
 } from './sect-data.js';
 import { checkNewAchievements, getAchievement } from './sect-achievements.js';
 import { resetDialogueMemory, pickCombatLine, pickLifeLine, isDialogueEnabled, setDialogueFlags, getDialogueFlags } from './sect-dialogues.js';
@@ -67,11 +68,17 @@ export const sectModeMethods = {
     this.sectAchievementQueue = [];  // 待展示的成就ID队列
     this.sectAchievementCurrent = null; // 当前展示的成就ID
 
-    // 训练动画系统
-    this.sectTrainAnim = false;       // 是否正在播放训练动画
-    this.sectTrainAnimData = null;    // { type, disciples, speakers }
-    this.sectTrainAnimProgress = 0;   // 0→1 动画进度
-    this.sectTrainAnimWait = false;   // 动画完成，等待点击继续
+    // 训练动画系统（兼容保留）
+    this.sectTrainAnim = false;
+    this.sectTrainAnimData = null;
+    this.sectTrainAnimProgress = 0;
+    this.sectTrainAnimWait = false;
+
+    // 战斗加速系统
+    this.sectBattleSpeed = 1; // 1x, 2x, 4x
+
+    // 日终结算系统
+    this.sectDaySummary = null; // { trained:[], fought:[], income, healed:[], events:[] }
 
     // 战斗对话气泡系统
     this.sectSpeechBubbles = [];     // { fighter, text, timer, maxTimer, personality, color }
@@ -96,7 +103,10 @@ export const sectModeMethods = {
     }
     // 兼容旧存档（没有achievements字段）
     if (!this.sect.achievements) this.sect.achievements = [];
-    if (this.sect.leaderId === undefined) this.sect.leaderId = null;
+    // 大弟子默认设置：如果没有leader，自动指定第一个弟子
+    if (!this.sect.leaderId && this.sect.disciples.length > 0) {
+      this.sect.leaderId = this.sect.disciples[0].id;
+    }
     if (this.sect.trainedToday !== undefined) delete this.sect.trainedToday;
     if (this.sect.trainsToday !== undefined) delete this.sect.trainsToday;
     if (!this.sect.stats.totalTrains) this.sect.stats.totalTrains = 0;
@@ -178,7 +188,6 @@ export const sectModeMethods = {
         }
         return;
       }
-      // 训练动画：ESC跳过动画直接完成
       if (this.sectTrainAnim) {
         const cb = this._sectTrainAnimCallback;
         this.sectTrainAnim = false;
@@ -189,13 +198,17 @@ export const sectModeMethods = {
         if (cb) cb.call(this);
         return;
       }
+      if (this.sectPopup === 'daySummary') {
+        this._sectAfterDaySummary();
+        return;
+      }
       if (this.sectPopup) {
         this.sectPopup = null;
         this.sectSelectedQuestIdx = -1;
         return;
       }
       if (this.sectSubPage === 'disciple_detail') {
-        this.sectSubPage = 'disciples';
+        this.sectSubPage = 'main';
         return;
       }
       // 无弹窗在主页则回到标题画面
@@ -240,11 +253,13 @@ export const sectModeMethods = {
             if (fA.hp <= fB.hp) { fA.hp = 0; fA.alive = false; }
             else { fB.hp = 0; fB.alive = false; }
           }
+        } else if (action && action.type === 'action' && action.id === 'changeBattleSpeed') {
+          this._sectDoAction('changeBattleSpeed', action);
         }
       }
 
-      // 正常战斗 tick（含 hitFreeze / 慢动作 / combat.resolve / 粒子 / 浮文字）
-      this._tick(dt);
+      // 正常战斗 tick（含加速）
+      this._tick(dt * this.sectBattleSpeed);
 
       // 战斗对话气泡：检查事件触发 + 更新计时
       this._sectCheckCombatSpeechTriggers();
@@ -481,41 +496,43 @@ export const sectModeMethods = {
 
   _sectDoAction(id, action) {
     switch (id) {
-      case 'setTrainingMode': {
-        const d = this.sect.disciples.find(d => d.id === action.discipleId);
-        if (!d) break;
-        if (d.onQuest) { this._sectShowToast('该弟子正在任务中', '#ff6644'); break; }
-        d.trainingMode = action.mode;
-        const mode = TRAINING_MODES[action.mode];
-        this._sectShowToast(`${d.name} → ${mode.icon}${mode.name}`, '#4499ff');
+      case 'cycleLeader': {
+        // 循环切换大弟子
+        const ds = this.sect.disciples;
+        if (ds.length <= 1) break;
+        const curIdx = ds.findIndex(d => d.id === this.sect.leaderId);
+        const nextIdx = (curIdx + 1) % ds.length;
+        this.sect.leaderId = ds[nextIdx].id;
+        const nd = ds[nextIdx];
+        const bonus = LEADER_BONUSES[nd.personality];
+        this._sectShowToast(`⭐ ${nd.name}成为大弟子 · ${bonus?.name || ''}`, '#ffcc44');
+        this._sectAddLog(`⭐ ${nd.name}被任命为大弟子`, '#ffcc44');
         break;
       }
 
-      case 'batchMode': {
-        const mode = TRAINING_MODES[action.mode];
-        if (!mode) break;
-        let count = 0;
-        for (const d of this.sect.disciples) {
-          if (!d.onQuest) { d.trainingMode = action.mode; count++; }
-        }
-        this._sectShowToast(`${count}人切换至${mode.icon}${mode.name}`, '#4499ff');
+      case 'dismissDaySummary':
+        this._sectAfterDaySummary();
+        break;
+
+      case 'changeBattleSpeed': {
+        const speeds = [1, 2, 4];
+        const curIdx = speeds.indexOf(this.sectBattleSpeed);
+        this.sectBattleSpeed = speeds[(curIdx + 1) % speeds.length];
+        this._sectShowToast(`战斗速度: ${this.sectBattleSpeed}x`, '#4499ff');
         break;
       }
-
-      case 'train':
-        this._sectDoTraining();
-        break;
 
       case 'setLeader': {
         const d = this.sect.disciples.find(d => d.id === action.discipleId);
         if (!d) break;
         if (this.sect.leaderId === d.id) {
-          this.sect.leaderId = null;
-          this._sectShowToast(`取消${d.name}的领头`, '#888');
+          // 已经是大弟子，不允许取消（大弟子必须始终存在）
+          this._sectShowToast(`${d.name}已是大弟子`, '#888');
         } else {
           this.sect.leaderId = d.id;
           const bonus = LEADER_BONUSES[d.personality];
-          this._sectShowToast(`⭐ ${d.name}成为领头 · ${bonus?.name || ''}`, '#ffcc44');
+          this._sectShowToast(`⭐ ${d.name}成为大弟子 · ${bonus?.name || ''}`, '#ffcc44');
+          this._sectAddLog(`⭐ ${d.name}被任命为大弟子`, '#ffcc44');
         }
         break;
       }
@@ -650,7 +667,7 @@ export const sectModeMethods = {
         }
         this.sect._dismissTarget = null;
         this.sectPopup = null;
-        this.sectSubPage = 'disciples';
+        this.sectSubPage = 'main';
         break;
       }
 
@@ -812,14 +829,14 @@ export const sectModeMethods = {
 
   // ===== 经验 =====
   _sectGainExp(d, amount) {
-    if (d.level >= d.talent) return;
+    if (d.level >= d.talent * 2) return; // 资质N→最高Lv N×2
     d.exp += amount;
     const need = expToLevel(d.level);
     if (d.exp >= need) {
       d.exp -= need;
-      d.level = Math.min(d.talent, d.level + 1);
+      d.level = Math.min(d.talent * 2, d.level + 1);
       this._sectAddLog(`🎉 ${d.name} 升级到 Lv${d.level}！`, '#ffdd00');
-      resetDialogueMemory(d.id); // 升级后清除台词记忆，避免短期重复殪奒語
+      resetDialogueMemory(d.id);
     }
   },
 
@@ -893,7 +910,7 @@ export const sectModeMethods = {
   // ===== 任务战斗（直接观看，使用正常战斗循环）=====
   _sectStartQuestFight(disciple, quest) {
     const d = disciple;
-    const aiDiffD = Math.min(5, Math.max(3, d.level));
+    const aiDiffD = Math.min(7, Math.max(1, Math.ceil(d.level * 0.7)));
 
     this.sectWatchingFight = true;
     this.sectFightResult = null;
@@ -1312,142 +1329,91 @@ export const sectModeMethods = {
     this._sectAddLog(`⚔ ${a.name} vs ${b.name} 切磋开始！`, '#ff9944');
   },
 
-  // ===== 训练（每天最多3次）=====
-  _sectDoTraining() {
-    // ===== 训练结算（体力门控）=====
+  // ===== 自动训练（每天结束时自动执行）=====
+  _sectAutoTrain() {
     const dojoMul = trainExpMul(this.sect.buildings.dojo);
     const libLv = this.sect.buildings.library;
-    const leader = this.sect.disciples.find(d => d.id === this.sect.leaderId);
-    const leaderBonus = leader ? LEADER_BONUSES[leader.personality] : null;
-    let trainedCount = 0;
-    let totalExpGained = 0;
-    let skippedCount = 0;
+    const leaderId = this.sect.leaderId;
+    const hMul = healMul(this.sect.buildings.clinic);
+    const summary = { trained: [], rested: [], healed: [], income: 0, newDisciple: null, events: [] };
     const animDisciples = []; // 训练动画数据
 
     for (const d of this.sect.disciples) {
       if (d.onQuest) continue;
 
-      const mode = TRAINING_MODES[d.trainingMode || 'normal'];
-      if (mode.id === 'rest') {
-        // 休养模式：仅恢复体力，不计为训练
-        const oldSta = d.stamina;
-        d.stamina = Math.min(100, d.stamina + mode.stamina);
-        animDisciples.push({ disciple: d, oldStamina: oldSta, newStamina: d.stamina, expGain: 0 });
-        continue;
-      }
-
-      // 体力门控：体力不足以支撑训练则跳过
-      const staminaCost = -mode.stamina; // mode.stamina 是负数
-      if (d.stamina < staminaCost) {
-        skippedCount++;
-        animDisciples.push({ disciple: d, oldStamina: d.stamina, newStamina: d.stamina, expGain: 0, skipped: true });
-        continue;
-      }
-
       const oldStamina = d.stamina;
-      let staminaDelta = mode.stamina;
-      let expGain = Math.floor(mode.exp * dojoMul);
-      let riskChance = mode.risk;
 
-      // 领头加成
-      if (leaderBonus && mode.exp > 0) {
-        if (leaderBonus.teamStaminaSave && staminaDelta < 0)
-          staminaDelta += leaderBonus.teamStaminaSave;
-        if (leaderBonus.teamExpMul)
-          expGain = Math.floor(expGain * (1 + leaderBonus.teamExpMul));
-        if (leaderBonus.teamRiskAdd)
-          riskChance += leaderBonus.teamRiskAdd;
-        if (leaderBonus.teamRiskMul !== undefined)
-          riskChance *= leaderBonus.teamRiskMul;
-        if (leaderBonus.condExpMul && leader && d.id !== leader.id && d.loyalty < leader.loyalty - 20)
-          expGain = Math.floor(expGain * (1 + leaderBonus.condExpMul));
-        if (leaderBonus.teamLoyalty)
-          d.loyalty = Math.min(100, d.loyalty + leaderBonus.teamLoyalty);
+      // 自动恢复伤势
+      if (d.injury > 0) {
+        const heal = Math.floor(15 * hMul);
+        const oldInj = d.injury;
+        d.injury = Math.max(0, d.injury - heal);
+        if (heal > 0) summary.healed.push({ name: d.name, from: oldInj, to: d.injury });
       }
 
-      // 领头本人：经验+50%
-      if (d.id === this.sect.leaderId && expGain > 0)
-        expGain = Math.floor(expGain * 1.5);
+      // 受伤严重或体力极低→休养
+      if (d.injury > 50 || d.stamina < 15) {
+        const prevSta = d.stamina;
+        d.stamina = Math.min(100, d.stamina + 30);
+        summary.rested.push({ name: d.name, from: prevSta, to: d.stamina });
+        animDisciples.push({ disciple: d, oldStamina: oldStamina, newStamina: d.stamina, expGain: 0 });
+        continue;
+      }
 
-      // 应用体力变化
-      d.stamina = Math.max(0, Math.min(100, d.stamina + staminaDelta));
+      // 自动训练
+      let exp = Math.floor(AUTO_TRAIN_EXP * dojoMul);
+      if (d.id === leaderId) exp = Math.floor(exp * 1.5); // 大弟子+50%
+      d.stamina = Math.max(0, d.stamina - 8); // 少量体力消耗
+      if (d.stamina < 10) d.stamina = Math.min(100, d.stamina + 25); // 体力过低自动补
 
-      // 获得经验
-      if (expGain > 0 && d.level < d.talent) {
-        this._sectGainExp(d, expGain);
-        trainedCount++;
-        totalExpGained += expGain;
+      // 忠诚缓慢回升
+      if (d.loyalty < 60) d.loyalty = Math.min(60, d.loyalty + 1);
+
+      const maxLv = d.talent * 2;
+      let actualExp = 0;
+      if (d.level < maxLv) {
+        const before = d.level;
+        this._sectGainExp(d, exp);
+        actualExp = exp;
+        const entry = {
+          name: d.name, exp, level: d.level,
+          levelUp: d.level > before,
+          expPct: Math.floor(d.exp / expToLevel(d.level) * 100),
+        };
 
         // 藏经阁：概率获得特质
-        if (libLv > 0 && d.traits.length < 3) {
-          let traitChance = libLv * 0.08;
-          if (leaderBonus?.traitChanceAdd) traitChance += leaderBonus.traitChanceAdd;
-          if (Math.random() < traitChance) {
-            const pool = COMMON_TRAITS.filter(t => !d.traits.includes(t.id));
-            if (pool.length > 0) {
-              const nt = pool[Math.floor(Math.random() * pool.length)];
-              d.traits.push(nt.id);
-              this._sectAddLog(`  📖 ${d.name}领悟「${nt.name}」`, '#ffaa44');
-            }
+        if (libLv > 0 && d.traits.length < 3 && Math.random() < libLv * 0.05) {
+          const pool = COMMON_TRAITS.filter(t => !d.traits.includes(t.id));
+          if (pool.length > 0) {
+            const nt = pool[Math.floor(Math.random() * pool.length)];
+            d.traits.push(nt.id);
+            entry.newTrait = nt.name;
+            this._sectAddLog(`  📖 ${d.name}领悟「${nt.name}」`, '#ffaa44');
           }
         }
+        summary.trained.push(entry);
+      } else {
+        summary.trained.push({ name: d.name, exp: 0, level: d.level, maxed: true });
       }
 
-      // 记录动画数据
-      const actualExpGain = (expGain > 0 && d.level <= d.talent) ? expGain : 0;
-      animDisciples.push({ disciple: d, oldStamina, newStamina: d.stamina, expGain: actualExpGain });
-
-      // 极限模式：受伤风险
-      if (riskChance > 0 && Math.random() < riskChance) {
-        const injAmount = 15 + Math.floor(Math.random() * 10);
-        d.injury = Math.min(100, d.injury + injAmount);
-        this._sectAddLog(`  🤕 ${d.name}训练受伤(+${injAmount})`, '#ff6644');
-      }
-
-      // 忠诚变化（极限模式-1）
-      if (mode.loyaltyMod)
-        d.loyalty = Math.max(0, Math.min(100, d.loyalty + mode.loyaltyMod));
-
-      // 体力过低自动降档至休养
-      if (d.stamina < 10 && d.trainingMode !== 'rest') {
-        d.trainingMode = 'rest';
-        this._sectAddLog(`  💤 ${d.name}体力不足，自动切换休养`, '#ff9944');
-      }
+      animDisciples.push({ disciple: d, oldStamina: oldStamina, newStamina: d.stamina, expGain: actualExp });
     }
 
-    if (trainedCount > 0) {
-      this.sect.stats.totalTrains++;
-      const skipNote = skippedCount > 0 ? `，${skippedCount}人体力不足` : '';
-      this._sectAddLog(`📊 训练：${trainedCount}人修炼，共+${totalExpGained}exp${skipNote}`, '#4499ff');
-    } else if (skippedCount > 0) {
-      this._sectAddLog(`📊 全员体力不足，无法训练`, '#ff9944');
-    } else {
-      this._sectAddLog(`📊 训练：全员休养`, '#88aacc');
-    }
+    this.sect.stats.totalTrains++;
 
-    // 如果有弟子，播放训练动画
-    if (animDisciples.length > 0) {
-      let speakers = [];
-      if (isDialogueEnabled('training')) {
-        const trainees = animDisciples.map(ad => ad.disciple);
-        speakers = pickGroupSpeakers(trainees, Math.min(3, trainees.length));
-      }
-      this.sectTrainAnimData = {
-        type: animDisciples.length === 1 ? 'single' : 'batch',
-        disciples: animDisciples,
-        speakers,
-      };
-      this.sectTrainAnim = true;
-      this.sectTrainAnimProgress = 0;
-      this.sectTrainAnimWait = false;
-      // 动画结束后不调用 _sectFinishDay，训练是独立操作
-      this._sectTrainAnimCallback = null;
+    // 构建训练动画数据
+    let speakers = [];
+    if (isDialogueEnabled('training') && animDisciples.length > 0) {
+      const trainees = animDisciples.map(ad => ad.disciple);
+      speakers = pickGroupSpeakers(trainees, Math.min(3, trainees.length));
     }
+    summary._animData = {
+      type: animDisciples.length === 1 ? 'single' : 'batch',
+      disciples: animDisciples,
+      speakers,
+    };
 
-    // 自动存档
-    if (isAutoSaveOn()) {
-      autoSaveSect(this.sect);
-    }
+    return summary;
   },
 
   // ===== 下一天 =====
@@ -1462,31 +1428,55 @@ export const sectModeMethods = {
       this.sect.stats.totalGold += income;
     }
 
-    // 受伤恢复 + 忠诚回升（每天自动）
-    const hMul = healMul(this.sect.buildings.clinic);
-    for (const d of this.sect.disciples) {
-      if (d.onQuest) continue;
-      if (d.injury > 0)
-        d.injury = Math.max(0, d.injury - Math.floor(15 * hMul));
-      if (d.loyalty < 60) d.loyalty += 1;
+    // 自动训练所有空闲弟子
+    const summary = this._sectAutoTrain();
+    summary.income = income;
+
+    // 客栈来客
+    const innLv = this.sect.buildings.inn;
+    if (innLv > 0 && this.sect.disciples.length < maxDisciples(this.sect.buildings.barracks)) {
+      if (Math.random() < 0.15 * innLv) {
+        const talent = 1 + Math.floor(Math.random() * Math.min(4, 1 + Math.floor(this.sect.fame / 25)));
+        const recruit = createDisciple({ talent, joinDay: this.sect.day, loyalty: 55 + Math.floor(Math.random() * 20) });
+        this.sect.disciples.push(recruit);
+        summary.newDisciple = { name: recruit.name, talent: recruit.talent };
+        this._sectAddLog(`🏨 ${recruit.name}(资质${recruit.talent})慕名而来！`, '#44dd88');
+      }
     }
 
-    // 保存收入值供 _sectFinishDay 使用
-    this._sectDayIncome = income;
+    // 刷新任务和商店
+    this._sectRefreshQuests();
+    this._sectRefreshShop();
 
-    // 直接完成后续
-    this._sectFinishDay();
+    this._sectAddLog(`━ 第${this.sect.day}天 ━ ${income > 0 ? `收入+${income}💰` : ''}`, '#888');
+
+    // 保存日终总结数据
+    this.sectDaySummary = summary;
+
+    // 播放训练动画（动画结束后显示总结弹窗）
+    const animData = summary._animData;
+    if (animData && animData.disciples.length > 0) {
+      this.sectTrainAnimData = animData;
+      this.sectTrainAnim = true;
+      this.sectTrainAnimProgress = 0;
+      this.sectTrainAnimWait = false;
+      this._sectTrainAnimCallback = () => {
+        this.sectPopup = 'daySummary';
+      };
+    } else {
+      this.sectPopup = 'daySummary';
+    }
+
+    // 自动存档
+    if (isAutoSaveOn()) {
+      autoSaveSect(this.sect);
+    }
   },
 
-  // ===== 下一天（后半段：事件、任务、商店等）=====
-  _sectFinishDay() {
-    const income = this._sectDayIncome || 0;
-
-    // 刷新任务
-    this._sectRefreshQuests();
-
-    // 刷新宗门商店（每天）
-    this._sectRefreshShop();
+  // ===== 日终总结确认后：触发事件 =====
+  _sectAfterDaySummary() {
+    this.sectDaySummary = null;
+    this.sectPopup = null;
 
     // 随机事件（60%概率）
     if (Math.random() < 0.6) {
@@ -1494,13 +1484,23 @@ export const sectModeMethods = {
       let showEvent = true;
       // 处理需要弟子名的事件
       if (evt.id === 'breakthrough') {
-        const candidates = this.sect.disciples.filter(d => d.level < d.talent);
+        const candidates = this.sect.disciples.filter(d => d.level < d.talent * 2);
         if (candidates.length > 0) {
           const d = candidates[Math.floor(Math.random() * candidates.length)];
           evt.desc = evt.desc.replace('{disciple}', d.name);
           evt._targetDiscipleId = d.id;
         } else {
-          showEvent = false; // 无可突破的弟子，跳过此事件
+          showEvent = false;
+        }
+      } else if (evt.id === 'wanderer' || evt.id === 'prodigy') {
+        // 满编时修改选项
+        if (this.sect.disciples.length >= maxDisciples(this.sect.buildings.barracks)) {
+          evt.desc += '，但门中已无空位...';
+          evt.choices = [
+            { label: '切磋一场(全队+exp)', effect: 'wandererSpar' },
+            { label: '请教武学(+200💰)', effect: 'gainGold', params: { gold: [200, 200] } },
+            { label: '婉拒', effect: 'none' },
+          ];
         }
       } else if (evt.id === 'betrayal') {
         const d = this.sect.disciples.filter(d => d.loyalty < 50).sort((a, b) => a.loyalty - b.loyalty)[0];
@@ -1524,19 +1524,6 @@ export const sectModeMethods = {
         this.sectPopup = 'event';
       }
     }
-
-    // 客栈来客（招募机会）
-    const innLv = this.sect.buildings.inn;
-    if (innLv > 0 && this.sect.disciples.length < maxDisciples(this.sect.buildings.barracks)) {
-      if (Math.random() < 0.15 * innLv) {
-        const talent = 1 + Math.floor(Math.random() * Math.min(4, 1 + Math.floor(this.sect.fame / 25)));
-        const recruit = createDisciple({ talent, joinDay: this.sect.day, loyalty: 55 + Math.floor(Math.random() * 20) });
-        this.sect.disciples.push(recruit);
-        this._sectAddLog(`🏨 ${recruit.name}(资质${recruit.talent})慕名而来！`, '#44dd88');
-      }
-    }
-
-    this._sectAddLog(`━ 第${this.sect.day}天 ━ ${income > 0 ? `收入+${income}💰` : ''}`, '#888');
 
     // 日常对话（新的一天，随机一名弟子说话）
     if (isDialogueEnabled('life') && this.sect.disciples.length > 0) {
@@ -1709,7 +1696,7 @@ export const sectModeMethods = {
       case 'donationTrain': {
         let count = 0;
         for (const d of this.sect.disciples) {
-          if (d.level < d.talent) {
+          if (d.level < d.talent * 2) {
             this._sectGainExp(d, 20);
             count++;
           }
@@ -1746,7 +1733,7 @@ export const sectModeMethods = {
       }
 
       case 'studyManual': {
-        const freeD = this.sect.disciples.filter(d => !d.onQuest && d.level < d.talent);
+        const freeD = this.sect.disciples.filter(d => !d.onQuest && d.level < d.talent * 2);
         if (freeD.length === 0) { this._sectAddLog('无人可用', '#ff6644'); break; }
         const d = freeD[Math.floor(Math.random() * freeD.length)];
         this._sectGainExp(d, 30);
@@ -1845,7 +1832,17 @@ export const sectModeMethods = {
         const amount = g[0] + Math.floor(Math.random() * (g[1] - g[0] + 1));
         this.sect.gold += amount;
         this.sect.stats.totalGold += amount;
-        this._sectAddLog(`💎 获得${amount}银两捐赠`, '#ffd700');
+        this._sectAddLog(`💎 获得${amount}银两`, '#ffd700');
+        break;
+      }
+
+      case 'wandererSpar': {
+        // 满编时的切磋选项：全队获得经验
+        const expEach = 15;
+        for (const d of this.sect.disciples) {
+          if (!d.onQuest) this._sectGainExp(d, expEach);
+        }
+        this._sectAddLog(`⚔ 与来客切磋，全队+${expEach}exp`, '#44dd88');
         break;
       }
 
@@ -2096,7 +2093,7 @@ export const sectModeMethods = {
         const bbH = narrow ? 24 : 28;
         const bbX = 8;
         const bbY = narrow ? 30 : 36;
-        const bbHovered = hit(this.input.mouseX, this.input.mouseY, bbX, bbY, bbW, bbH);
+        const bbHovered = mx >= bbX && mx <= bbX + bbW && my >= bbY && my <= bbY + bbH;
         ctx.globalAlpha = bbHovered ? 0.9 : 0.5;
         ctx.fillStyle = 'rgba(0,0,0,0.6)';
         ctx.fillRect(bbX, bbY, bbW, bbH);
@@ -2118,6 +2115,27 @@ export const sectModeMethods = {
       ctx.font = `${narrow ? 10 : 12}px "Microsoft YaHei", sans-serif`;
       if (this._victoryTimer < 0) {
         ctx.fillText(`${Math.ceil(Math.max(0, 45 - this.gameTime))}s`, lw / 2, narrow ? 16 : 20);
+
+        // 战斗加速按钮
+        const speedLabels = { 1: '1x', 2: '2x', 4: '4x' };
+        const speedLabel = speedLabels[this.sectBattleSpeed] || '1x';
+        const spW = narrow ? 36 : 44;
+        const spH = narrow ? 22 : 26;
+        const spX = lw - spW - 8;
+        const spY = narrow ? 30 : 36;
+        const spHovered = mx >= spX && mx <= spX + spW && my >= spY && my <= spY + spH;
+        ctx.globalAlpha = spHovered ? 0.9 : 0.5;
+        ctx.fillStyle = 'rgba(0,0,0,0.6)';
+        ctx.fillRect(spX, spY, spW, spH);
+        ctx.strokeStyle = this.sectBattleSpeed > 1 ? '#ffcc44' : '#888';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(spX, spY, spW, spH);
+        ctx.fillStyle = this.sectBattleSpeed > 1 ? '#ffcc44' : '#ddd';
+        ctx.font = `bold ${narrow ? 10 : 12}px "Microsoft YaHei", sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.fillText(speedLabel, spX + spW / 2, spY + spH / 2 + 4);
+        ctx.globalAlpha = 1;
+        this.sectUI._buttons.push({ x: spX, y: spY, w: spW, h: spH, action: { type: 'action', id: 'changeBattleSpeed' } });
       }
 
       // 模式标签 + 战斗上下文
@@ -2196,6 +2214,8 @@ export const sectModeMethods = {
     } else if (this.sectPopup === 'achievement' && this.sectAchievementCurrent) {
       const ach = getAchievement(this.sectAchievementCurrent);
       if (ach) this.sectUI.drawAchievementPopup(ctx, lw, lh, ach, mx, my, narrow);
+    } else if (this.sectPopup === 'daySummary' && this.sectDaySummary) {
+      this.sectUI.drawDaySummary(ctx, lw, lh, this.sectDaySummary, mx, my, narrow);
     }
 
     // Toast通知（屏幕上方浮动提示）

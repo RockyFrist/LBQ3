@@ -93,6 +93,21 @@ export const BUILDINGS = {
 };
 export const BUILDING_LIST = Object.values(BUILDINGS);
 
+/** 建筑渐进解锁：检查指定建筑是否对当前状态可见 */
+export function isBuildingUnlocked(buildingId, state) {
+  switch (buildingId) {
+    case 'bank':     return state.day >= 2;
+    case 'dojo':     return state.day >= 2;
+    case 'clinic':   return (state.buildings.bank || 0) >= 1;
+    case 'barracks': return (state.buildings.bank || 0) >= 1;
+    case 'inn':      return (state.buildings.barracks || 0) >= 2;
+    case 'smith':    return state.stats.totalWins >= 1;
+    case 'library':  return state.stats.totalWins >= 1;
+    case 'tower':    return state.fame >= 50;
+    default: return true;
+  }
+}
+
 /** 弟子容量上限 */
 export function maxDisciples(barracksLv) {
   return [3, 5, 8, 12, 16][barracksLv - 1] || 3;
@@ -132,6 +147,8 @@ export const QUEST_TYPES = [
   { id: 'rival',    name: '门派挑战', icon: '🔥', minTower: 2, enemyDiff: [4, 5], reward: { gold: [200, 400], fame: [25, 50], exp: [40, 60] }, risk: 'high', desc: '挑战对手门派，胜者为王' },
   { id: 'assassin', name: '夜袭敌营', icon: '🌙', minTower: 2, enemyDiff: [3, 5], reward: { gold: [250, 450], fame: [12, 25], exp: [35, 55] }, risk: 'high', desc: '趁夜突袭，一击制胜' },
   { id: 'guard',    name: '守卫要塞', icon: '🛡', minTower: 1, enemyDiff: [2, 4], reward: { gold: [120, 250], fame: [8, 18], exp: [20, 40] }, risk: 'mid', desc: '驻守要塞，抵御来犯' },
+  { id: 'warlord',  name: '征伐军阀', icon: '⚔', minTower: 3, enemyDiff: [5, 7], reward: { gold: [400, 800], fame: [30, 60], exp: [50, 80] }, risk: 'high', desc: '直捣军阀大本营，凶险万分' },
+  { id: 'legend',   name: '挑战传说', icon: '👑', minTower: 3, enemyDiff: [6, 7], reward: { gold: [500, 1000], fame: [50, 100], exp: [60, 100] }, risk: 'high', desc: '挑战江湖传说人物' },
 ];
 
 /** 获取当前可用任务（基于望楼等级）*/
@@ -351,14 +368,17 @@ export function createDisciple(opts = {}) {
     losses: 0,
     joinDay: opts.joinDay || 1,
     onQuest: false, // 是否在执行任务
-    trainingMode: 'normal', // 训练档位: rest|normal|intense|extreme
   };
 }
 
-/** 弟子升级所需经验 (每级约3-5天全力训练可升，给玩家充足成长感) */
+/** 弟子升级所需经验（10级制，资质N→最高Lv N×2） */
 export function expToLevel(currentLevel) {
-  return [0, 100, 260, 520, 1000][currentLevel - 1] || 9999;
+  const table = [0, 80, 160, 300, 500, 800, 1200, 1800, 2500, 4000];
+  return table[currentLevel - 1] || 9999;
 }
+
+/** 每日自动训练基础经验 */
+export const AUTO_TRAIN_EXP = 20;
 
 /** 宗门名称池 */
 const SECT_NAMES = [
@@ -377,14 +397,14 @@ export function createInitialState() {
   resetDiscipleIdCounter(0);
   const sectName = randomSectName();
   // 初始3个弟子
-  const d1 = createDisciple({ talent: 2, loyalty: 80, joinDay: 1 });
-  const d2 = createDisciple({ talent: 1, loyalty: 75, joinDay: 1 });
+  const d1 = createDisciple({ talent: 3, loyalty: 80, joinDay: 1 });
+  const d2 = createDisciple({ talent: 2, loyalty: 75, joinDay: 1 });
   const d3 = createDisciple({ talent: 2, loyalty: 70, joinDay: 1 });
   return {
-    version: 1,
+    version: 2,
     sectName,
     day: 1,
-    phase: 'morning', // morning | noon | night
+    phase: 'morning',
     gold: 500,
     fame: 0,
     disciples: [d1, d2, d3],
@@ -409,7 +429,7 @@ export function createInitialState() {
       shopBuys: 0,
     },
     achievements: [],  // 已解锁成就ID列表
-    leaderId: null,      // 领头弟子ID
+    leaderId: d1.id,     // 领头弟子ID（默认第一个弟子）
     pendingEvent: null,  // 当前待处理事件
     pendingFightResult: null, // 战斗观看结果
     storyProgress: [],  // 已触发的剧情ID列表
@@ -651,14 +671,14 @@ export const TRAINING_MODES = {
 };
 export const TRAINING_MODE_ORDER = ['rest', 'normal', 'intense', 'extreme'];
 
-// ===== 领头弟子加成 =====
+// ===== 领头弟子加成（大弟子经验+50%，个性决定风味文本）=====
 export const LEADER_BONUSES = {
-  hotblood: { name: '热血鼓舞', desc: '全队经验+10%，受伤风险+5%', teamExpMul: 0.10, teamRiskAdd: 0.05 },
-  calm:     { name: '沉稳统率', desc: '全队受伤风险减半',          teamRiskMul: 0.5 },
-  tsundere: { name: '不甘示弱', desc: '忠诚低于领头的弟子经验+15%', condExpMul: 0.15 },
-  cunning:  { name: '暗中谋划', desc: '训练获得特质概率+10%',      traitChanceAdd: 0.10 },
-  airhead:  { name: '天然感染', desc: '全员忠诚每日+1',            teamLoyalty: 1 },
-  diligent: { name: '以身作则', desc: '全队体力消耗-5',            teamStaminaSave: 5 },
+  hotblood: { name: '热血鼓舞', desc: '大弟子经验+50%，全队士气高昂' },
+  calm:     { name: '沉稳统率', desc: '大弟子经验+50%，训练更加安全' },
+  tsundere: { name: '不甘示弱', desc: '大弟子经验+50%，激发队友斗志' },
+  cunning:  { name: '暗中谋划', desc: '大弟子经验+50%，洞察对手弱点' },
+  airhead:  { name: '天然感染', desc: '大弟子经验+50%，气氛轻松愉快' },
+  diligent: { name: '以身作则', desc: '大弟子经验+50%，勤勉带动全队' },
 };
 
 // 台词库已迁移至 sect-dialogues.js，此处重导出保持向后兼容

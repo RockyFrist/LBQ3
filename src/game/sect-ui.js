@@ -6,8 +6,8 @@ import {
   QUEST_TYPES, maxDisciples, availableArmors, expToLevel,
   ITEM_QUALITY, itemLabel, WEAPON_IDS,
   FAME_TIERS, getFameTier, SHOP_POOL,
-  PERSONALITY_TYPES,
-  TRAINING_MODES, TRAINING_MODE_ORDER, LEADER_BONUSES,
+  PERSONALITY_TYPES, LEADER_BONUSES,
+  isBuildingUnlocked,
 } from './sect-data.js';
 import { getDialogueFlags } from './sect-dialogues.js';
 import { isAutoSaveOn } from './sect-save.js';
@@ -142,38 +142,26 @@ export class SectUI {
 
     switch (subPage) {
       case 'main':
-        this._drawMainPanel(ctx, pad, contentY + 4, cw - pad * 2, contentH - 8, state, mx, my, isNarrow);
-        break;
-      case 'disciples':
-        this._drawDisciplesPanel(ctx, pad, contentY + 4, cw - pad * 2, contentH - 8, state, mx, my, isNarrow);
+        this._drawDashboard(ctx, pad, contentY + 4, cw - pad * 2, contentH - 8, state, mx, my, isNarrow);
         break;
       case 'buildings':
         this._drawBuildingsPanel(ctx, pad, contentY + 4, cw - pad * 2, contentH - 8, state, mx, my, isNarrow);
         break;
-      case 'quests':
-        this._drawQuestsPanel(ctx, pad, contentY + 4, cw - pad * 2, contentH - 8, state, mx, my, isNarrow);
-        break;
-      case 'inventory':
+      case 'inventory': case 'market':
         this._drawInventoryPanel(ctx, pad, contentY + 4, cw - pad * 2, contentH - 8, state, mx, my, isNarrow);
         break;
       case 'shop':
         this._drawShopPanel(ctx, pad, contentY + 4, cw - pad * 2, contentH - 8, state, mx, my, isNarrow);
         break;
-      case 'log':
-        this._drawLogPanel(ctx, pad, contentY + 4, cw - pad * 2, contentH - 8, state, mx, my, isNarrow);
-        break;
       case 'disciple_detail':
         this._drawDiscipleDetail(ctx, pad, contentY + 4, cw - pad * 2, contentH - 8, state, mx, my, isNarrow);
-        break;
-      case 'market':
-        this._drawInventoryPanel(ctx, pad, contentY + 4, cw - pad * 2, contentH - 8, state, mx, my, isNarrow);
         break;
     }
 
     ctx.restore();
 
-    // 底部导航栏
-    this._drawNavBar(ctx, cw, ch, state, subPage, mx, my, isNarrow);
+    // 底部操作栏
+    this._drawBottomBar(ctx, cw, ch, state, subPage, mx, my, isNarrow);
   }
 
   // ===== 顶栏 =====
@@ -228,9 +216,9 @@ export class SectUI {
     this._buttons.push({ x: gearX, y: gearY, w: gearSize, h: gearSize, action: { type: 'action', id: 'settings' } });
   }
 
-  // ===== 底部导航栏 =====
-  _drawNavBar(ctx, cw, ch, state, subPage, mx, my, narrow) {
-    const barH = narrow ? 64 : 72;
+  // ===== 底部操作栏 =====
+  _drawBottomBar(ctx, cw, ch, state, subPage, mx, my, narrow) {
+    const barH = narrow ? 52 : 60;
     const barY = ch - barH;
     ctx.fillStyle = 'rgba(20,15,30,0.95)';
     ctx.fillRect(0, barY, cw, barH);
@@ -238,283 +226,178 @@ export class SectUI {
     ctx.lineWidth = 1;
     ctx.beginPath(); ctx.moveTo(0, barY); ctx.lineTo(cw, barY); ctx.stroke();
 
-    const allTabs = [
-      { id: 'main',       icon: '🏠', label: '总览', minDay: 1 },
-      { id: 'disciples',  icon: '👥', label: '弟子', minDay: 1 },
-      { id: 'buildings',  icon: '🏗', label: '建造', minDay: 2 },
-      { id: 'quests',     icon: '📜', label: '任务', minDay: 3 },
-      { id: 'inventory',  icon: '🎒', label: '背包', minDay: 1 },
-      { id: 'shop',       icon: '🛒', label: '商店', minDay: 2 },
-      { id: 'log',        icon: '📋', label: '日志', minDay: 1 },
-    ];
-    const day = state.day;
-    const hasBuilding = Object.values(state.buildings).some(v => v > 1);
-    const tabs = allTabs.filter(t => day >= t.minDay || (t.id === 'quests' && hasBuilding));
-    const tabW = cw / tabs.length;
-    const iconFs = narrow ? 18 : 22;
-    const labelFs = narrow ? 9 : 11;
-
-    for (let i = 0; i < tabs.length; i++) {
-      const t = tabs[i];
-      const x = i * tabW;
-      const active = subPage === t.id || (subPage === 'disciple_detail' && t.id === 'disciples');
-      const hovered = hit(mx, my, x, barY, tabW, barH);
-
-      if (active) {
-        ctx.fillStyle = 'rgba(255,204,68,0.12)';
-        ctx.fillRect(x, barY, tabW, barH);
-      } else if (hovered) {
-        ctx.fillStyle = 'rgba(255,255,255,0.05)';
-        ctx.fillRect(x, barY, tabW, barH);
-      }
-
-      ctx.textAlign = 'center';
-      ctx.font = `${iconFs}px ${FONT}`;
-      ctx.fillStyle = active ? COL_ACCENT : '#888';
-      ctx.fillText(t.icon, x + tabW / 2, barY + (narrow ? 24 : 30));
-      ctx.font = `${labelFs}px ${FONT}`;
-      ctx.fillText(t.label, x + tabW / 2, barY + (narrow ? 42 : 50));
-
-      // 角标：任务数 / 受伤弟子数
-      let badge = 0;
-      if (t.id === 'quests') badge = (state.quests || []).length;
-      if (t.id === 'disciples') badge = state.disciples.filter(d => d.injury > 30 || d.loyalty < 40).length;
-      if (t.id === 'inventory') badge = (state.inventory || []).filter(i => i.quality !== 'normal').length;
-      if (t.id === 'shop') badge = (state.shop?.items || []).filter(s => !s.sold).length;
-      if (badge > 0 && !active) {
-        const bx = x + tabW / 2 + (narrow ? 8 : 10);
-        const by2 = barY + (narrow ? 8 : 10);
-        const br = narrow ? 7 : 8;
-        ctx.fillStyle = t.id === 'disciples' ? COL_DANGER : '#ffaa44';
-        ctx.beginPath(); ctx.arc(bx, by2, br, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = '#fff';
-        ctx.font = `bold ${narrow ? 8 : 9}px ${FONT}`;
-        ctx.fillText(Math.min(badge, 9), bx, by2 + (narrow ? 3 : 3));
-      }
-
-      this._buttons.push({ x, y: barY, w: tabW, h: barH, action: { type: 'nav', page: t.id } });
+    if (subPage !== 'main') {
+      // 子页面：返回按钮
+      const btnH = barH - 14;
+      const rect = { x: 10, y: barY + 7, w: cw - 20, h: btnH };
+      drawBtn(ctx, rect, '← 返回总览', COL_ACCENT, mx, my, { fontSize: narrow ? 13 : 15 });
+      this._buttons.push({ ...rect, action: { type: 'nav', page: 'main' } });
+      return;
     }
+
+    // 仪表盘底栏：[图标按钮] + [🌙 下一天]
+    const gap = narrow ? 4 : 6;
+    const btnH = barH - 14;
+    const endDayW = narrow ? 90 : 110;
+
+    const iconBtns = [];
+    if (state.day >= 2) iconBtns.push({ label: '🏗', page: 'buildings' });
+    if (state.day >= 2) iconBtns.push({ label: '🛒', page: 'shop' });
+    iconBtns.push({ label: '📦', page: 'inventory' });
+    if (state.day >= 4 || state.stats.totalFights > 0) {
+      iconBtns.push({ label: '⚔', action: { type: 'action', id: 'spar' } });
+    }
+
+    const iconTotalW = cw - 20 - endDayW - gap;
+    const iconBtnW = iconBtns.length > 0 ? (iconTotalW - (iconBtns.length - 1) * gap) / iconBtns.length : 0;
+
+    for (let i = 0; i < iconBtns.length; i++) {
+      const ic = iconBtns[i];
+      const bx = 10 + i * (iconBtnW + gap);
+      const rect = { x: bx, y: barY + 7, w: iconBtnW, h: btnH };
+      drawBtn(ctx, rect, ic.label, '#888', mx, my, { fontSize: narrow ? 16 : 18 });
+      const action = ic.page ? { type: 'nav', page: ic.page } : ic.action;
+      this._buttons.push({ ...rect, action });
+    }
+
+    // "下一天" 按钮
+    const endX = cw - 10 - endDayW;
+    const endRect = { x: endX, y: barY + 7, w: endDayW, h: btnH };
+    drawBtn(ctx, endRect, '🌙 下一天', COL_ACCENT, mx, my, { fontSize: narrow ? 12 : 14 });
+    this._buttons.push({ ...endRect, action: { type: 'action', id: 'nextDay' } });
   }
 
-  // ===== 总览面板 =====
-  _drawMainPanel(ctx, x, y, w, h, state, mx, my, narrow) {
+  // ===== 仪表盘（单屏总览：弟子 + 任务 + 日志）=====
+  _drawDashboard(ctx, x, y, w, h, state, mx, my, narrow) {
     let cy = y;
-    const fs = narrow ? 12 : 14;
+    const smallFs = narrow ? 10 : 11;
 
-    // 门派信息卡
-    ctx.fillStyle = COL_PANEL;
-    ctx.fillRect(x, cy, w, narrow ? 70 : 80);
-    ctx.strokeStyle = COL_BORDER;
-    ctx.strokeRect(x, cy, w, narrow ? 70 : 80);
+    // ── 大弟子 ──
+    const leader = state.disciples.find(d => d.id === state.leaderId);
+    if (leader) {
+      const lH = narrow ? 28 : 34;
+      ctx.fillStyle = COL_PANEL;
+      ctx.fillRect(x, cy, w, lH);
+      ctx.textAlign = 'left';
+      ctx.fillStyle = COL_ACCENT;
+      ctx.font = `bold ${narrow ? 11 : 13}px ${FONT}`;
+      const pInfo = PERSONALITY_TYPES[leader.personality];
+      const bonus = LEADER_BONUSES[leader.personality];
+      ctx.fillText(`⭐ ${leader.name} ${pInfo?.icon || ''} ${bonus?.desc || '经验+50%'}`, x + 8, cy + (narrow ? 18 : 22));
+      if (state.disciples.length > 1) {
+        const bW = narrow ? 40 : 48;
+        const bRect = { x: x + w - bW - 4, y: cy + 3, w: bW, h: lH - 6 };
+        drawBtn(ctx, bRect, '切换', '#888', mx, my, { fontSize: narrow ? 9 : 10 });
+        this._buttons.push({ ...bRect, action: { type: 'action', id: 'cycleLeader' } });
+      }
+      cy += lH + 4;
+    }
 
+    // ── 弟子列表 ──
     ctx.textAlign = 'left';
-    ctx.fillStyle = COL_ACCENT;
-    ctx.font = `bold ${narrow ? 16 : 20}px ${FONT}`;
-    ctx.fillText(`🏯 ${state.sectName}`, x + 10, cy + (narrow ? 22 : 28));
+    ctx.fillStyle = COL_DIM;
+    ctx.font = `bold ${smallFs}px ${FONT}`;
+    ctx.fillText(`👥 弟子 (${state.disciples.length}/${maxDisciples(state.buildings.barracks)})`, x, cy + 10);
+    cy += 16;
 
-    ctx.fillStyle = COL_TEXT;
-    ctx.font = `${fs}px ${FONT}`;
-    ctx.fillText(`第${state.day}天 · ${PHASE_NAMES[state.phase]}时`, x + 10, cy + (narrow ? 42 : 52));
-    ctx.fillText(`弟子 ${state.disciples.length}人 · 胜${state.stats.totalWins}场`, x + 10, cy + (narrow ? 58 : 70));
-
-    ctx.textAlign = 'right';
-    ctx.fillStyle = COL_GOLD;
-    ctx.fillText(`💰 ${state.gold}`, x + w - 10, cy + (narrow ? 22 : 28));
-    ctx.fillStyle = COL_FAME;
-    ctx.fillText(`🏆 ${state.fame}`, x + w - 10, cy + (narrow ? 42 : 48));
-
-    cy += (narrow ? 78 : 90);
-
-    // 快捷操作区（渐进解锁）
-    const btnH = narrow ? 36 : 42;
-    const btnGap = narrow ? 6 : 8;
-    const btnW = (w - btnGap) / 2;
-    const day = state.day;
-    const hasTrained = state.stats.totalDays > 0; // 至少过了一天
-    const hasBuilding = Object.values(state.buildings).some(v => v > 1); // 升级过建筑
-    const hasFought = state.stats.totalFights > 0; // 有过战斗
-
-    const actions = [];
-    // 训练按钮（体力门控，无次数限制）
-    actions.push({ label: '⚔ 训练', action: { type: 'action', id: 'train' }, color: '#4499ff' });
-    actions.push({ label: '🌙 进入下一天', action: { type: 'action', id: 'nextDay' }, color: COL_ACCENT });
-    // 第2天起解锁建造
-    if (day >= 2) {
-      actions.push({ label: '🏗 建造设施', action: { type: 'nav', page: 'buildings' }, color: '#44dd88' });
-    }
-    // 第3天或建造过建筑后解锁任务
-    if (day >= 3 || hasBuilding) {
-      actions.push({ label: '📜 任务派遣', action: { type: 'nav', page: 'quests' }, color: '#ffaa44' });
-    }
-    // 第4天或有过战斗后解锁擂台
-    if (day >= 4 || hasFought) {
-      actions.push({ label: '⚔ 门派切磋', action: { type: 'action', id: 'spar' }, color: '#ff6644' });
-    }
-    // 全体休养
-    actions.push({ label: '🌙 全体休养', action: { type: 'action', id: 'batchMode', mode: 'rest' }, color: '#88aacc' });
-
-    for (let i = 0; i < actions.length; i++) {
-      const col = i % 2;
-      const row = Math.floor(i / 2);
-      const bx = x + col * (btnW + btnGap);
-      const by = cy + row * (btnH + btnGap);
-      const a = actions[i];
-      const rect = { x: bx, y: by, w: btnW, h: btnH };
-      drawBtn(ctx, rect, a.label, a.color, mx, my, { fontSize: narrow ? 11 : 13, disabled: a.disabled });
-      if (!a.disabled) this._buttons.push({ ...rect, action: a.action });
-    }
-
-    cy += Math.ceil(actions.length / 2) * (btnH + btnGap) + 4;
-
-    // 训练档位概览
-    const modeCounts = { rest: 0, normal: 0, intense: 0, extreme: 0 };
+    const cardH = narrow ? 36 : 42;
+    const cardGap = 3;
     for (const d of state.disciples) {
-      if (!d.onQuest) modeCounts[d.trainingMode || 'normal']++;
-    }
-    const modeOverview = TRAINING_MODE_ORDER
-      .filter(m => modeCounts[m] > 0)
-      .map(m => `${TRAINING_MODES[m].icon}${TRAINING_MODES[m].name}×${modeCounts[m]}`)
-      .join('  ');
-    if (modeOverview) {
+      const hovered = hit(mx, my, x, cy, w, cardH);
+      ctx.fillStyle = hovered ? COL_PANEL_HI : COL_PANEL;
+      ctx.fillRect(x, cy, w, cardH);
+      // 颜色条
+      ctx.fillStyle = d.color || '#888';
+      ctx.fillRect(x, cy, 3, cardH);
+
+      const isLeader = state.leaderId === d.id;
       ctx.textAlign = 'left';
-      ctx.fillStyle = COL_DIM;
-      ctx.font = `${narrow ? 9 : 10}px ${FONT}`;
-      ctx.fillText(`档位: ${modeOverview}`, x, cy + 8);
-      cy += 14;
-    }
-    cy += 4;
-
-    // 弟子概览（前5个）
-    ctx.textAlign = 'left';
-    ctx.fillStyle = COL_DIM;
-    ctx.font = `bold ${narrow ? 11 : 12}px ${FONT}`;
-    ctx.fillText('— 弟子概览 —', x, cy + 10);
-    cy += 18;
-
-    const dList = state.disciples.slice(0, 5);
-    for (const d of dList) {
-      this._drawDiscipleMini(ctx, x, cy, w, d, narrow, state, mx, my);
-      cy += narrow ? 52 : 60;
-    }
-    if (state.disciples.length > 5) {
-      ctx.fillStyle = COL_DIM;
-      ctx.font = `${narrow ? 10 : 11}px ${FONT}`;
-      ctx.textAlign = 'center';
-      ctx.fillText(`还有 ${state.disciples.length - 5} 名弟子...`, x + w / 2, cy + 10);
-      cy += 20;
-    }
-
-    // 最近日志（最后5条）
-    if (state.log.length > 0) {
-      cy += 8;
-      ctx.textAlign = 'left';
-      ctx.fillStyle = COL_DIM;
+      ctx.fillStyle = COL_TEXT;
       ctx.font = `bold ${narrow ? 11 : 12}px ${FONT}`;
-      ctx.fillText('— 最近动态 —', x, cy + 10);
-      cy += 18;
+      ctx.fillText(`${isLeader ? '⭐' : ''}${d.name} Lv${d.level}`, x + 8, cy + (narrow ? 14 : 16));
 
-      const recent = state.log.slice(0, 5);
-      const lineH = narrow ? 16 : 19;
+      ctx.fillStyle = COL_DIM;
+      ctx.font = `${narrow ? 9 : 10}px ${FONT}`;
+      const weaponName = WEAPON_NAMES[d.weaponId] || '?';
+      ctx.fillText(`${starsText(d.talent)} ${weaponName}`, x + 8, cy + (narrow ? 26 : 30));
+
+      // 状态
+      let status, statusColor;
+      if (d.onQuest) { status = '📜出征'; statusColor = '#ffaa44'; }
+      else if (d.injury > 50) { status = '🤕重伤'; statusColor = '#ff4444'; }
+      else if (d.injury > 20) { status = '🩹受伤'; statusColor = '#ff8844'; }
+      else { status = '✅待命'; statusColor = '#44dd88'; }
+      ctx.textAlign = 'right';
+      ctx.fillStyle = statusColor;
       ctx.font = `${narrow ? 10 : 11}px ${FONT}`;
-      for (const entry of recent) {
-        ctx.fillStyle = entry.color || COL_DIM;
-        ctx.fillText(entry.text, x + 4, cy + lineH * 0.7);
-        cy += lineH;
-      }
+      ctx.fillText(status, x + w - 8, cy + (narrow ? 14 : 16));
+
+      // 经验条
+      const barW = narrow ? 50 : 70;
+      const expNeed = expToLevel(d.level);
+      drawBar(ctx, x + w - barW - 8, cy + (narrow ? 22 : 26), barW, 4, d.exp / expNeed, '#4499ff');
+      ctx.fillStyle = '#666';
+      ctx.font = `${narrow ? 8 : 9}px ${FONT}`;
+      ctx.fillText(`${Math.floor(d.exp / expNeed * 100)}%`, x + w - 8, cy + (narrow ? 30 : 34));
+
+      this._buttons.push({ x, y: cy, w, h: cardH, action: { type: 'selectDisciple', id: d.id } });
+      cy += cardH + cardGap;
     }
-  }
+    cy += 6;
 
-  // ===== 弟子迷你卡片 =====
-  _drawDiscipleMini(ctx, x, y, w, d, narrow, state, mx, my) {
-    const h = narrow ? 48 : 56;
-    ctx.fillStyle = COL_PANEL;
-    ctx.fillRect(x, y, w, h);
-
-    // 颜色标记
-    ctx.fillStyle = d.color || '#888';
-    ctx.fillRect(x, y, 3, h);
-
-    // === 第1行：名字 + 个性 + 右侧状态条 ===
-    const isLeader = state && state.leaderId === d.id;
+    // ── 今日任务 ──
     ctx.textAlign = 'left';
-    ctx.fillStyle = COL_TEXT;
-    ctx.font = `bold ${narrow ? 11 : 13}px ${FONT}`;
-    const nameStr = `${isLeader ? '⭐' : ''}${d.name}`;
-    ctx.fillText(nameStr, x + 8, y + (narrow ? 13 : 15));
-    const _pMini = PERSONALITY_TYPES[d.personality];
-    if (_pMini) {
-      const _nw = ctx.measureText(nameStr).width;
-      ctx.fillStyle = _pMini.color;
-      ctx.font = `${narrow ? 9 : 10}px ${FONT}`;
-      ctx.fillText(_pMini.icon, x + 8 + _nw + 3, y + (narrow ? 13 : 15));
-    }
-
-    // 右侧：经验条 + 血条 + 体力条
-    const barW = narrow ? 50 : 70;
-    const barX = x + w - barW - 6;
-    const expNeed = expToLevel(d.level);
-    drawBar(ctx, barX, y + 4, barW, 4, d.exp / expNeed, '#4499ff');
-    const hpRatio = (100 - d.injury) / 100;
-    drawBar(ctx, barX, y + 10, barW, 4, hpRatio, hpRatio > 0.5 ? COL_HP_OK : COL_HP_HURT);
-    const staRatio = (d.stamina || 0) / 100;
-    const staColor = staRatio >= 0.7 ? '#ffcc44' : staRatio >= 0.35 ? '#ff9944' : '#ff4444';
-    drawBar(ctx, barX, y + 16, barW, 4, staRatio, staColor);
-    // 体力数字
-    ctx.textAlign = 'right';
-    ctx.fillStyle = staColor;
-    ctx.font = `${narrow ? 8 : 9}px ${FONT}`;
-    ctx.fillText(`体${d.stamina}`, barX - 3, y + (narrow ? 18 : 19));
-    ctx.textAlign = 'left';
-
-    // === 第2行：Lv + 武器 + 天赋 + 状态 ===
-    const row2Y = y + (narrow ? 26 : 30);
     ctx.fillStyle = COL_DIM;
-    ctx.font = `${narrow ? 9 : 11}px ${FONT}`;
-    const weaponName = WEAPON_NAMES[d.weaponId] || '?';
-    const wQColor = ITEM_QUALITY[d.weaponQuality || 'normal']?.color || COL_DIM;
-    const staminaIcon = d.stamina >= 70 ? '\u26A1' : d.stamina >= 35 ? '\uD83D\uDCAB' : d.stamina >= 15 ? '\uD83D\uDE05' : '\uD83D\uDCA4';
-    const statusStr = d.onQuest ? '\uD83D\uDCDC任务中' : d.injury > 30 ? '\uD83E\uDD15受伤' : d.stamina < 15 ? `${staminaIcon}体乏` : d.stamina < 40 ? `${staminaIcon}疲劳` : '\u2705待命';
-    ctx.fillText(`Lv${d.level} `, x + 8, row2Y);
-    const lvW = ctx.measureText(`Lv${d.level} `).width;
-    ctx.fillStyle = wQColor;
-    ctx.fillText(weaponName, x + 8 + lvW, row2Y);
-    const wW = ctx.measureText(weaponName).width;
-    ctx.fillStyle = COL_DIM;
-    ctx.fillText(` ${starsText(d.talent)} ${statusStr}`, x + 8 + lvW + wW, row2Y);
+    ctx.font = `bold ${smallFs}px ${FONT}`;
+    const quests = state.quests || [];
+    ctx.fillText(`📜 今日任务 (${quests.length})`, x, cy + 10);
+    cy += 16;
 
-    // === 第3行：训练档位（4个小按钮，直接多选一）===
-    const row3Y = y + (narrow ? 34 : 40);
-    const currentMode = d.trainingMode || 'normal';
-    if (!d.onQuest) {
-      const mBtnGap = 2;
-      const mBtnW = Math.floor((w - 8 - mBtnGap * 3) / 4);
-      const mBtnH = narrow ? 13 : 15;
-      for (let i = 0; i < TRAINING_MODE_ORDER.length; i++) {
-        const mId = TRAINING_MODE_ORDER[i];
-        const mode = TRAINING_MODES[mId];
-        const bx = x + 4 + i * (mBtnW + mBtnGap);
-        const selected = currentMode === mId;
-        // 背景
-        ctx.fillStyle = selected ? 'rgba(255,204,68,0.3)' : 'rgba(60,60,60,0.5)';
-        ctx.fillRect(bx, row3Y, mBtnW, mBtnH);
-        if (selected) {
-          ctx.strokeStyle = '#ffcc44';
-          ctx.lineWidth = 1;
-          ctx.strokeRect(bx, row3Y, mBtnW, mBtnH);
-        }
-        // 文字
-        ctx.fillStyle = selected ? '#ffcc44' : '#999';
-        ctx.font = `${selected ? 'bold ' : ''}${narrow ? 9 : 10}px ${FONT}`;
-        ctx.textAlign = 'center';
-        ctx.fillText(mode.icon + mode.name, bx + mBtnW / 2, row3Y + (narrow ? 10 : 12));
-        // 点击区
-        this._buttons.push({ x: bx, y: row3Y, w: mBtnW, h: mBtnH, action: { type: 'action', id: 'setTrainingMode', discipleId: d.id, mode: mId } });
-      }
-      ctx.textAlign = 'left';
+    if (quests.length === 0) {
+      ctx.fillStyle = '#555';
+      ctx.font = `${smallFs}px ${FONT}`;
+      ctx.fillText('暂无可用任务', x + 8, cy + 12);
+      cy += 20;
     } else {
-      ctx.fillStyle = '#777';
+      const qH = narrow ? 32 : 36;
+      for (let i = 0; i < quests.length; i++) {
+        const q = quests[i];
+        ctx.fillStyle = COL_PANEL;
+        ctx.fillRect(x, cy, w, qH);
+        const riskColor = q.risk === 'high' || q.risk === 'extreme' ? '#ff6644' : q.risk === 'mid' ? '#ffaa44' : '#44dd88';
+        ctx.fillStyle = riskColor;
+        ctx.fillRect(x + w - 4, cy, 4, qH);
+
+        ctx.textAlign = 'left';
+        ctx.fillStyle = COL_TEXT;
+        ctx.font = `${narrow ? 11 : 12}px ${FONT}`;
+        ctx.fillText(`${q.icon} ${q.name}`, x + 8, cy + (narrow ? 13 : 15));
+        ctx.fillStyle = COL_DIM;
+        ctx.font = `${narrow ? 9 : 10}px ${FONT}`;
+        ctx.fillText(`D${q.enemyDiff} · ${q.reward.gold}💰 ${q.reward.fame}🏆`, x + 8, cy + (narrow ? 25 : 29));
+
+        const dbW = narrow ? 48 : 54;
+        const dbRect = { x: x + w - dbW - 10, y: cy + 3, w: dbW, h: qH - 6 };
+        const hasFree = state.disciples.some(d => !d.onQuest && d.injury < 50 && d.stamina >= 20);
+        drawBtn(ctx, dbRect, '派遣', COL_BTN, mx, my, { fontSize: narrow ? 10 : 11, disabled: !hasFree });
+        if (hasFree) {
+          this._buttons.push({ ...dbRect, action: { type: 'action', id: 'assignQuest', questIndex: i } });
+        }
+        cy += qH + 2;
+      }
+    }
+    cy += 6;
+
+    // ── 最近日志 ──
+    if (state.log.length > 0) {
+      ctx.textAlign = 'left';
       ctx.font = `${narrow ? 9 : 10}px ${FONT}`;
-      ctx.fillText('📜 任务中', x + 8, row3Y + (narrow ? 10 : 12));
+      const recent = state.log.slice(0, 4);
+      for (const entry of recent) {
+        ctx.fillStyle = entry.color || '#555';
+        ctx.fillText(entry.text, x, cy + 10);
+        cy += narrow ? 14 : 16;
+      }
     }
   }
 
@@ -634,7 +517,7 @@ export class SectUI {
     // 返回按钮
     const backRect = { x, y: cy, w: 60, h: 24 };
     drawBtn(ctx, backRect, '← 返回', COL_DIM, mx, my, { fontSize: 11 });
-    this._buttons.push({ ...backRect, action: { type: 'nav', page: 'disciples' } });
+    this._buttons.push({ ...backRect, action: { type: 'nav', page: 'main' } });
     cy += 32;
 
     // 头部
@@ -710,37 +593,11 @@ export class SectUI {
     }
     cy += 28;
 
-    // 训练档位选择（4个横排切换按钮）
-    ctx.fillStyle = COL_DIM;
-    ctx.font = `bold ${narrow ? 11 : 12}px ${FONT}`;
-    ctx.fillText('训练档位:', x, cy + 12);
-    cy += 18;
-    const modeW = Math.floor((w - 9) / 4);
-    const modeH = narrow ? 28 : 32;
-    const currentMode = d.trainingMode || 'normal';
-    for (let i = 0; i < TRAINING_MODE_ORDER.length; i++) {
-      const mId = TRAINING_MODE_ORDER[i];
-      const mode = TRAINING_MODES[mId];
-      const bx = x + i * (modeW + 3);
-      const selected = currentMode === mId;
-      const rect = { x: bx, y: cy, w: modeW, h: modeH };
-      const color = selected ? '#ffcc44' : '#555';
-      drawBtn(ctx, rect, `${mode.icon}${mode.name}`, color, mx, my, { fontSize: narrow ? 10 : 11 });
-      if (!d.onQuest) this._buttons.push({ ...rect, action: { type: 'action', id: 'setTrainingMode', discipleId: d.id, mode: mId } });
-    }
-    // 档位说明
-    const curMode = TRAINING_MODES[currentMode];
-    cy += modeH + 4;
-    ctx.fillStyle = '#999';
-    ctx.font = `${narrow ? 9 : 10}px ${FONT}`;
-    ctx.fillText(`${curMode.desc} · 体力${curMode.stamina >= 0 ? '+' : ''}${curMode.stamina} 经验+${curMode.exp}${curMode.risk > 0 ? ` 受伤${Math.round(curMode.risk * 100)}%` : ''}`, x, cy + 10);
-    cy += 16;
-
     // 领头弟子按钮
     const isLeader = state.leaderId === d.id;
     const leaderH = narrow ? 28 : 32;
     const leaderRect = { x, y: cy, w, h: leaderH };
-    const leaderLabel = isLeader ? '⭐ 取消领头' : '⭐ 设为领头';
+    const leaderLabel = isLeader ? '⭐ 当前大弟子' : '⭐ 设为大弟子';
     const leaderColor = isLeader ? '#ffcc44' : '#777';
     drawBtn(ctx, leaderRect, leaderLabel, leaderColor, mx, my, { fontSize: narrow ? 11 : 12 });
     if (!d.onQuest) this._buttons.push({ ...leaderRect, action: { type: 'action', id: 'setLeader', discipleId: d.id } });
@@ -795,6 +652,9 @@ export class SectUI {
     const gap = narrow ? 5 : 6;
 
     for (const bld of BUILDING_LIST) {
+      // 渐进解锁：未解锁的建筑不显示
+      if (!isBuildingUnlocked(bld.id, state)) continue;
+
       const lv = state.buildings[bld.id] || 0;
       const maxed = lv >= bld.maxLv;
       const cost = maxed ? 0 : bld.costs[lv];
@@ -1922,6 +1782,102 @@ export class SectUI {
     const cancelRect = { x: cw / 2 - 50, y: cancelY, w: 100, h: narrow ? 28 : 32 };
     drawBtn(ctx, cancelRect, '取消', COL_DIM, mx, my, { fontSize: narrow ? 12 : 13 });
     this._buttons.push({ ...cancelRect, action: { type: 'cancelTalentSelect' } });
+  }
+
+  // ===== 日终总结弹窗 =====
+  drawDaySummary(ctx, cw, ch, summary, mx, my, narrow) {
+    this._buttons = this._buttons || [];
+    ctx.fillStyle = 'rgba(0,0,0,0.72)';
+    ctx.fillRect(0, 0, cw, ch);
+
+    const pw = Math.min(cw - 30, narrow ? 300 : 400);
+    const ph = Math.min(ch - 60, narrow ? 350 : 420);
+    const px = (cw - pw) / 2;
+    const py = (ch - ph) / 2;
+
+    ctx.fillStyle = 'rgba(15,12,25,0.96)';
+    ctx.fillRect(px, py, pw, ph);
+    ctx.strokeStyle = '#ffcc44';
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(px, py, pw, ph);
+
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#ffcc44';
+    ctx.font = `bold ${narrow ? 15 : 18}px ${FONT}`;
+    ctx.fillText('🌙 日终总结', cw / 2, py + (narrow ? 24 : 30));
+
+    let cy = py + (narrow ? 36 : 44);
+    const fs = narrow ? 11 : 13;
+    const lineH = narrow ? 16 : 19;
+    ctx.textAlign = 'left';
+
+    if (summary.income > 0) {
+      ctx.fillStyle = '#ffd700';
+      ctx.font = `${fs}px ${FONT}`;
+      ctx.fillText(`💰 被动收入 +${summary.income}`, px + 12, cy);
+      cy += lineH;
+    }
+
+    if (summary.trained && summary.trained.length > 0) {
+      ctx.fillStyle = '#4499ff';
+      ctx.font = `bold ${fs}px ${FONT}`;
+      ctx.fillText('📖 训练进展', px + 12, cy);
+      cy += lineH;
+      ctx.font = `${narrow ? 10 : 11}px ${FONT}`;
+      for (const t of summary.trained) {
+        if (cy > py + ph - 60) break;
+        if (t.maxed) {
+          ctx.fillStyle = '#666';
+          ctx.fillText(`  ${t.name} Lv${t.level} (已满级)`, px + 12, cy);
+        } else {
+          ctx.fillStyle = t.levelUp ? '#ffdd00' : '#aaa';
+          const lvStr = t.levelUp ? `↑Lv${t.level}!` : `${t.expPct}%`;
+          ctx.fillText(`  ${t.name} +${t.exp}exp ${lvStr}${t.newTrait ? ` 📖${t.newTrait}` : ''}`, px + 12, cy);
+        }
+        cy += lineH - 2;
+      }
+    }
+
+    if (summary.rested && summary.rested.length > 0) {
+      ctx.fillStyle = '#88aacc';
+      ctx.font = `bold ${fs}px ${FONT}`;
+      ctx.fillText('💤 休养', px + 12, cy);
+      cy += lineH;
+      ctx.font = `${narrow ? 10 : 11}px ${FONT}`;
+      for (const r of summary.rested) {
+        if (cy > py + ph - 60) break;
+        ctx.fillStyle = '#888';
+        ctx.fillText(`  ${r.name} 体力${r.from}→${r.to}`, px + 12, cy);
+        cy += lineH - 2;
+      }
+    }
+
+    if (summary.healed && summary.healed.length > 0) {
+      ctx.fillStyle = '#44dd88';
+      ctx.font = `bold ${fs}px ${FONT}`;
+      ctx.fillText('💊 伤势恢复', px + 12, cy);
+      cy += lineH;
+      ctx.font = `${narrow ? 10 : 11}px ${FONT}`;
+      for (const h of summary.healed) {
+        if (cy > py + ph - 60) break;
+        ctx.fillStyle = '#888';
+        ctx.fillText(`  ${h.name} 伤势${h.from}→${h.to}`, px + 12, cy);
+        cy += lineH - 2;
+      }
+    }
+
+    if (summary.newDisciple) {
+      ctx.fillStyle = '#44dd88';
+      ctx.font = `${fs}px ${FONT}`;
+      ctx.fillText(`🏨 ${summary.newDisciple.name}(资质${summary.newDisciple.talent})慕名而来！`, px + 12, cy);
+      cy += lineH;
+    }
+
+    const bw = narrow ? 120 : 150;
+    const bh = narrow ? 30 : 36;
+    const btnRect = { x: cw / 2 - bw / 2, y: py + ph - bh - 10, w: bw, h: bh };
+    drawBtn(ctx, btnRect, '继续 →', '#ffcc44', mx, my, { fontSize: narrow ? 13 : 15 });
+    this._buttons.push({ ...btnRect, action: { type: 'action', id: 'dismissDaySummary' } });
   }
 
   // ===== 成就弹窗 =====
