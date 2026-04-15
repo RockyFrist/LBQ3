@@ -54,6 +54,12 @@ export const sectModeMethods = {
     this.sectAchievementQueue = [];  // 待展示的成就ID队列
     this.sectAchievementCurrent = null; // 当前展示的成就ID
 
+    // 训练动画系统
+    this.sectTrainAnim = false;       // 是否正在播放训练动画
+    this.sectTrainAnimData = null;    // { type, disciples, speakers }
+    this.sectTrainAnimProgress = 0;   // 0→1 动画进度
+    this.sectTrainAnimWait = false;   // 动画完成，等待点击继续
+
     // 战斗对话气泡系统
     this.sectSpeechBubbles = [];     // { fighter, text, timer, maxTimer, personality, color }
     this._sectSpeechCd = {};         // 每个fighter的冷却 { [team]: number }
@@ -112,6 +118,15 @@ export const sectModeMethods = {
           this.sectStoryPageIdx = 0;
           this._sectCheckStory();
         }
+        return;
+      }
+      // 训练动画：ESC跳过动画直接完成
+      if (this.sectTrainAnim) {
+        this.sectTrainAnim = false;
+        this.sectTrainAnimData = null;
+        this.sectTrainAnimProgress = 0;
+        this.sectTrainAnimWait = false;
+        this._sectFinishDay();
         return;
       }
       if (this.sectPopup) {
@@ -218,6 +233,27 @@ export const sectModeMethods = {
       if (_inPortrait && (input.mouseLeftDown || input.pressed('Escape') || input.touchBack)) {
         this.sectFightShowResult = true;
         this.sect.pendingFightResult = this.sectFightResult;
+      }
+      return;
+    }
+
+    // 训练动画更新
+    if (this.sectTrainAnim) {
+      if (this.sectTrainAnimWait) {
+        // 等待点击继续
+        if (input.mouseLeftDown || input.pressed('Escape') || input.touchBack) {
+          this.sectTrainAnim = false;
+          this.sectTrainAnimData = null;
+          this.sectTrainAnimProgress = 0;
+          this.sectTrainAnimWait = false;
+          this._sectFinishDay();
+        }
+      } else {
+        this.sectTrainAnimProgress += dt * 0.45;
+        if (this.sectTrainAnimProgress >= 1) {
+          this.sectTrainAnimProgress = 1;
+          this.sectTrainAnimWait = true;
+        }
       }
       return;
     }
@@ -1209,11 +1245,14 @@ export const sectModeMethods = {
     const leaderBonus = leader ? LEADER_BONUSES[leader.personality] : null;
     let trainedCount = 0;
     let totalExpGained = 0;
+    const animDisciples = []; // 训练动画数据
 
     for (const d of this.sect.disciples) {
       if (d.onQuest) continue;
 
       const mode = TRAINING_MODES[d.trainingMode || 'normal'];
+      // 休养模式也记录动画数据（体力回复）
+      const oldStamina = d.stamina;
       let staminaDelta = mode.stamina;
       let expGain = Math.floor(mode.exp * dojoMul);
       let riskChance = mode.risk;
@@ -1269,6 +1308,10 @@ export const sectModeMethods = {
         }
       }
 
+      // 记录动画数据
+      const actualExpGain = (expGain > 0 && d.level <= d.talent) ? expGain : 0;
+      animDisciples.push({ disciple: d, oldStamina, newStamina: d.stamina, expGain: actualExpGain });
+
       // 极限模式：受伤风险
       if (riskChance > 0 && Math.random() < riskChance) {
         const injAmount = 15 + Math.floor(Math.random() * 10);
@@ -1298,6 +1341,36 @@ export const sectModeMethods = {
       this.sect.stats.totalTrains++;
       this._sectAddLog(`📊 训练结算：${trainedCount}人修炼，共+${totalExpGained}exp`, '#4499ff');
     }
+
+    // 保存收入值供 _sectFinishDay 使用
+    this._sectDayIncome = income;
+
+    // 如果有训练弟子，播放训练动画
+    if (animDisciples.length > 0) {
+      // 准备台词气泡
+      let speakers = [];
+      if (isDialogueEnabled('training')) {
+        const trainees = animDisciples.map(ad => ad.disciple);
+        speakers = pickGroupSpeakers(trainees, Math.min(3, trainees.length));
+      }
+      this.sectTrainAnimData = {
+        type: animDisciples.length === 1 ? 'single' : 'batch',
+        disciples: animDisciples,
+        speakers,
+      };
+      this.sectTrainAnim = true;
+      this.sectTrainAnimProgress = 0;
+      this.sectTrainAnimWait = false;
+      return; // 动画结束后由 _sectFinishDay 继续
+    }
+
+    // 无训练弟子，直接完成后续
+    this._sectFinishDay();
+  },
+
+  // ===== 下一天（后半段：事件、任务、商店等）=====
+  _sectFinishDay() {
+    const income = this._sectDayIncome || 0;
 
     // 刷新任务
     this._sectRefreshQuests();
@@ -1906,6 +1979,11 @@ export const sectModeMethods = {
 
     // 管理界面
     this.sectUI.draw(ctx, lw, lh, this.sect, this.sectSubPage, mx, my);
+
+    // 训练动画覆盖层
+    if (this.sectTrainAnim && this.sectTrainAnimData) {
+      this.sectUI.drawTrainAnim(ctx, lw, lh, this.sectTrainAnimProgress, narrow, this.sectTrainAnimData, this.sectTrainAnimWait);
+    }
 
     // 弹窗层
     if (this.sectPopup === 'story' && this.sect.pendingStory) {
